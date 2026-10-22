@@ -1,0 +1,6 @@
+[h1]Knox Inventory 1.0 BETA - update 3, fixes[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+[list]
+[*]The in-game news post of update 3 is redone in Knox's style.
+[*]Fixed an error in the main menu news.
+[/list]

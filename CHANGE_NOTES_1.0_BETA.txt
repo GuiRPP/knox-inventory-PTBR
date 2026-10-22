@@ -1,0 +1,83 @@
+[h1]Knox Inventory 1.0 BETA[/h1]
+The beta of version 1.0 is out. It is everything we have made since 0.9.8.7 - rigs, a new right-click menu, a car dashboard and dozens of changes to the inventory and the main menu. We are putting it out now so that you can try it and tell us what works, what doesn't and what gets in your way.
+[list]
+[*][b]This is a test version, not a version for a full playthrough. It has bugs we haven't seen yet, and something may break in the middle of a game. Don't put the beta on a save you care about, or make a copy of it first.[/b]
+[/list]
+[h2]How to try it[/h2]
+The beta is a mod of its own in the same Workshop item. Your mod list now has two entries: "Knox Inventory" - the released 0.9.8.7, as it was - and "Knox Inventory 1.0 BETA". Only one of them can be on: they don't work together, and the game won't let you enable both.
+[list]
+[*]A new game: in the main menu open Mods, turn "Knox Inventory" off, turn "Knox Inventory 1.0 BETA" on and restart the game.
+[*]An existing save: Load, pick the save, Mods - swap "Knox Inventory" for "Knox Inventory 1.0 BETA" there. A save keeps its own mod list, so switching in the main menu alone is not enough.
+[*]You can go back to 0.9.8.7 the same way at any time.
+[*][b]On the beta's first start ZombieBuddy asks about KnoxInventoryJava.jar again - answer Allow.[/b]
+[*]In the beta the corner of the inventory screen says "1.0 BETA" instead of "Stage 1". If you see "Stage 1", you are running 0.9.8.7.
+[/list]
+[h2]Not finished yet[/h2]
+[list]
+[*][b]The car dashboard works, but it is not finished: it will be reworked, and its look and layout will change.[/b]
+[*][b]Not all item sizes have been reworked. Some items still take too much or too little room. Tell us which ones, with the item's name.[/b]
+[*][b]The balance of bags may change: how many cells each bag has and how much fits in it.[/b]
+[*][b]The tooltips of menu entries and recipes are still to be polished.[/b]
+[*][b]Clothing has two "Inspect" entries in the right-click menu. We know, and it will be fixed.[/b]
+[*]There will be no Health tab in 1.0: we are rebuilding it from scratch for 2.0. The health key opens the game's window.
+[*]Multiplayer, controller and split-screen keep the game's own windows, as before.
+[/list]
+[h2]Rigs: bags with compartments[/h2]
+[list]
+[*]The game's bags now have compartments, Tarkov style: a main room, side pockets, a lid on top. 33 kinds of bags, each with a shape of its own, always symmetrical.
+[*]Anything that fits by size goes into a pocket. Bags from mods stay one grid, and you can give them a shape of your own with a parts line in Zomboid/Lua/knox_overrides.txt.
+[*]A bag can go into a bag. An empty bag takes little room, a filled one more, a full one as much as its own grid. Wallets, key rings and first aid kits don't grow.
+[*]The "Size of bags and pockets" slider in Settings, Game tab: from 50 to 200%. The Organized trait adds cells, Disorganized takes some away. Every bag has at least 4 cells.
+[/list]
+[h2]Inventory[/h2]
+[list]
+[*]Knox's own key - Tab, which you can change in Settings, Controls tab. The game's inventory key works too, Esc closes.
+[*]Every bag's header has cubes: how many cells are taken and how much it weighs. The weight is green, yellow from 80% of the limit, red over it.
+[*]Scattered loot: what you find in furniture, cars and bodies lies around anyhow, not in neat rows. Sort lays it out neatly. Switch it off in Settings, Game tab.
+[*]Ctrl+S sorts the grid under the mouse. The key can be changed in Settings.
+[*]Quick slot order: hold Alt and drag a slot.
+[*]Shift+click on a key puts it on your key ring, if you have one.
+[*]An item that fits no grid at all is carried in both hands.
+[*]Feathers, seeds and grass stack.
+[*]Trousers, sweaters and hoodies are 1x2, like T-shirts. All jackets are 2x2. Paperbacks are 1x2, like magazines. Cornflour is 2x2, the lamp's propane bottle 1x2, a steel bar 1x3, playing cards 1x1, Dr. Oids Painting 2x4, cigar boxes 1x2. Pillows no longer stack.
+[*]Grids that the dragged item doesn't fit into go dark exactly along their own cells and compartments.
+[*]A bag's window is no wider than its grid. A long name isn't cut off, it scrolls smoothly.
+[*]The tooltip of a bag you haven't looked into doesn't show what's inside.
+[*]Frozen food has an icy blue frame.
+[*]The weight of items with something in them was counted without it - without the water in a bottle, the rounds in a magazine, the things in a bag. Now it is the full weight.
+[*]Searching a mannequin shows what it wears at once.
+[/list]
+[h2]Right-click menu[/h2]
+[list]
+[*]Knox's own menu instead of the game's repainted one: the item's header on top, like its tooltip, entries in labelled groups, dangerous ones at the bottom in red, Other folded.
+[*]81 Knox-style icons for menu entries. Eat and Drink portions are small squares right in the line. When an entry is unavailable, the reason is written under it.
+[*]The world menu: a header for the place - the room and what lies on the ground - objects on top, groups of their own.
+[*]An item's recipes are in the Interact submenu, with icons and what else is needed.
+[*]Knox windows for the alarm clock and for Fluid Container Info. The game's tooltips are on Knox's plate.
+[/list]
+[h2]Car[/h2]
+[list]
+[*]Knox's dashboard: warning lights, tachometer, speedometer with the gear, fuel, the key in the ignition, wires when hotwired. Switch it off on the Modules page.
+[*]Radio in the car: the same card as the camp's radio - the car radio's broadcast or your own music from the Knox folder.
+[/list]
+[h2]Main menu and new game[/h2]
+[list]
+[*]Modes: Sandbox, Apocalypse, Extinction, Outbreak, Rising, Challenges. The mouse wheel turns the modes; when the mode changes, the frame slides over and the text and video change smoothly.
+[*]Map: the mouse wheel picks the next town, the town's card fades in, an empty save name gets a thick red frame.
+[*]Sandbox: the scroll bar runs the whole list, the bottom of the list fades out, drop-down lists have an arrow of their own, Delete is red, pages change with an animation.
+[*]The step numbers in the header and the stage plates are centred exactly.
+[*]A "News in the main menu" switch in Settings, Look tab.
+[*]Loading a save without Knox, Knox asks whether to add it or to play without it. The answer is remembered.
+[*]A deleted save leaves the fire at once. Traits and skills in character creation scroll with the wheel.
+[*]On the loading screen the letters of the phrases are spaced evenly.
+[*]Soundtrack mods' music, such as The Walking Dead's, is muted in the menu without bursts at a track change.
+[*]The menu's music no longer plays on forever in the game after a save loads.
+[/list]
+[h2]How to report a bug[/h2]
+Post in the mod page's Discussions, in the "1.0 BETA" thread. We need three things:
+[list]
+[*]what you did and what happened, ideally with a screenshot;
+[*]the file Zomboid\console.txt right after the bug;
+[*]your list of mods.
+[/list]
+We can't sort out reports without console.txt and the mod list. Thank you for testing!

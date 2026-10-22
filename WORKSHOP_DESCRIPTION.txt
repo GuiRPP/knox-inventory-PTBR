@@ -1,0 +1,106 @@
+Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+
+[h1]Knox Inventory[/h1]
+[b]The whole Project Zomboid UI, redesigned in the style of Escape From Tarkov - one stage at a time.[/b]
+A grid inventory where every item takes its real space, your character in 3D, and a main menu that is a camp with the heroes of your saves by the fire.
+
+[img]https://images.steamusercontent.com/ugc/17471200081781262748/58D6572D5A1573EC011D4D04610A71F5174049DD/[/img]
+
+[h1]NEW: 1.0 BETA - a test version[/h1]
+[b]This item now has two mods: "Knox Inventory" (0.9.8.7, as before) and "Knox Inventory 1.0 BETA". Enable only one.[/b]
+The beta is for trying the new features and reporting bugs, [b]not for a full playthrough[/b] - back up your saves. For an existing save: Load, pick it, Mods, swap Knox Inventory for the beta.
+[list]
+[*][b]Rigs[/b]: bags with compartments, bags in bags, a bag size slider (50-200%).
+[*][b]A new right-click menu[/b] with groups and 81 icons, a world menu, alarm clock and fluid windows.
+[*][b]Car dashboard and car radio[/b] - working, but they will be reworked.
+[*]Tab key, Ctrl+S sort, Alt+drag quick slots, scattered loot, bag fill cubes, new item sizes, new game screens polished, music fixes.
+[/list]
+Not finished yet: the dashboard, some item sizes, bag balance, menu tooltips. No Health tab in 1.0 (it comes in 2.0). Report bugs in the [b]1.0 BETA[/b] discussion with your console.txt and mod list. Full change list: the in-game news and Change Notes.
+[h1]Compatibility[/h1]
+[b]Viewpoint[/b], [b]OldPoint[/b] and [b]Project Viewpoint QOL[/b] are supported: Knox windows give you the cursor, Viewpoint's loot key opens Knox on what you look at (pick the fridge or freezer with the wheel), its Grab goes through Knox's grids.
+Not compatible: Grid Inventory, Inventory Tetris (they replace the same windows).
+
+[h1]Stage 1: Inventory[/h1]
+One full-screen view on Tab with your equipment, your bags and everything around you.
+
+[img]https://images.steamusercontent.com/ugc/16459335299719061900/22889AF8D0F84F43CE0065A8D4559679FA786097/[/img]
+[list]
+[*][b]Grids[/b] for every pocket, bag and shelf: items take their real size, turn with R, stack, split (Alt + click) and merge.
+[*]Ctrl + click or a frame to select many, Shift + click to move them across, Take all, Sort, drag bag headers to reorder.
+[/list]
+
+[img]https://images.steamusercontent.com/ugc/17793809760647608880/DC01D88AC50A12509463E936CEF3AB6D25B8586A/[/img]
+[list]
+[*][b]Equipment[/b] around your 3D character, layered by body zone (mouse wheel or arrows), both hands, the back slot.
+[*][b]Quick pick[/b]: hover an empty slot and put on what fits in one click - on the game's hotbar too.
+[*]Slots light up where an item will go; what it replaces turns red.
+[/list]
+
+[img]https://images.steamusercontent.com/ugc/9985983832409754463/DB6513EF2B41D1E812A4DE1ECCDA7C6DEC62FC3A/[/img]
+[list]
+[*][b]Bag windows[/b] tied to their tile, drop items onto a bag, inspect any item in 3D.
+[*]Moves take game time: the item waits in place with its progress.
+[*]Restyled tooltips, context menus, hotbar and cursor; read books and watched tapes are marked.
+[*][b]TV and radio[/b] have windows of their own: the set with subtitles on its screen, the receiver with a dial and a tape of what was said.
+[/list]
+
+[h1]Main menu: the camp by the fire[/h1]
+[b]The main menu is a 3D camp at night, and the heroes of your saves are sitting in it.[/b]
+
+[img]https://images.steamusercontent.com/ugc/10696727666732072207/A5B199B09497E702C92676AB0CD54BF5932AE77F/[/img]
+[list]
+[*][b]Your heroes by the fire[/b]: the three latest survivors of your saves, looking exactly as you left them - face, hair, every piece of clothing, their weapon lying next to them.
+[*][b]One click to load[/b]: the hero gets up and walks off into the dark, the screen fades, the save loads. Exit to the menu and they walk back in and sit down.
+[*][b]News in the menu[/b]: every update explained with pictures, right in the game.
+[/list]
+
+[img]https://images.steamusercontent.com/ugc/15294683056109365265/B4B87D974E50EACA964F3AEC3B1AA8ED867830BF/[/img]
+[b]A survivor's passport[/b]: point at a hero to see the portrait, name, profession, game mode and town, days survived, zombies killed, health and how they feel.
+
+[img]https://images.steamusercontent.com/ugc/11625563666997065433/FCEA9932A7440A87FAF0B679486241D6D86C6C03/[/img]
+[b]This is how you died[/b]: the dead never return to the fire. The last three wander behind the fence as zombies, those before them lie under the crosses by a grave lantern.
+
+[h1]A new game in Knox style[/h1]
+[img]https://images.steamusercontent.com/ugc/12967718575779563748/67290102213807B7E71391F888AB573708AF6AD6/[/img]
+[list]
+[*]Click the tent in the camp: game mode, spawn on the world map and sandbox options - every step in the same look.
+[*][b]Sandbox options[/b]: every setting is a row, pages split into Game and Mods, help always on the right.
+[/list]
+
+[img]https://images.steamusercontent.com/ugc/13612287805232946192/7DF674205D6E57B5114D5FB328C03EBE6FDCDFB6/[/img]
+[list]
+[*][b]One character screen[/b] instead of two: occupation, traits with filters, appearance and clothing, with your survivor's summary always in view.
+[*]These are the game's own screens redrawn, so what mods add to them stays.
+[/list]
+
+[h1]What's next[/h1]
+[img]https://images.steamusercontent.com/ugc/14176073233891746803/D0861A7FB3FD5CB8DFE9FABD8FEAB973D5B79D02/[/img]
+The inventory comes first: Stage 1 ends with 1.0, and only then come health, skills and the map. Until a stage lands, its tab opens the game's own window. Bugs, suggestions and the roadmap have their own threads in Discussions.
+
+[b]Like it? Rate the mod up[/b] - it is how other players find it.
+
+[h2]Install[/h2]
+[b]Requires [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3619862853]ZombieBuddy[/url][/b] - a one-time setup.
+[olist]
+[*]Install [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3619862853]ZombieBuddy[/url] exactly as its page says (it starts with the game from its launch options).
+[*]Subscribe and enable [b]Knox Inventory[/b], then restart the game.
+[*]On the first start, and after every update, ZombieBuddy asks to allow Knox's Java part (KnoxInventoryJava.jar) - allow it.
+[/olist]
+Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, and tells you what is missing.
+
+[h2]FAQ[/h2]
+[list]
+[*][b]Why ZombieBuddy?[/b] Knox's fonts, tooltips, cursor, 3D framing, the live character and the menu's camp need Java code that Lua alone can't reach.
+[*][b]Only want the camp menu, or only the inventory?[/b] You can have that right now: the "Knox Inventory | Modules" plate at the top of the main menu switches the in-game interface, the main menu and the new game screens on and off separately. Turn off everything but the main menu and you keep just the camp - it stays part of Knox, not a separate mod.
+[*][b]Can I re-upload it or parts of it?[/b] No (see below).
+[*][b]Existing save?[/b] Yes, add it any time.
+[*][b]My hero is a dark figure in the menu?[/b] Load that save once: the hero's look is recorded while you play.
+[*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers, in testing - tell us how it goes.
+[*][b]A windowed inventory?[/b] Not planned - the opacity sliders in Settings > Look let you see the world through it.
+[*][b]An item's size or sound?[/b] Set your own in Zomboid/Lua/knox_overrides.txt.
+[*][b]With Grid Inventory / Inventory Tetris?[/b] No: both replace the same windows.
+[*][b]Controller?[/b] Controller and split-screen keep the game's inventory.
+[*][b]Found a bug?[/b] Post in Discussions with what you did and your [i]Zomboid\console.txt[/i].
+[/list]
+
+Please don't re-upload Knox Inventory or any part of it (code, models, art), here or elsewhere, and don't put it in modpacks. Link to this page instead.

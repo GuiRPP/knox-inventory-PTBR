@@ -1,0 +1,144 @@
+{
+  "stage": "STAGE 1  ·  PUBLIC TEST",
+  "s1_title": "ONE SCREEN FOR EVERYTHING",
+  "s1_callouts": ["EQUIPMENT", "INVENTORY", "SURROUNDINGS"],
+  "s1_lead": "Tab opens it. Everything you carry and everything around you.",
+  "s1_points": [
+    ["1  Equipment", "Your 3D character with every worn item, both hands, the back slot."],
+    ["2  Inventory", "Pockets and every bag you wear, each one a grid."],
+    ["3  Surroundings", "Floor, furniture, cars, corpses: pick one, its grid opens."],
+    ["Quick slots", "The hotbar along the bottom, ready to fill."]
+  ],
+  "s1_hints": [["Tab", "open / close"], ["Esc", "close"]],
+  "s2_title": "EVERY ITEM TAKES ITS SPACE",
+  "s2_lead": "A Tarkov-style grid for every pocket, bag and shelf.",
+  "s2_points": [
+    ["Real sizes", "A rifle is long, a can is small. Pack your bags like a puzzle; R turns an item while you drag it."],
+    ["Stacks", "Ammo and nails share a tile. Alt + click splits a stack, dropping one onto another merges them."],
+    ["Many at once", "Ctrl + click or draw a frame to select; Shift + click sends everything to the other side."],
+    ["Take all and Sort", "One click empties a container into your bags, or packs a grid neatly."]
+  ],
+  "s2_hints": [["Shift+LMB", "quick move"], ["Ctrl+LMB", "select"], ["Alt+LMB", "split / wear"], ["R", "rotate"], ["RMB", "actions"]],
+  "s3_title": "YOUR CHARACTER, LIVE",
+  "s3_callouts": ["LAYERS 1/2", "QUICK PICK"],
+  "s3_lead": "Equipment around a 3D character that moves with you.",
+  "s3_points": [
+    ["Slots by body zone", "Head, face, chest, armor, arms, backpack, rig, belt, legs, feet - each holds its layers: the mouse wheel or the arrows go through them."],
+    ["Quick pick", "Hover an empty slot: you see what fits from your bags and put it on in one click. Works on the game's hotbar too."],
+    ["It shows where things go", "Hover an item or a menu option: its slot lights up; what it would replace turns red."],
+    ["A live model", "With the Java part your character repeats your moves and holds what you hold."]
+  ],
+  "s3_bottom": "Drop clothes on the model or in the free space under your bags to put them on. Drag a bag's header to take it off.",
+  "s4_title": "WINDOWS, NOT MENUS",
+  "s4_points": [
+    ["Bag windows", "Double click a bag: its grid opens in a window, tied to its tile by a thread. Drop items on a bag to put them inside."],
+    ["Inspect in 3D", "Turn, roll and zoom any item, with its stats and description."],
+    ["Moves take time", "As in the game: an item waits in place, filling up, and appears where it goes at the end. Several moves are numbered."],
+    ["Everything restyled", "Item tooltips, context menus, the hotbar and the cursor. Read books and watched tapes are marked."]
+  ],
+  "s4_hints": [["2xLMB", "open a bag / use"], ["RMB", "actions"], ["Esc", "close"]],
+  "s5_title": "THE ROAD AHEAD",
+  "s5_lead": "Knox Inventory redesigns the whole Project Zomboid UI in one style, one stage at a time.",
+  "s5_sub": "Each stage is tested in public before the next one begins. Until a stage lands, its tab opens the game's own window.",
+  "s5_stages": [
+    ["STAGE 1", "INVENTORY", "NOW · PUBLIC TEST", "Equipment, grids, bags, surroundings, quick slots, tooltips, context menus, hotbar, cursor."],
+    ["STAGE 2", "HEALTH", "NEXT", "Your injuries on your character's body, treatment in a click or by dropping an item on a wound."],
+    ["STAGE 3", "SKILLS & MAP", "LATER", "Skills and progress, and the world map, in the Knox style."],
+    ["STAGE 4", "THE WHOLE UI", "LATER", "Crafting, building, vehicles, menus - the rest of the game's windows, one by one."]
+  ],
+  "s5_bottom": "Feedback decides what comes first: tell us in the comments what you want to see in Knox style.",
+  "m1_title": "THE CAMP BY THE FIRE",
+  "m1_callouts": ["YOUR HEROES", "THE FALLEN", "NEWS"],
+  "m1_lead": "The main menu is a camp at night, fully 3D.",
+  "m1_points": [
+    ["1  Your heroes", "The three latest survivors of your saves sit by the fire, looking exactly as you left them."],
+    ["2  The fallen", "Those who died walk behind the fence as zombies. Older ones lie under the crosses."],
+    ["3  News", "The mod's updates as cards. A click opens the post."],
+    ["Menu in Knox style", "The items fade away after a few seconds and return with the mouse."]
+  ],
+  "m1_hints": [["LMB", "load a hero's save"], ["Hover", "who is it"]],
+  "m2_title": "A SURVIVOR'S PASSPORT",
+  "m2_lead": "Point at a hero to see who they are. Click to play.",
+  "m2_points": [
+    ["Who", "Portrait, name, profession, game mode and the town they stopped in."],
+    ["How long", "Days survived, zombies killed, health - and their state in words: thirsty, injured, bitten..."],
+    ["One click to load", "The hero gets up and walks off into the dark, the screen fades and the save loads. No lists, no dialogs."],
+    ["And back", "Exit to the menu: your hero walks out of the dark and sits down by the fire again."]
+  ],
+  "m2_bottom": "A hero's look is remembered while you play: face, hair, every piece of clothing, the weapon in their hands.",
+  "m3_title": "THIS IS HOW YOU DIED",
+  "m3_lead": "The dead never come back to the fire.",
+  "m3_points": [
+    ["Risen", "The last three who died wander behind the fence - in the clothes they died in."],
+    ["Buried", "Those before them have crosses by the fence, a grave lantern burning next to them."],
+    ["Remembered", "Point at one to see who it was and how long they lasted."]
+  ],
+  "m3_bottom": "A click on a fallen hero starts over in the same world.",
+  "m4_title": "NEWS IN THE MENU",
+  "m4_points": [
+    ["Every update explained", "What is new, what changed and what was fixed - with pictures, right in the game."],
+    ["Cards in the corner", "Unread posts are marked. A click opens the post over the whole screen."],
+    ["No browser needed", "Scroll with the wheel, close with Esc."]
+  ],
+  "m4_hints": [["Wheel", "scroll"], ["Esc", "close"]],
+  "n_shots": [
+    {
+      "name": "newgame", "file": "screen_081_mode.jpg", "rect": [70, 84, 1860, 1030],
+      "title": "A NEW GAME, STEP BY STEP",
+      "lead": "The whole way to a new game in Knox style.",
+      "points": [
+        ["Four steps", "Mode, spawn, world, character - one after another, each in the same look."],
+        ["Game mode", "A list on the left, the mode's video and what it is on the right."],
+        ["Mods welcome", "These are the game's own screens redrawn: what mods add stays."]
+      ],
+      "bottom": "Click the tent in the camp to start a new survivor."
+    },
+    {
+      "name": "spawn", "file": "screen_081_spawn.jpg", "rect": [70, 84, 1860, 1030],
+      "title": "WHERE IT BEGINS",
+      "lead": "Towns, the world map and the town's file on one screen.",
+      "points": [
+        ["The game's map", "Drag it, zoom it; it moves to the town you pick."],
+        ["The town's file", "Its description and video, the save's name and the world's seed."],
+        ["Map mods", "Their towns are in the list as before."]
+      ],
+      "bottom": "Step 2 of 4."
+    },
+    {
+      "name": "sandbox", "file": "screen_081_sandbox.jpg", "rect": [70, 84, 1860, 1030],
+      "title": "SANDBOX OPTIONS",
+      "lead": "Every setting is a row. Help is always on the right.",
+      "points": [
+        ["Game and Mods", "The pages are split in two, mods' pages show up by themselves."],
+        ["What you changed", "Changed settings are marked in sand - the name and the value."],
+        ["Help", "What the setting under the mouse does and its default."]
+      ],
+      "bottom": "Presets are saved and loaded as in the game."
+    },
+    {
+      "name": "survivor", "file": "screen_081_char_traits.jpg", "rect": [70, 84, 1860, 1030],
+      "title": "ONE SCREEN FOR YOUR SURVIVOR",
+      "lead": "The game's two character screens are now one.",
+      "points": [
+        ["Four tabs", "Occupation, Traits, Appearance, Clothing."],
+        ["Always in view", "Name, occupation, points, chosen traits and skills on the left."],
+        ["Traits", "One list with filters. Excluded ones stay, dimmed, with the reason."],
+        ["Mods welcome", "Their occupations, traits and clothes work as before."]
+      ],
+      "bottom": "A click takes a trait or gives it back."
+    },
+    {
+      "name": "loading", "file": "screen_081_loading.jpg", "rect": [0, 112, 2000, 1013],
+      "title": "THIS IS HOW YOU DIED",
+      "lead": "The loading screen: the same words, a new look.",
+      "points": [
+        ["The phrases", "In the middle, in Knox's font."],
+        ["Tips", "On a plate at the bottom."],
+        ["A sand bar", "Instead of the walking figure. Full means you can start."]
+      ],
+      "bottom": "Dialogs, color pickers and the menu's corner buttons are in Knox style too."
+    }
+  ],
+  "poster_stage": "STAGE 1",
+  "poster_note": "PUBLIC TEST"
+}

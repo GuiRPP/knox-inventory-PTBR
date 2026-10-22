@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<clothingItem>
+	<m_MaleModel>skinned\KnoxHealth\KnoxSkeleton_M</m_MaleModel>
+	<m_FemaleModel>skinned\KnoxHealth\KnoxSkeleton_F</m_FemaleModel>
+	<m_GUID>4b6e0d2a-7c51-4f0e-9a3d-6b1c2e8f5a71</m_GUID>
+	<m_Static>false</m_Static>
+	<m_AllowRandomHue>false</m_AllowRandomHue>
+	<m_AllowRandomTint>false</m_AllowRandomTint>
+	<m_AttachBone></m_AttachBone>
+	<textureChoices>KnoxHealth\knox_skeleton</textureChoices>
+</clothingItem>

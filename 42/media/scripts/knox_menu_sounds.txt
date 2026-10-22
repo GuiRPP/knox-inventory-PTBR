@@ -1,0 +1,91 @@
+/* The camp of the main menu (KnoxMenuScene.lua, M:updateSounds): now and then an
+   owl, a wolf far off (the risen heroes' moans and steps: KnoxCamp) (the fire, the forest, the
+   wind and the cricket are played by the Java part: KnoxCamp). The game's own
+   recordings (media/sound), played as UI sounds. The game's menu ambience (a TV, rain, thunder) is
+   muted meanwhile: knoxMenuMuteAmbience.
+   Every one of them is 2D (is3D = false): a file sound in 3D asks where the
+   player is - none in the menu. Back in the menu from a game (the UI emitter
+   left away from 0,0) that was an error every frame, the menu black and the
+   game hung (seen 2026-10-15). */
+module Base
+{
+    /* the radio by the fire, while the music plays from it (KnoxMenuMusic):
+       its speaker's hiss and crackle - made by Knox (knox_radio_static.wav) */
+    sound KnoxRadioStatic
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        loop = true,
+        clip
+        {
+            file = media/sound/knox_radio_static.wav,
+            volume = 0.05,
+        }
+    }
+
+    /* the game's own menu music, for the player's "Game's music" theme when a
+       mod has silenced the game's (a music mod may replace MusicCombined with a
+       copy at volume 0): the same FMOD event, a voice of Knox's own */
+    sound KnoxGameMenuMusic
+    {
+        category = Music,
+        master = Music,
+        clip
+        {
+            event = Music/Main,
+        }
+    }
+
+    sound KnoxCampOwl
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip { file = media/sound/PZ_Owl_01.wav, volume = 0.38, }
+        clip { file = media/sound/PZ_Owl_02.wav, volume = 0.38, }
+        clip { file = media/sound/PZ_Owl_03.wav, volume = 0.38, }
+    }
+
+    sound KnoxCampWolf
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip { file = media/sound/PZ_WolfHowl_01.wav, volume = 0.2, }
+        clip { file = media/sound/PZ_WolfHowl_03.wav, volume = 0.2, }
+        clip { file = media/sound/PZ_WolfHowl_05.wav, volume = 0.2, }
+    }
+
+    /* a hero's bag at the fire opened and closed (KnoxMenuBag; the author's
+       wish, 2026-10-16): the game's own files - its OpenBag / CloseBag are FMOD
+       events, silent in the menu. Loudness measured (rms: open 2800, close
+       2000, the owl 1600): a bag at hand, a little over the owl far off. */
+    sound KnoxBagOpen
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip { file = media/sound/PZ_OpenBag.wav, volume = 0.3, }
+    }
+
+    /* a keepsake put down on the camp's grass (KnoxMenuKeep): the game's own
+       short grass steps (rms ~950, 0.2 s), near at hand */
+    sound KnoxKeepPut
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip { file = media/sound/PZ_grassFoot_01.wav, volume = 0.4, }
+        clip { file = media/sound/PZ_grassFoot_03.wav, volume = 0.4, }
+        clip { file = media/sound/PZ_grassFoot_05.wav, volume = 0.4, }
+    }
+
+    sound KnoxBagClose
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip { file = media/sound/PZ_CloseBag.wav, volume = 0.35, }
+    }
+}

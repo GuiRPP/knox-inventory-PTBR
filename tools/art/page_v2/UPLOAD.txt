@@ -1,0 +1,24 @@
+Картинки страницы Workshop, версия 2 (tools\make_page_v2.ps1), 21.10.2026.
+Описание: WORKSHOP_DESCRIPTION_V2.txt, в нём заглушки [img]{имя}[/img].
+
+Как загрузить (так загружались прежние картинки страницы - через сайт Steam):
+ 1. Страница предмета 3816775774 > «Добавить/изменить изображения и видео» - загрузить файл
+    (или любой другой способ, который даёт ссылку images.steamusercontent.com/ugc/...).
+ 2. Открыть загруженную картинку, правой кнопкой - «Копировать адрес изображения».
+ 3. В WORKSHOP_DESCRIPTION_V2.txt заменить {имя} на эту ссылку: [img]https://images.steamusercontent.com/ugc/.../[/img]
+ 4. powershell -ExecutionPolicy Bypass -File tools\page\check_page.ps1 - байты, ссылки, предпросмотр.
+
+Файл              -> заглушка       где на странице                              размер
+hero.gif          -> {hero}         сразу под первым абзацем                  430 КБ
+modules.gif       -> {modules}      раздел Modules                            193 КБ
+rigs.gif          -> {rigs}         раздел Inventory, первая                  395 КБ
+search.gif        -> {search}       раздел Inventory, вторая                  140 КБ
+inv_space.gif     -> {space}        раздел Inventory, третья (make_page_gifs.ps1)179 КБ
+menu.gif          -> {menu}         раздел Right-click menu                   283 КБ
+devices.gif       -> {devices}      раздел Device windows                     1095 КБ
+dash.gif          -> {dash}         раздел Car dashboard                      634 КБ
+music.png         -> {music}        раздел Music                              229 КБ
+extras.png        -> {extras}       раздел Tooltips, sounds, SaveGuard        155 КБ
+Все файлы меньше 2 МБ (предел картинок галереи предмета; описание брало и 5 МБ).
+Раздел Main menu берёт прежние ссылки (лагерь и новая игра) - они рабочие.
+Из прежнего описания были битыми (404): 2-я (сетки) и 4-я (окна сумок) картинки.

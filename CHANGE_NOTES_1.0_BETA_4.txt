@@ -1,0 +1,26 @@
+[h1]Knox Inventory 1.0 BETA - update 3: a new dashboard and music in the car[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+[h2]Dashboard[/h2]
+[list]
+[*]A dashboard like a real one from the 90s, in Knox style. Two kinds by the car's class: a sedan and a pickup (pickups, vans, SUVs, buses).
+[*]Everything in its place: by the door the light knob and the lock switch, before the driver the tachometer, the speedometer with the gear and the cruise control, the fuel gauge with the filler side, the warning lamps behind glass, the ignition lock, in the middle the radio and the heater.
+[*]A radio like a real one: VOL, TUNE, a display, preset buttons 1-6, SEEK, FM and TAPE. Your own music is a tape: click the slot to put it in, "eject" pushes it out. A click on the display opens the radio card, a click outside the dashboard closes it.
+[*]The mouse wheel: the volume, the station, the track, the heater's temperature, the lights.
+[*]Needles on springs, a lamp check when the ignition goes on, the dials lit by the headlights at night, the dashboard shaking on a hit. Bigger, and sharp at 1440p and 4K.
+[/list]
+[h2]Music in the car[/h2]
+[list]
+[*]Your own music no longer stops when you get out: it plays in the car - quieter with the distance, muffled through the body, clearer with a door or a window open. Zombies hear it.
+[*]Leave music playing in one car and drive another - both play. Back at the wheel of the first, its track goes on from where it was.
+[*][b]Multiplayer (test)[/b]: your own music is heard by the players near the car, by passengers as inside. A file they don't have goes to them through the server; file names are never sent. Settings: "Share my music", "Hear others' music", "Others' music volume" (Game page). Servers can turn it off or limit it with the music.* lines in their own Zomboid/Lua/knox_server.txt (music.share = 0 - off).
+[*]Fixed: the broadcast breaking in over your own music, the radio hiss with no track, your music going silent for a while with many sounds around, the broadcast coming back outside the car when a track ended, a folder switch resetting the track.
+[/list]
+[h2]Fixed[/h2]
+[list]
+[*]The dashboard was gone if you got into a car with the inventory open and then closed it.
+[*]A fridge and other furniture from 20 kg picked up with "Pick up" goes into both hands, not into the pockets.
+[*]Bicycle bags (redchili) take things again.
+[*]The battery of a radio, walkie-talkie or flashlight: a click on its tile takes it out or puts one in.
+[*]A backpack's grid no longer overlaps its header; long container names scroll instead of being cut; right-click menu entries are centred in their rows.
+[/list]
+A new Java part: ZombieBuddy will ask about KnoxInventoryJava.jar again - answer "Allow".

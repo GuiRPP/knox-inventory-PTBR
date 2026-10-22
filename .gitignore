@@ -1,0 +1,48 @@
+# Knox Inventory - what stays on the author's disk and out of the public repository.
+
+# --- The author's working notes (plans, player reports, promotion, private matters)
+/ROADMAP.md
+/FEEDBACK.md
+/STEAM_REVIEW_*.md
+/ULTRA_REPORT.md
+/BUGFIX_REPORT.md
+/PROMO_LOG.md
+/DTF_*.md
+/PROMPT_*.md
+/VIDEO_SCRIPT*.md
+/MUSIC_NET_RESEARCH.md
+/VIEWPOINT_COMPAT.md
+/COPY_*.md
+# Claude Code's own files: project rules, skills, settings
+/CLAUDE.md
+/CLAUDE.local.md
+/.claude/
+
+# --- Sounds licensed from Artlist: shipped inside the mod on Steam, but the
+# licence forbids handing the files out on their own (see 42/CREDITS.txt)
+/42/media/sound/knox_steps/boots_*.ogg
+/42/media/sound/knox_radio/press_*.ogg
+
+# --- Built: the Java part is built by java/build.ps1
+/42/media/java/client/*.jar
+/42/media/java/client/*.zbs
+/java/build/
+
+# --- Promotional media and auditions (made by the scripts in tools/, or picked by ear)
+/tools/art/**/*.png
+/tools/art/**/*.gif
+/tools/art/**/*.mp4
+/tools/art/**/*.jpg
+/tools/art/**/*.webp
+/tools/step_samples/
+/tools/*.png
+/java/tools/**/*.png
+
+# --- Reports the tools write
+/tools/**/report.txt
+
+# --- System
+Thumbs.db
+desktop.ini
+*.tmp
+/tools/art/**/*.html

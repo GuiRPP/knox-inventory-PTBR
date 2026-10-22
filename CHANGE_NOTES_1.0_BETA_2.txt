@@ -1,0 +1,22 @@
+[h1]Knox Inventory 1.0 BETA - update 1: multiplayer and speed[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+[h2]Multiplayer (test)[/h2]
+[list]
+[*][b]Knox now works on servers and in hosted games. This is new and has not been tried on a real server yet - tell us how it goes in the 1.0 BETA thread, with the server's console.txt.[/b]
+[*]Where things lie in a cupboard, a car or a bag, and how stacks are split, is kept by the server: every player sees the same, and it stays after reconnecting.
+[*]A thing dragged into another container lands where you dropped it.
+[*]Searching, locks, the order of your bags and the layout of your pockets are your own: another player searches a cupboard for themselves.
+[*]The size of bags and pockets is the server's, the same for everyone: grid.scale in knox_server.txt and the server's own knox_overrides.txt, in its Zomboid/Lua folder. In the settings the slider says "Set by the server".
+[*]The server needs ZombieBuddy and Knox Inventory 1.0 BETA in its mod list.
+[/list]
+[h2]Faster[/h2]
+[list]
+[*]A big shelf or a pile on the floor with hundreds of things builds its grid about ten times faster.
+[/list]
+[h2]Fixed[/h2]
+[list]
+[*]The stove, pouring, container info and alarm clock windows close when the character dies.
+[*]The Close button shows your own inventory key, not always "Tab".
+[*]Closing the inventory could fail when the character was gone.
+[*]Some data grew for the whole game session (marks of new things, searched things); it is trimmed now.
+[/list]

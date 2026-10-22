@@ -1,0 +1,949 @@
+; Knox Inventory news (English, also shown for languages without their own file). Newest first.
+; How to write:
+;   # version | date | type | title     - a new post. Type: update, news, plans or tech (a technical update: fixes, speed, compatibility - its own frame and pictures).
+;                                         The version may be empty: # | 10.10.2026 | news | ...
+;   ## Section                          - a heading inside a post
+;   + text                              - added (green mark)
+;   * text                              - changed (sand)
+;   - text                              - fixed (grey)
+;   ! text                              - important (red)
+;   @ picture.png                       - a picture from media/knox/news
+;   @banner picture.png                 - the background of the post's card in the main menu (912 x 204)
+;   @art picture.png                    - the large picture on the right of the opened post (960 x 1080, shown whole on the frame's colour)
+;   @frame #rrggbb                      - the post card's frame in a colour of its own in the main menu (default: the main colour)
+;   plain text                          - a paragraph; an empty line starts a new one
+;   ; ...                               - a comment, not shown in game
+; A post counts as read by its version, date and title: change them and it shows as new again.
+
+# | 22.10.2026 | tech | Lighter and steadier
+A technical update of the beta: nothing new to play with, but the inventory is easier on your computer, and a handful of small breakages are fixed.
+
+## Important
+! A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+## Faster
+* Moving lots of things at once no longer drags your FPS down: thirty things on their way used to cost almost 30 ms every frame, now about one.
+* The right-click menu, item tooltips, Surroundings, Equipment, the TV and the radio do less work every frame.
+
+## Fixed
+- A battery can be taken out of a radio or a walkie-talkie lying in a bag again.
+- With other players, the things in a car's trunk nobody has opened lie scattered, as in furniture.
+- With other players, a thing left behind by Take for lack of room stays in its stack for the other player too.
+- Inspect from the hotbar with the inventory closed can no longer break the Knox screen.
+- An error in the game's tooltip goes to console.txt once, not every frame.
+- The hidden Health tab no longer counts anything in the background or writes anything into your save.
+
+## Small things
+* Grass stacks 10 to a tile.
+* New sizes: chocolate, butter, the fillet knife, the oven mitt, the toothbrush and toothpaste, tissues, letters, fliers, paperwork and a sheet of paper are 1x1; the strainer, the rolling pin, the bread knife and the sewing kit are 1x2. The TV remote and tweezers no longer stack.
+* New icons in the menus: the light bulb, the sort rule, the layout, the order of sections. A stove's Settings sit next to Turn off instead of under Other.
+* A tall grid in Surroundings - a car's trunk, a big cupboard - fades at its edges as you scroll, like the inventory column.
+* Long titles on the news cards in the main menu glide along instead of being cut off.
+* Chinese: the dashboard is translated, and its numbers are back to their normal size.
+
+# | 21.10.2026 | update | Behind the wheel
+@banner b3_banner_en.png
+@art b3_art_en.png
+The key goes in. The needles sweep to the end of the dials and back, the lamps light one by one. A tape clicks in, and the reels start to turn.
+
+Now a car in Knox looks like a car: a dashboard of its own, a radio of its own - and music that doesn't stop when you get out.
+
+## Important
+! A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, answer "Allow".
+
+## Dashboard
+@dash sedan
+This is not a picture but the dashboard itself. Turn the key in the lock, switch the lights on, put a tape in, turn the mouse wheel over the speedometer - that's the gas.
++ A dashboard like a real car's from the 90s. By the door the light knob and the lock switch, before the driver the tachometer, the speedometer with the gear and the cruise, the fuel with the filler side, warning lamps behind glass, the lock on the column. In the middle - the radio and the heater.
++ At night the dials are lit by the headlights. The needles swing on springs, the lamps light one by one when the ignition goes on, the panel shakes on a hit.
++ The mouse wheel turns the knobs: the lights, the volume, the station, the heater's temperature.
+* The dashboard is bigger, and sharp at 1440p and 4K.
+
+## Sedan and pickup
+@dash pickup hot
+This pickup is hot-wired: no key, a click on the wires starts the engine.
++ The dashboard depends on the car. Pickups, vans, SUVs and buses get a rugged one: a pull knob for the lights, a bolted strip, a row of gears under the fuel. Every other car, mods' cars too, gets the sedan's.
++ No key - wires stick out of the lock and spark while the engine cranks.
+
+## Radio
+@ b3_radio_en.png
++ VOL, TUNE, a display, presets 1-6, SEEK, FM and TAPE - all working, like a real one.
++ Your own music is a tape. Click the slot to put it in, eject pushes it out, the reels turn while it plays. Buttons 1-4 with a tape in: the track back and forward, shuffle, repeat.
++ A click on the display opens the radio card, a click outside the dashboard closes it.
+
+## Music in the car
+@ b3_music_en.png
++ Get out - the music plays on in the car: quieter with the distance, muffled through the body, clearer with a door or a window open. Zombies hear it.
++ Leave music playing in one car and drive another - both play. Come back, and the track goes on from where it was.
++ Multiplayer (test): the players near the car hear your music, passengers as inside. A file they don't have goes to them through the server. File names are never sent. The settings are on the Game page.
+* For servers: the shared music can be turned off or limited with lines in the server's own Zomboid/Lua/knox_server.txt: music.share = 0 - off, music.files = 0 - no files sent, music.max_mb - the largest file.
+- The broadcast no longer breaks in over your own music, and the radio's hiss is there only while a track plays.
+- Your own music no longer goes silent for a while when there are many sounds around.
+- Outside the car, the next track plays when one ends, not the broadcast. Switching folders doesn't reset the track playing.
+
+## Fixes
+- The dashboard was gone if you got into a car with the inventory open and then closed it.
+- A fridge and other furniture from 20 kg picked up with "Pick up" goes into both hands, not into the pockets.
+- Bicycle bags (redchili) take things again.
+- The battery of a radio, walkie-talkie or flashlight comes out and goes in with a click on its tile.
+- A backpack's grid no longer overlaps its header.
+- Long container names are not cut with a dot but scroll smoothly.
+- Right-click menu entries stand right in the middle of their rows.
+
+Start the engine. The road is waiting, and the music will wait for you in the car.
+# 1.0 BETA | 20.10.2026 | tech | 1.0 BETA: Viewpoint, OldPoint and fixes
+The second update of the beta: Knox with Viewpoint and OldPoint, and the lost hotbar and dashboard found.
+
+## Viewpoint and OldPoint
++ The cursor is there at once with every Knox window and dialog open (the alarm clock, the split dialog, bag windows too), and the view comes back when you close it.
++ Pick a row in Viewpoint's loot panel with the wheel, and its loot key opens that compartment: the fridge or the freezer, the trunk or the glove box.
+* OldPoint: the middle button stays Knox's inside its windows - the cursor no longer vanishes and the camera doesn't turn behind the screen. In its overhead camera, Surroundings set to "Auto" shows everything around, bodies included.
+* A controller taking over (Viewpoint switches to a pad when it is touched) closes the Knox screen; the pad gets the game's windows.
+* If a Viewpoint update changes something Knox uses, only that part of the integration switches off, with one line in console.txt.
+* Knox does less every frame while its windows are closed.
+
+## Fixed
+- The hotbar and the car dashboard could be gone for good: the game's furniture button tooltip broke when the "Toggle mode" key had no name (often after Tab was given to the inventory), and the game stopped building them. Knox now guards against it.
+- The hotbar and the dashboard hidden while the inventory is open always come back when it closes.
+- In a car you can drop things outside again: with the door or its window open, Surroundings shows the floor - drag a thing onto it and the character drops it through the door.
+# 1.0 BETA | 20.10.2026 | tech | 1.0 BETA: multiplayer and speed
+The first update of the beta: Knox on servers, much faster big containers, and fixes.
+
+## Multiplayer (test)
+! Knox now works on servers and in hosted games. This is new and has not been tried on a real server yet - tell us how it goes in the beta thread, with the server's console.txt.
++ Where things lie in a cupboard, a car or a bag, and how stacks are split, is kept by the server: every player sees the same, and it stays after reconnecting.
++ A thing dragged into another container lands where you dropped it.
++ Searching, locks, the order of your bags and the layout of your pockets are your own: another player searches a cupboard for themselves.
++ The size of bags and pockets is the server's, the same for everyone: grid.scale in knox_server.txt and the server's own knox_overrides.txt, in its Zomboid/Lua folder. In the settings the slider says "Set by the server".
+* The server needs ZombieBuddy and Knox Inventory 1.0 BETA in its mod list.
+
+## Faster
+* A big shelf or a pile on the floor with hundreds of things builds its grid about ten times faster.
+
+## Fixed
+- The stove, pouring, container info and alarm clock windows close when the character dies.
+- The Close button shows your own inventory key, not always "Tab".
+- Closing the inventory could fail when the character was gone.
+- Some data grew for the whole game session (marks of new things, searched things); it is trimmed now.
+
+; The 1.0 BETA post. What lies between the BETA-POST marks is also put into the news of the
+; released 0.9.8.7 (the same Workshop item) by tools\prepare_workshop.ps1: its players hear of
+; the beta there. Leave the marks as they are.
+; BETA-POST-BEGIN
+# 1.0 BETA | 20.10.2026 | update | Knox Inventory 1.0 BETA
+@banner tech_banner.png
+@art tech_art_en.png
+@frame #c9a24a
+The beta of version 1.0 is out. It is everything we have made since 0.9.8.7 - rigs, a new right-click menu, a car dashboard and dozens of changes to the inventory and the main menu. We are putting it out now so that you can try it and tell us what works, what doesn't and what gets in your way.
+
+! This is a test version, not a version for a full playthrough. It has bugs we haven't seen yet, and something may break in the middle of a game. Don't put the beta on a save you care about, or make a copy of it first.
+
+## How to try it
+The beta is a mod of its own in the same Workshop item. Your mod list now has two entries: "Knox Inventory" - the released 0.9.8.7, as it was - and "Knox Inventory 1.0 BETA". Only one of them can be on: they don't work together, and the game won't let you enable both.
++ A new game: in the main menu open Mods, turn "Knox Inventory" off, turn "Knox Inventory 1.0 BETA" on and restart the game.
++ An existing save: Load, pick the save, Mods - swap "Knox Inventory" for "Knox Inventory 1.0 BETA" there. A save keeps its own mod list, so switching in the main menu alone is not enough.
++ You can go back to 0.9.8.7 the same way at any time.
+! On the beta's first start ZombieBuddy asks about KnoxInventoryJava.jar again - answer Allow.
+* In the beta the corner of the inventory screen says "1.0 BETA" instead of "Stage 1". If you see "Stage 1", you are running 0.9.8.7.
+
+## Not finished yet
+! The car dashboard works, but it is not finished: it will be reworked, and its look and layout will change.
+! Not all item sizes have been reworked. Some items still take too much or too little room. Tell us which ones, with the item's name.
+! The balance of bags may change: how many cells each bag has and how much fits in it.
+! The tooltips of menu entries and recipes are still to be polished.
+! Clothing has two "Inspect" entries in the right-click menu. We know, and it will be fixed.
+* There will be no Health tab in 1.0: we are rebuilding it from scratch for 2.0. The health key opens the game's window.
+* A controller and split-screen keep the game's own windows, as before.
+
+## Rigs: bags with compartments
++ The game's bags now have compartments, Tarkov style: a main room, side pockets, a lid on top. 33 kinds of bags, each with a shape of its own, always symmetrical.
++ Anything that fits by size goes into a pocket. Bags from mods stay one grid, and you can give them a shape of your own with a parts line in Zomboid/Lua/knox_overrides.txt.
++ A bag can go into a bag. An empty bag takes little room, a filled one more, a full one as much as its own grid. Wallets, key rings and first aid kits don't grow.
++ The "Size of bags and pockets" slider in Settings, Game tab: from 50 to 200%. The Organized trait adds cells, Disorganized takes some away. Every bag has at least 4 cells.
+
+## Inventory
++ Knox's own key - Tab, which you can change in Settings, Controls tab. The game's inventory key works too, Esc closes.
++ Every bag's header has cubes: how many cells are taken and how much it weighs. The weight is green, yellow from 80% of the limit, red over it.
++ Scattered loot: what you find in furniture, cars and bodies lies around anyhow, not in neat rows. Sort lays it out neatly. Switch it off in Settings, Game tab.
++ Ctrl+S sorts the grid under the mouse. The key can be changed in Settings.
++ Quick slot order: hold Alt and drag a slot.
++ Shift+click on a key puts it on your key ring, if you have one.
++ An item that fits no grid at all is carried in both hands.
++ Feathers, seeds and grass stack.
+* Trousers, sweaters and hoodies are 1x2, like T-shirts. All jackets are 2x2. Paperbacks are 1x2, like magazines. Cornflour is 2x2, the lamp's propane bottle 1x2, a steel bar 1x3, playing cards 1x1, Dr. Oids Painting 2x4, cigar boxes 1x2. Pillows no longer stack.
+* Grids that the dragged item doesn't fit into go dark exactly along their own cells and compartments.
+* A bag's window is no wider than its grid. A long name isn't cut off, it scrolls smoothly.
+* The tooltip of a bag you haven't looked into doesn't show what's inside.
+* Frozen food has an icy blue frame.
+- The weight of items with something in them was counted without it - without the water in a bottle, the rounds in a magazine, the things in a bag. Now it is the full weight.
+- Searching a mannequin shows what it wears at once.
+
+## Right-click menu
++ Knox's own menu instead of the game's repainted one: the item's header on top, like its tooltip, entries in labelled groups, dangerous ones at the bottom in red, Other folded.
++ 81 Knox-style icons for menu entries. Eat and Drink portions are small squares right in the line. When an entry is unavailable, the reason is written under it.
++ The world menu: a header for the place - the room and what lies on the ground - objects on top, groups of their own.
++ An item's recipes are in the Interact submenu, with icons and what else is needed.
++ Knox windows for the alarm clock and for Fluid Container Info. The game's tooltips are on Knox's plate.
+
+## Car
++ Knox's dashboard: warning lights, tachometer, speedometer with the gear, fuel, the key in the ignition, wires when hotwired. Switch it off on the Modules page.
++ Radio in the car: the same card as the camp's radio - the car radio's broadcast or your own music from the Knox folder.
+
+## Main menu and new game
+* Modes: Sandbox, Apocalypse, Extinction, Outbreak, Rising, Challenges. The mouse wheel turns the modes; when the mode changes, the frame slides over and the text and video change smoothly.
+* Map: the mouse wheel picks the next town, the town's card fades in, an empty save name gets a thick red frame.
+* Sandbox: the scroll bar runs the whole list, the bottom of the list fades out, drop-down lists have an arrow of their own, Delete is red, pages change with an animation.
+* The step numbers in the header and the stage plates are centred exactly.
++ A "News in the main menu" switch in Settings, Look tab.
++ Loading a save without Knox, Knox asks whether to add it or to play without it. The answer is remembered.
+* A deleted save leaves the fire at once. Traits and skills in character creation scroll with the wheel.
+- On the loading screen the letters of the phrases are spaced evenly.
+- Soundtrack mods' music, such as The Walking Dead's, is muted in the menu without bursts at a track change.
+- The menu's music no longer plays on forever in the game after a save loads.
+
+## How to report a bug
+Post in the mod page's Discussions, in the "1.0 BETA" thread. We need three things:
++ what you did and what happened, ideally with a screenshot;
++ the file Zomboid\console.txt right after the bug;
++ your list of mods.
+We can't sort out reports without console.txt and the mod list. Thank you for testing!
+; BETA-POST-END
+
+; The 1.0 diary ("The Road to 1.0"): one post that grows. A new day adds its sections
+; "## Month dd - topic" at the TOP, under the intro; old ones stay. The post's date is
+; the date of its newest section: changing it makes the post open for players as new again.
+; Pictures: tools\make_news_road10.ps1 (r10_*).
+; Remove the line "! Everything below comes with version 1.0..." once 1.0 is out.
+# | 18.10.2026 | news | The Road to 1.0
+@banner r10_banner_en.png
+@art r10_art_en.png
+This is the diary of version 1.0. Here we show what we are working on while 1.0 is on its way: whenever something is ready on our side, a new dated section appears here. The newest is always on top.
+
+* Everything below is already in Knox Inventory 1.0 BETA.
+
+The heart of 1.0 is rigs: bags with compartments, Tarkov style. Around it goes everything that makes the inventory feel whole and finished.
+
+## October 18 - The dashboard
+@ r10_dash_en.png
+The car's dashboard is now Knox's own. It sits at the bottom in the middle, like the game's, but lower and wider, so it hardly covers the road.
++ On the left, in a grid, the lamps: engine, battery, headlights, doors, heater, radio, cruise control and trunk. The colours are the game's, and a click on a lamp does what the game's does: starts the engine, switches the headlights, locks the doors and the trunk.
++ Next to the cruise control, its figures: the speed it holds is right there, no tooltip needed.
++ A tachometer; a speedometer with its sand arc, the speed in figures and the gear; a fuel gauge with a pump and an arrow showing which side the filler is on. Low fuel - the pump lights yellow; nearly empty - red, blinking.
++ The needles swing on springs. Switch the ignition on - the needles sweep to the end and back, and the lamps light one after another, as in a real car.
++ The key goes into the lock and turns to ON, to START while the engine cranks, and springs back. Hot-wired, the car has wires hanging from the lock that spark as the engine cranks.
+* A lamp's tooltip says only what the panel doesn't show: the engine's condition, the battery's charge, the exact fuel left, the revs, and why something won't work.
+* When the car hits something, the panel flickers and shakes. The dashboard can be switched off on the Modules page - the game's own comes back.
+
+## October 18 - The car's radio
+@ r10_carradio_en.png
++ Hover the radio's lamp - the same card as the camp radio's in the main menu comes up.
++ Broadcast - the car's own set: the button switches it on and off, the stations are in a list and step with the buttons, the volume is its knob. A click on the radio's square opens the set's window.
++ Mine - your music from Knox's folder: playlists, shuffle, repeat, seeking. It plays from the car's speaker, so it needs power and the set on. The broadcast goes quiet under it, and zombies hear the music just as they hear a radio.
+* While the set is on, the game's music is silent - soundtrack mods too, The Walking Dead's for one. With the game paused, the track waits.
+
+## October 18 - The right-click menu
+@ r10_menu_en.png
+Until now the right-click menu was the game's menu, only repainted in Knox's colours. Now Knox has a menu of its own, and it carries on from the item's tooltip.
++ On top is the same coloured header as the tooltip's: icon, name, category, size and weight. Right-click while the tooltip is up and it flows into the menu, the header staying where it is. A book's long name wraps instead of stretching the menu.
++ At the very top, with no title, is what you use most. Inspect always comes first. Then the item's main action - what a double click does: Eat, Drink, Wear, Read. A weapon has Attach there. Then the item's own actions - Rip, Dismantle.
++ The rest stands in titled groups: Use, Wear and hold, Move, Craft. Drop and Pour on Ground sit at the very bottom, in red, after a line - so you don't click them by accident.
++ Other is folded. Bring the mouse onto its title and it opens; move the mouse back up and it folds. Click the title to fold or open it yourself.
++ Eat and Drink no longer hide their portions in a sub menu: sand squares stand right on the row - a quarter, a half, all of it. A click on the row itself is all of it.
++ When an option can't be done right now, the reason is written under it in grey, for example "Too dark". No need to look for it in a tooltip.
+* The highlight glides from option to option, sub menus unfold, and the menu and its sub menus have the same sand frame as the item's tile.
+* Put in Container is gone: Shift and dragging do that. The long "Remove Baseball Bat from Back" is just "Unequip" now.
+- A quick slot's menu (the Back, for example) has its header and groups again, like everything else.
+
+## October 18 - Icons
+@ r10_icons_en.png
++ Every option of the game's menus now has an icon of its own in Knox's style - 47 of them, drawn in one line: food, drink, hands, clothes, moving, fluids, recipes, the alarm and all the rest.
+* Icons are grey at rest, sand under the mouse, red for the dangerous options. The game's colourful item and recipe pictures no longer get in the way of reading the menu.
+* Options added by other mods are unknown to Knox and keep their own pictures. Neat Crafting's and Neat Building's recipe and building searches already have icons.
+
+## October 18 - Recipes
+@ r10_recipes_en.png
++ The recipes' sub menu that used to be named after the item itself ("Sheet") is now called Interact. Every recipe has an icon for what it does: tie a rope, rip, sew a bag, open a can, dismantle.
++ What else a recipe takes is written right under it: a toolbox mark and "Claw Hammer".
+* Option tooltips are gone from the menu: they only repeated what you can already see. "Replace: Claw Hammer" no longer pops up next to Attach.
+
+## October 18 - The alarm
+@ r10_alarm_en.png
++ Set Alarm opens a Knox window that looks like the clock itself: a wristwatch with its strap and crown, or a desk clock on its feet. Amber digits on a dark display show the time.
++ Hours and minutes change with the small arrows over and under the digits, or with the mouse wheel.
++ The alarm is switched by a button on the clock itself: on a wristwatch at its side, on a desk clock on top. When it is on, the button is pushed in and lit, and AL glows on the display.
+* There is no Done button: close the window with the cross or Esc and the time is set. While the window is open, a thread runs to the clock and the clock is lit.
+
+## October 18 - Containers and tooltips
+@ r10_fluid_en.png
++ Container Info is a Knox window now: a tank with the fluid in its own colour, the container's name, how much it holds, how much is in it and how much is free.
+* The game's other tooltips - on buttons, on things in the world, on recipes - show on Knox's plate in Knox's font.
+
+## October 18 - Weight and small things
+@ r10_weight_en.png
+- Things with something in them had the wrong weight. The tooltip, the inspect window, sort by weight and the +/- of a move took the weight of the empty thing - no water in the bottle, no rounds in the magazine, nothing in the bag. Now it is the full weight. The character's total weight was right before too.
+* Frozen food has a blue frame, the colour of ice.
+- The Tuning and Volume captions over the radio's and walkie-talkie's knobs no longer run into each other.
+* The stage plates under the tabs line up with the edges of the panels.
+
+## October 17 - Rigs
+@ r10_rigs_en.png
++ 33 families of bags got compartments: the main room, a lid, pouches, side pockets. ALICE, school and hiking packs, sports, military and medical bags, the chest rig, toolboxes, the suitcase, the first aid kit - each has a layout of its own.
++ Compartments are always symmetric: nothing sticks out on one side, and a narrow gap runs between them.
++ Any pocket takes anything that fits its size. A thing lies whole inside one compartment, never across two.
+* A bag still has twice as many cells as its capacity - they are just split into compartments now.
++ Sort fills the compartments, the main room first. A new thing with no place of its own goes there first too.
++ What fits nowhere - a rifle in a chest rig, say - lies in the red rows under the compartments.
+* The size in a bag's header reads as main room + the rest: 4x5+10.
++ The hero's bag by the campfire shows the same compartments.
+* Bags from mods keep one grid. You can give them compartments with a line in Zomboid/Lua/knox_overrides.txt, for example: Mod.Bag = parts 4x2 / 1x2 5x6 1x2.
+
+## October 17 - The inventory column
+@ r10_column_en.png
++ Sections fold and unfold smoothly: the grid slides under its header and the sections below follow it.
++ Grids that run past the column's edge fade out softly instead of being cut off.
+* The scroll bar starts level with the first header and no longer hugs the edge.
+* A bag window with a long name keeps its grid centred.
+- The columns no longer run under the bottom bar with the hints.
+
+## October 17 - Modules
+@ r10_modules_en.png
++ The single "In-game interface" switch is now seven: inventory, hotbar, TV and radio, stove and microwave, pouring, item tooltips, menus and dialogs. Want the game's (or another mod's) inventory but Knox's TV and stove windows? Now you can. And the other way round.
+* If you have "In-game interface" off, all seven will be off in 1.0 - nothing changes by itself.
+
+## October 17 - Walkie-talkie
+@ r10_walkie_en.png
++ A walkie-talkie in your hands opens a Knox window, like radios on the floor and in cars. Frequency, volume, stations, microphone, battery - all there. It has a body of its own, in dark plastic.
+- Spinning the wheel over the TV's channel knob no longer has your character clicking through channel after channel: the channel changes in one action once the wheel stops.
+
+The next section will appear right here. What would you like to see in 1.0? Tell us in the discussions on the mod's Steam page.
+
+# 0.9.8.7 | 17.10.2026 | update | Update 0.9.8.7: By Ear
+@banner u0987_banner_en.png
+@art u0987_art_en.png
+In the dark you can't see what's in the box. You can hear it, though: a can clinks, a cover slaps shut, cloth rustles. Your hands find a thing before your eyes do.
+
+Knox works the same way now. Every thing sounds like what it is made of, and every sound sits at the same volume.
+
+## Important
+! If you haven't updated the mod since October 16, restart the game fully after this update. When ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+## Sounds
+@ u0987_sound_en.png
++ When you search, you hear your hands rummaging through the container, and each thing makes its sound the moment it is found.
++ Pick a thing up with the mouse, put it down elsewhere in the same bag, turn it with R - it makes a sound. A bag's window opens and closes with that bag's own zip.
++ The sound depends on the material. Knox knows the material of every item in the game, and works out items from mods by the same signs: tin, glass, ceramic, cloth, leather, paper, books, plastic, wood and more.
+* Every sound was measured and brought to one level: nothing whispers or booms next to the rest. Weapons no longer crash as if dropped on the floor.
++ You can give an item its own sound in Zomboid/Lua/knox_overrides.txt, for example: Base.ToiletPaper = sound softpaper.
+
+## Settings
+@ u0987_settings_en.png
++ Two new sliders on the Game tab: Search sounds and Interface sounds. 0% is silence, 200% is twice as loud.
+
+## Saves
++ If Steam updated the mod while the game was running, Knox could drop out of a save: for a moment the game couldn't see the mod and saved without it. Now Knox spots such saves in the main menu and offers to put itself back with one button.
+
+## Magazines
+@ u0987_mags_en.png
+* Full and empty magazines no longer stack together: you can load each one without taking the stack apart by hand.
+
+## Fixes
+- With the admin power Unlimited Carry you can take as much as you like again: whatever doesn't fit the grid goes to the "Doesn't fit" row.
+- The menu radio's hiss no longer carries into the game after you create a new character.
+- Fridge and freezer: in the "Only the opened one" mode both compartments show.
+- In a scrolled inventory column clicks land where they should, and the right-click menu opens at the mouse.
+- Hidden items from mods (the fists and gloves of unarmed combat mods) no longer show as tiles.
+- Music mods' menu music plays through the radio by the fire.
+- Players using the vanilla inventory get the bag by the fire back.
+- Knox is lighter on the game: less work every frame, especially in the main menu.
+
+Listen. A box will tell you what's inside before you get a good look at it.
+
+# 0.9.8.6 | 16.10.2026 | update | Update 0.9.8.6: Belongings
+@banner u0986_banner_en.png
+@art u0986_art_en.png
+Nobody by the fire asks what's in anyone's pack. But the packs come off all the same and sit close at hand. And when the fire burns low, someone takes out something of their own - an old bat, a flask, the keys to a house that isn't there any more - lays it on the ground and looks at it for a long time.
+
+Now it is the same by your fire.
+
+## Important
+! The mod's Java part was updated. Restart the game fully, and when ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+## The bag by the fire
+@ u0986_bag_en.png
++ The heroes by the fire take their backpacks off and put them down beside them. Click one and everything that hero carries opens up: the pockets and every bag worn, each thing in its place, as in the inventory.
++ The things on the card behave as in the inventory: they lift under the mouse, and a thing taken follows the cursor and sways, a heavy one more.
++ Each bag sounds like itself: a backpack unzips, a bag made of a sheet or a sack rustles.
+* Knox remembers what is in the bag while you play. For an older save the bag shows up by the fire once you have played it at least once.
+
+## Keepsakes
+@ u0986_keep_en.png
++ Hold a thing on the bag's card and drag it out into the camp - it lies down on the ground. While you carry it, R turns it.
++ It is only a keepsake: the thing itself stays in the hero's bag, and the save is never touched.
++ Drag a keepsake to move it; right click it, or drop it on any bag, to take it away. Rest the mouse on it to see whose it was.
++ The camp holds up to 30 things. To clear them all at once, use "Put the camp back as it was" in Knox's settings, on the Modules tab.
+
+## The camp lives
++ Rest the mouse on a hero by the fire and they look up at you.
++ The dead behind the fence no longer sway as one. Each has a pace and a gait of their own: they wander along the fence and look around, their steps heard in time.
+* The moans behind the fence are quieter and rarer, and each has a voice of their own - a man's or a woman's, as the hero had in life.
++ The main menu's items slide in one after another, and under the mouse the plate unrolls and the item moves a little.
+
+## Fixes
+- An error in the main menu when one of the fallen heroes came from a save never played with Knox.
+- A hero could come to the fire in underwear: when the game hadn't loaded their clothes yet, and with mods like Transmog. Now they come in their real clothes.
+- With some inventory mods every container around, even the Ground, was shown locked.
+
+Sit closer. And show us what's in your pack.
+# 0.9.8.5 | 16.10.2026 | update | Update 0.9.8.5: Signal
+@banner u0985_banner_en.png
+@art u0985_art_en.png
+Third night at the camp, and nobody had really slept. The fire crackled, something moaned behind the fence that no one could help any more, and one of us kept poking a screwdriver into an old red radio found in a stranger's garage. "Just leave it," someone said. He didn't.
+
+The switch clicked. Hiss crept out of the speaker, a whistle slid down the dial - and through the crackle, music. Faint and far away, as if from a world where the lights are still on and someone still cares about songs. Everyone by the fire went quiet. Even the cricket in the grass stopped for a while.
+
+That is how our camp got its radio.
+
+## Important
+! The mod's Java part was updated. Restart the game fully, and when ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+## The radio by the fire
+@ u0985_radio_en.png
++ A radio lies by the fire, a screwdriver and a battery next to it - someone has just mended it. Rest the mouse on it and its card comes up.
++ It plays the game's music or your own: put .ogg, .mp3, .wav or .flac files in Zomboid/knox_music - the folder button opens it. Each subfolder is a playlist of its own.
++ Seek, pause, next and previous track, repeat (the list, one track or none), shuffle, volume and the track list. The mouse wheel over the card sets the volume.
++ Press the radio button and the music plays from its small speaker: muffled, a little rough, hissing. The signal drifts, and now and then sinks into the air for a moment and comes back. While the radio plays, a light glows on its dial.
++ The switch clicks, the station comes in with a whistle, and the buttons answer like an old tape deck's.
+* Everything is remembered: what plays, the volume, repeat, shuffle and the radio.
+
+## The camp comes alive
++ The camera breathes a little and turns slightly after the mouse. The trees sway in the wind.
++ The camp has sound now: the fire crackles, the night forest rustles, the wind blows, a cricket sings now and then. Once in a while an owl hoots, a wolf howls far away, and behind the fence moan those who will never sit by the fire again.
+* The game's own menu thunder and TV no longer play over the camp.
+
+## Into the night
++ Pick a hero and the menu fades out with the music. He gets up and walks away from the fire alone, his steps in time with his walk.
++ When the screen goes dark, he takes a few more steps into the night, and the camp dies away behind him: the fire first, then the forest, the wind last.
+* Your music keeps playing over the loading screen and fades out in the game after Click to start. The game's music then comes in gently instead of all at once.
+
+## Inventory
+* A new thing goes next to one of its kind already in the bag: a second chocolate bar goes by the first one, wherever it lies, not to the top row of the food.
+
+## Fixes
+- Going back through TV channels from the first one and switching clothing layers backwards work properly again.
+
+Turn it on. Someone has to be listening.
+# 0.9.8 | 15.10.2026 | update | Update 0.9.8: Order
+@banner u098_banner_en.png
+@art u098_art_en.png
+Like everything neatly in its place but hate spending time on it? Your backpack now sorts itself with one button, and the way you lay it out by hand is remembered: things you find go to their places on their own.
+
+## Important
+! The mod's Java part was updated. Restart the game fully, and when ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+## Sort by category
+@ u098_sort_en.png
++ The Sort button lays a container out by category: weapons with weapons, medicine with medicine, each category in a block of its own. The same things lie side by side, part stacks are put together, and food that spoils sooner comes first.
++ Your pockets and bags have the Sort button on their headers too.
++ Right click the header of a bag, a container or a bag window for other rules: Tight, By name, By weight.
+* Locked things stay where they are. Rearranging inside one container takes no game time.
+
+## Layouts
+@ u098_layout_en.png
++ Lay a bag out the way you like and choose Save layout in its header's menu. Sort puts things back on those places whatever the rule.
++ The place of a thing that is missing shows as a pale silhouette, so you see at once what is not there. Other things keep off those places while there is other room.
++ A thing with no place of its own takes a free place of its category: an axe goes where the bat was. If there is none, it goes as near its category as it can.
++ The eye next to the Sort button hides and shows the silhouettes.
+* A layout is kept in the bag itself and stays with it when you take the bag off or drop it. Your pockets have their own, so do cupboards and car trunks.
+
+## Stacks
+@ u098_stacks_en.png
++ Rest the mouse on a thing around you and your stacks of its kind light up: green if there is room, red if the stack is full.
+* Shift+click and Take all top up your stacks first, whichever bag they are in, and only then look for a free place. If not all of it fits, the rest goes into a tile of its own.
+* Things that come in without a place picked go next to their category, not into the first free cell.
+* Cigarettes, rolled cigarettes and cigars stack, 20 to a tile. An opened pack no longer takes twenty cells.
+
+## Settings
+@ u098_settings_en.png
++ A new Order tab: the sort rule, where new things go and the order of categories. Drag a category's row with the mouse, or move it one step with the arrows on the left.
++ In Zomboid/Lua/knox_overrides.txt you can set any thing's category, for example: Base.Bleach = category mat.
+
+## Found window
++ Pick things with a selection frame or Ctrl+click, as in the grids, and move everything picked at once.
+* Your own pockets and bags are marked in sand there.
+
+## Skins (beta)
+@ u098_skins_en.png
++ Settings - Look - Skin: seven ready skins (Sand, Blood, Pine, Ice, Night vision, Coal, Mansion) or your own, set with hue, saturation and brightness sliders.
++ A skin changes the main colour of frames, buttons and picks, the tone of windows and grids, and the cursor, item tooltips and the loading screen with them. All at once, no reload.
+* Tiles keep their category colours - they tell things apart at a glance.
+! This is a beta: if something stayed sand somewhere, tell us in the comments.
+
+## Small things
++ A thing you drag with the mouse lags a little behind the cursor and sways when it stops. The heavier the thing, the more.
++ The tile under the mouse lifts a little, with a small hop.
+* A thing being moved right now has a sand frame and trembles a little, and its fill line is thicker.
++ A thing in your hand can be dragged straight off the quick bar at the bottom of the screen and let go over the world: it drops to the ground.
++ A generator and other very heavy things shake while you drag them: they're hard to hold up.
++ Hot things glow red on their tile and cold ones blue, as rows do in the game's own inventory. A pot on the stove now shows how hot the water is: the brighter the red, the hotter.
+
+## Speed
+* A big pile on the floor no longer eats your frames: the plain tiles are now drawn by the Java part in one go.
+
+## Fixes
+- The main menu camp no longer breaks when a survivor carried a weapon from a mod that has no 3D model.
+- Grab (from the right-click menu, from the ground and from Viewpoint's loot panel) no longer stuffs a thing into full pockets. It goes where Shift+click would put it: onto its stack or into the first bag with room. If there is no room anywhere, it stays where it is.
+- A generator and other heavy things go from your hands into a car's trunk instead of falling to the ground.
+- Faded copies of things being moved no longer show up in another container of the same kind on the same square, such as the next body in a pile.
+- A water bottle and other things with liquid no longer stay behind as a bare icon when their move ends: they fade out with the tile.
+- Viewpoint no longer gives away what unsearched containers hold: its loot panel shows only what you've found, the rest is behind a "Not searched yet" line.
+
+# 0.9.7 | 14.10.2026 | update | Update 0.9.7: Stages and searching
+@banner u097_banner_en.png
+@art u097_art_en.png
+The tabs now show which stage each part of the UI is in. And searching is honest all the way: a bag opened with a double click and a backpack you pick up have to be searched too, and what you haven't found can't be peeked at anywhere.
+
+## Important
+! If ZombieBuddy asks again whether to load KnoxInventoryJava.jar, answer Allow.
+
+## Stages under the tabs
+@ u097_stages_en.png
++ Under every tab of the top bar there is a plate with its stage. The sand one is the stage we are working on now.
+* The Journal tab is gone, the map has no stage.
+
+## Searching
+@ u097_search_en.png
++ A bag window opened with a double click is searched too: things are found one by one, and the window's header says "Searching N / M".
++ A backpack you picked up and put on without a look is searched right in the inventory column. Your own things, your starting kit and what you packed yourself need no searching.
+* Searching happens in one place at a time: the bag window first, then the bags you wear, then the container in the Surroundings. The others wait their turn and show only what has been found.
+- Things not found yet no longer show in the Found window, in the name search counts, in the quick pick of an empty slot or among the containers and tapes of the pouring, radio and TV windows.
+- The selection frame, Sort and quick moves no longer catch what has not been found yet.
+
+## Multiplayer
+- On dedicated servers every vehicle turned blue-green: the main menu camp's lighting stayed on after joining a server.
+
+## Character creation
+- With NeatUI Hairstyler the hairstyle button was hidden under the hair color swatch. Now they stand side by side.
+
+## News
+* The pictures of all the earlier posts are drawn anew in the new style: pieces of the Knox interface itself, with the game's own icons.
+
+## Fixes
+* The frame of a half-searched container's counter is now as thick as the frame of its icon.
+* The grids do less needless work every frame.
+
+# 0.9.6 | 14.10.2026 | update | Update 0.9.6: Search
+@banner u096_banner_en.png
+@art u096_art_en.png
+Type a few letters and Knox shows where the thing is: in your pockets, in your bags or in the cupboards around you. Bags can now be picked up straight from the Surroundings, searching remembers where you stopped, and big piles of loot no longer bring the game to a crawl.
+
+## Important
+! Restart the game completely: the mod's Java part was updated.
+! After every update ZombieBuddy asks again whether to load KnoxInventoryJava.jar. Answer Allow, or the mod and the camp menu stay off.
+
+## Search by name
+@ u096_search_en.png
++ A search field in the top bar. Type a few letters: everything that matches lights up in a sand frame and the rest fades - in your pockets, your bags, their windows and the Surroundings grid.
++ The plates of the Surroundings rows show how many matches each container holds, bags inside it included.
+* Only what you have already seen is searched: the search does not give away what is still unsearched.
+* Case does not matter. Esc or the cross clears the field, and so does closing the screen.
+
+## The Found window
+@ u096_found_en.png
++ The Found button next to the field opens every match at once, by container: what is around you first, then your own bags.
++ Take all moves everything found around you into your inventory.
++ Drag things straight out of the window - into any grid, or onto another container's card in the same window. Shift, right click, double click and the middle button work as in a grid.
+* While a thing is being moved it stays in the window, faded, with a progress bar. What leaves fades out, what comes fades in.
+
+## Bags from the Surroundings
+@ u096_bags_en.png
++ A backpack, a bag or a garbage bag on the floor or in a cupboard can be grabbed by its row in the Surroundings or by its grid's header and dropped on your back, in a hand, on a quick slot or into your grid.
+* Furniture, bodies and car parts can't be taken this way.
+
+## Searching containers
+@ u096_rummage_en.png
++ A container searched only in part no longer looks untouched: its plate is a dark square in a sand frame with the number of things found so far. Find everything and the plate fills with sand.
+* "Searching N / M" in the header counts the things found out of all of them, including what you found last time.
++ Searching remembers what you know: everything you have carried or already found. A backpack you dropped and opened again is searched only for what is new.
+- Switching to another container in the middle of a search showed the things not found yet for a moment.
+
+## Speed
+@ u096_speed_en.png
++ With a mountain of things nearby - hundreds of items on the floor or a packed warehouse - the game slowed to a crawl while the inventory was open, down to 5 frames per second. Four times a second Knox laid the whole pile out on its grid again, and one such layout took half a second.
+* Now the layout is 7 times faster and only happens when something in the pile changes: a thing taken, dropped or moved. And Knox no longer draws what is scrolled out of the column and can't be seen anyway.
+
+## Main menu and news
+* News cards and the hero's passport have frames of the same thickness on every side; the health bar no longer runs over the frame.
+* The big picture of an opened post is shown whole on any screen.
+
+## Fixes
+- When the mod was updated while the game was running, it threw errors and lost the camp menu. Now it simply asks you to restart the game.
+- If the inventory screen fails to open because of an error, Tab is no longer silent: the game's own inventory opens until a restart, and the reason goes to console.txt.
+- Close crosses in all Knox windows light up under the mouse like the buttons next to them.
+
+# 0.9.5 | 14.10.2026 | update | Update 0.9.5: Viewpoint
+@banner u095_banner_en.png
+@art u095_art_en.png
+The inventory now plays well with Viewpoint's first person. This post also gathers everything that came after Scavenger in small patches without a post: mixed stacks, searching, turning items with the mouse and many fixes.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+
+## Viewpoint
+@ u095_viewpoint_en.png
++ Open the inventory, a TV, a radio or any other Knox window and the cursor is there at once; close it and the mouse turns the view again. The middle button inspects items without losing the cursor.
++ Viewpoint's loot window key opens Knox on the container you are looking at; press it again to close the screen and look around.
++ With Viewpoint's camera the Surroundings column lists only the container you opened and the floor next to you. Settings, Game tab, "Surroundings": show everything around as before. In a car everything is shown.
++ Project Viewpoint QOL no longer takes the cursor back while Knox is open.
+
+## Stacks
+@ u095_stacks_en.png
++ Things of one type that are not alike now share a stack: keys to different doors, different tapes, batteries with different charge. Such a stack's count is sand-colored.
++ Rest the mouse on it to see its things one by one; drag one out or click it to put it in a tile of its own. Shift, right click and the other gestures work on it too.
+* A stack's menu is the game's again: "Merge all" of thread and tape, renaming a key and other one-item options are back.
+* Wallets and key rings have a 4-cell strip inside; outside they still take one cell.
+
+## Searching
+@ u095_search_en.png
++ A new Game tab in the settings: turn on searching containers (things in a new container are found one by one) and set its speed.
+* Bigger things take longer to find.
+* Clothes worn by a corpse are seen at once, without searching.
+
+## Controls
+@ u095_controls_en.png
++ Turning the held item can go on the right or middle mouse button (Settings, Controls tab).
+* While an item is held, the right button opens no menu - not in grids, slots, nor the TV and radio windows.
+
+## Main menu
++ The campfire's flames are 3D, and the camp comes out of the dark in their light.
++ The camp no longer waits for everyone: the fire's light spreads at once, and each hero sits down at the fire as soon as they are ready. Even without PZ Optimization they are all there within a few seconds of a start.
+- After leaving a game for the menu the heroes no longer go missing for up to half a minute: they are back at the fire in under a second.
+- After a clean start the heroes at the fire no longer stand undressed, and the zombies no longer freeze.
+
+## Fixes
+- A right-click menu no longer stays on screen when the inventory is closed without picking anything.
+- A stack's panel showed only 16 different things; now up to 36, so a big key ring keeps all its keys.
+- A thing taken out of a stack could land right on top of that stack.
+- Knox windows fold away smoothly when closed; buttons and the cursor react more visibly to a press.
+
+# 0.9.0 | 13.10.2026 | update | Update 0.9.0: Scavenger
+@banner u090_banner_en.png
+@art u090_art_en.png
+Every item now takes as many cells as it would in real life. Bags, stacks and pockets were recalculated as one system: a cell is volume, weight is still counted by the game itself.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+! Old saves: item and grid sizes have changed, so things may no longer fit where they were. Whatever doesn't fit lies in the red rows under the grid. Nothing is lost, but you will have to arrange it again.
+! Pockets are smaller and stacks are no longer endless. You need a bag sooner now.
+
+## Item sizes
+@ u090_sizes_en.png
+* A size comes from the item's real 3D model: a bat is 1x4, a rifle 1x6, a pistol 1x2, a can of food 1x1, a generator 4x6. Before, size depended almost only on weight.
+* Clothing goes by where it is worn: a T-shirt is 1x2, trousers 2x2, a jacket 2x2, a padded jacket and a bulletproof vest 2x3, boots 2x2, trainers 1x2, a helmet 2x2, a cap 1x1.
+* Weight keeps size within bounds: a light thing won't take half a bag because its model is large, a heavy one won't fit into a single cell.
+
+## Bags
+@ u090_bags_en.png
+* A bag still has two cells per unit of capacity, but each kind has its own shape: backpacks are tall, duffel bags wide, a rifle case long and narrow, a fanny pack is two cells.
+* Cupboards, shelves and car boots are roomier than bags: three cells per unit of capacity. There, as in the game itself, weight decides, not room.
+* An empty plastic or paper bag is folded and takes one cell.
+! A bag with things in it can't be put into another bag, and nothing goes into a bag that lies inside another one. Small organizers - a first aid kit, a wallet, a key ring, a pistol case - still can.
+
+## Stacks
+@ u090_stacks_en.png
+* One cell holds about two kilograms of small things: nails and screws by 40, 9 mm rounds by 100, shotgun shells by 30, batteries and bandages by 20, pills by 10. What doesn't fit into a stack takes the next cell.
++ An item's tooltip shows how many of it fit into a stack.
+
+## Pockets
+@ u090_pockets_en.png
+* Pockets depend on your clothes. With none you have 4 cells: hands and waistband. Trousers add 4, a jacket 4, a padded jacket 6, a vest 4, shorts, a skirt and a hoodie 2 each.
++ Hover the "Pockets" header to see how many cells each piece of clothing gives.
+
+## Items of other mods
++ Things from other mods are sized by the same rules: the mod measures their models when it first meets them and remembers the result.
+
+## Surroundings
+@ u090_loot_en.png
+* Every container in the list has a framed icon and an item counter. A grey empty plate means you have not looked into it yet.
++ A container's own actions (turn the stove on, settings, remove all and others) are separate icons in its header. A device that is on is lit.
++ An item can be dropped on a container's row in the list or on its header.
++ The mouse wheel over the list goes through the containers.
++ The chosen container's weight is a line in the "Surroundings" title, like the inventory's.
+
+## Time
++ The inventory's top bar has a clock with the date and four speed buttons: pause, normal and two fast-forwards.
+
+## Food and appliances
+@ u090_cook_en.png
++ A food tile shows how it is cooking: it fills up as it gets done and changes color when it is cooked, burning or frozen.
++ The stove and the microwave have a window of their own: temperature, timer, on and off.
+
+## Quality of life
+@ u090_convenience_en.png
++ Lock an item (T): a locked thing stays put on "Take all", sorting and quick move.
++ An item turns by itself if that is the only way it fits where you are carrying it.
++ While you carry an item, the bags it does not fit into are dimmed.
++ The middle mouse button opens the item's inspect window.
++ Things that have come since you last opened the inventory are marked with a dot.
++ While you carry an item over a container, the weight line shows how much it would add (red) or take away (green).
+* Empty hand slots show palm icons instead of captions.
+
+## Smoothness
++ Items settle into their cells and fade out, grids unroll and roll up, windows unfold from their tile, weight bars and the clock's digits change without jumps.
++ One switch in the settings turns the animations off.
+
+## Searching containers
+@ u090_search_en.png
++ A new optional feature, off by default: in a container your character has not looked into yet, items are found one by one. Once searched, the container opens at once. Turn it on in the settings, on the "Game" tab; its speed is set there too.
+
+## Settings
+@ u090_settings_en.png
++ The settings window has three tabs: "Modules", "Inventory look", "Inventory controls". It opens with the gear button in the inventory's top bar and with the plate in the main menu.
++ "Inventory controls": quick move, select, open, menu, inspect, rotate and lock can each be set to your own key, click or combination.
++ "Inventory look": six sliders - overall opacity, background, grids, grid line thickness, slots and the 3D character - and two switches: animations and searching.
+
+## Fixes
+- The loading screen in languages Knox's font lacks (Chinese and others) no longer shows "???": they keep the game's font.
+- Tab sometimes didn't close the inventory at the first press.
+- The inspect window shows clothes in their own color, not white.
+- The character model no longer slides out of its box while you sit in a car.
+- A car's dashboard is no longer drawn over the open inventory.
+- The furniture button on the sidebar: its menu opened away from the cursor and closed at once.
+- Items on their way to join a stack from another container no longer push the stack aside.
+
+# 0.8.2 | 12.10.2026 | update | Update 0.8.2: Modules
+@banner u082_banner_en.png
+@art u082_art_en.png
+The mod can be used in parts: if you want only the camp in the menu, or only the inventory, keep just those.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+
+## Modules
+@ u082_modules_en.png
++ At the top of the main menu there is a plate, "Knox Inventory | Modules". It opens a window with three switches.
++ "In-game interface": the inventory screen, the hotbar, item tooltips, action menus, the TV and radio windows.
++ "Main menu": the camp with your heroes, the menu's items in Knox's look and the news.
++ "New game screens": game mode, spawn location, sandbox options, character creation, the loading screen and the look of the Load, Options and Mods screens.
++ A part that is switched off gives the game's own screens back. After "Apply" the game reloads its interface by itself - no restart needed.
+* The plate stays where it is whatever is switched off: everything can be switched back on.
+
+## Fixed
+- A hero's card no longer hides under the game's logo: while the card is shown over it, the logo fades out.
+
+# 0.8.1 | 12.10.2026 | update | Update 0.8.1: New game
+@banner u081_banner_en.png
+@art u081_art_en.png
+The whole way to a new game is now in Knox's style: game mode, spawn location, sandbox options, character creation and the loading screen.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+! The game must also be restarted after the mod is enabled in the mod list. The main menu now reminds you of it.
+
+## Game mode
+@ u081_mode_en.png
++ The modes are a list on the left; on the right the chosen mode's video, its name and what it is.
++ The header shows the steps of a new game: mode, spawn, world, character.
+* Sandbox is first in the list.
+
+## Spawn location
+@ u081_spawn_en.png
++ Three columns: the towns, the world map, the town's file.
++ The map is the game's own: drag it with the mouse, zoom with the wheel; it moves to a town when you pick one.
++ The file has the town's description and its video, and below them the save's name and the world's seed.
+* "Random" is no longer offered.
+
+## Sandbox options
+@ u081_sandbox_en.png
++ The pages on the left are split into "Game" and "Mods"; long names wrap to a second line.
++ Every setting is a row: its name on the left, its value on the right. Changed ones are marked in sand, both the name and the value.
++ On the right - help: what the setting under the mouse does and its default.
++ Pages and settings of mods show up by themselves: the screen is built from the same list the game uses.
+
+## Character creation
+@ u081_character_en.png
++ The game's two screens - occupation with traits, and appearance - are now one, with tabs: Occupation, Traits, Appearance, Clothing.
++ The summary on the left is always in view: name, occupation, points to spend, the chosen traits and starting skills. A click on a trait there gives it back.
++ Traits are one list with the filters All / Positive / Negative. A click takes a trait or gives it back.
++ Excluded traits stay in the list, dimmed, with the reason: which chosen trait they don't go with.
++ Appearance and clothing are laid out in two columns. Color pickers and sliders are in Knox's style.
++ Occupations, traits and clothes from mods work as before.
+
+## Loading screen
+@ u081_loading_en.png
++ The words are the same, the look is new: the phrases in the middle in our font, tips with a plate at the bottom, "Start" as a key hint.
++ A sand bar along the bottom edge instead of the walking figure. When it is full, you can start.
+
+## Main menu
+@ u081_menu_en.png
++ A right click on a hero by the fire opens a menu: continue, open the save's folder, delete the save.
++ A click on the tent starts a new game. The tent glows faintly so that it is noticed.
++ The Load, Options and Mods screens are repainted in Knox's colors.
++ Confirmation boxes ("Quit?", "Delete this save?") and the buttons in the menu's corner are in Knox's style.
+* The cards of heroes and news and the hero's menu have a sand frame all round.
+* While any menu screen is open, the game's logo is not drawn behind it.
+
+## Fixed
+- A click on a news card no longer counts as a click on a hero.
+- The wheels of the camp's car no longer sink into the ground.
+- On 16:9 screens the free place by the fire is no longer hidden under the news cards: the tent starts a new game.
+
+## Not there yet
+* No gamepad support on the new screens: with a gamepad the game's own screens are shown only after death and in split screen.
+* No search in the list of traits yet.
+
+# 0.8.0 | 11.10.2026 | update | Update 0.8.0: The camp by the fire
+@banner menu_banner.png
+@art menu_art.png
+The main menu is now a camp at night: the heroes of your latest saves sit by the fire, and those who did not make it stay behind the fence.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+! A hero shows up at the fire the way you left them only after the save has been loaded at least once with this version. Until then a dark figure sits in their place.
+
+## Heroes by the fire
+@ menu_heroes.png
++ Your three latest heroes still alive sit by the fire: the latest in the middle, the one before on the left, the third on the right. One of them dying does not push the others from their places.
++ They look as they do in game: face, hair, beard, every piece of clothing. The mod remembers a hero's look while you play: on entering the world, every ten game minutes, on saving and at the moment of death.
++ They are alive: they warm and rub their hands over the fire, and its light flickers on their faces.
++ The weapon a hero held lies next to them.
+
+## A survivor's passport
+@ menu_card.png
++ Point at a hero to see their card: portrait, name and profession, game mode and the town they stopped in.
++ Three main figures: days survived, zombies killed, health.
++ Their state in words: fine, injured, bleeding, bitten, sick, cold, hungry, thirsty, tired.
++ At the bottom - when you last played this save.
+
+## Loading with one click
+@ menu_click.png
++ Click a hero: they get up and leave the camp - the middle one towards you, the left one to the left, the right one to the right. The others stay by the fire.
++ The screen fades to black and the save loads as usual.
++ Exiting to the main menu plays it backwards: the hero comes out of the dark, walks to their place and sits down by the fire.
+
+## This is how you died
+@ menu_dead.png
++ A dead hero does not come back to the fire. The three who died last wander behind the fence as zombies - in the clothes they died in.
++ Those who died before them lie under the crosses by the fence, with a grave lantern burning next to them. Each of the dead gets one of the two: a zombie or a cross.
++ Point at a zombie or a cross to see who it was and how long they lasted. A click on a zombie starts over in the same world.
+! Heroes who died before this update stand behind the fence without clothes: their look was recorded after death. New ones will not.
+
+## The camp
+@ menu_camp.png
++ All of it is 3D: the palisade, the watchtower, rows of firs to the horizon, a starry sky and the moon.
++ A tent, bedrolls and mats, a lantern on a post, a woodpile, a chopping block with an axe, a clothesline, barrels, crates.
++ A kettle on the fire, a pot, mugs, tin cans and bottles - the game's real items. A van is parked by the fence.
++ Three sources of light: warm from the fire and the lanterns, cold from the moon. Things are shaded on their dark side, sparks fly up, the flame is alive.
+
+## News in the menu
+@ menu_news.png
++ Bottom right - cards of the mod's news: the kind of post, its title and first line. Unread ones carry a "New" plate.
++ A click on a card opens the post over the whole screen: text on the left, a picture on the right, shots of what is described between the sections. The mouse wheel scrolls the text.
++ To close: Esc, the right mouse button or a click outside the post.
++ With more than two posts, turn pages with the mouse wheel over the cards or with the dots on the right.
+
+## Menu items
+* The main menu's items are drawn in Knox's style: our font, capitals, a sand plate under the mouse. They work as before, and other mods' items stay where they were.
+
+## Not there yet
+* No gamepad support in the scene: a hero is picked with the mouse. Menu items work with a gamepad as before.
+* Items on a hero's belt and back are not shown in the camp yet.
+
+# 0.7.0 | 10.10.2026 | update | Update 0.7.0: TV and radio
+@banner u070_banner_en.png
+@art u070_art_en.png
+The TV and the radio have windows of their own in the Knox look, and the hands moved onto the hotbar.
+
+## Important
+! Restart the game fully: the mod's Java part was updated.
+
+## TV
+@ u070_tv_en.png
++ The window is the set itself: the picture tube, the cabinet, knobs and channel buttons.
++ What a show says runs as subtitles on the screen. While the window is open the lines don't show over the TV in the world.
++ On-screen display: channel number, name, time, volume. Skills and moods a show changes pop up on it.
++ Static when switching channels and "No signal" when a channel is quiet.
++ Video deck: a tape slot, play and eject. Carried tapes are offered when you hover the slot.
+
+## Radio
+@ u070_radio_en.png
++ Receiver window: a frequency dial with a needle (drag it or use the wheel), saved stations as green marks, signal strength.
++ Paper tape: what was said with the time, frequency changes, skills learned. The tape keeps recording while the window is closed.
++ Tuning and volume knobs, station buttons: "+" saves a station, right click forgets it.
++ Battery, headphones and disc slots; the microphone of a ham radio.
++ Works for radios in houses, in cars and in hand. Walkie-talkies keep the game's window for now.
+
+## New
+@ u070_hands_en.png
++ Hands on the hotbar: right, left, a two-handed weapon across both. Condition and rounds "12/30". Click to take out of the hand, right click for its menu.
++ The game's hand pictures at the top left are gone; the sidebar buttons moved up into their place.
++ Container actions in the header: "Remove all" for bins, "Turn on" and settings for stoves and microwaves, washers, barbecues, fireplaces, car trunks and more.
++ Containers you haven't looked into yet get a sand stripe in the Surroundings list; the ones you have are dimmer.
++ Batteries, tape, thread and other things used up bit by bit stack up to 10.
++ Tooltips on the hotbar outside the inventory.
+
+## Changes
+* An item's description in its tooltip gets the same marker as the game's notes.
+* Casualties Undead's bandage and rag "Remaining" shows inside the Knox tooltip.
+* The videotape quick pick opens above its slot.
+
+## Fixes
+- An item in hand can now be put in the back slot and other quick slots.
+- No tooltip for the first item after opening the screen, and tooltips lost when moving from one quick slot to another.
+- Hand and back slots blinked when hovering an item in a bag.
+- The character model sat too low while in a car.
+- A hidden service item of the Over The Shoulder mod showed in the Misc slot.
+
+# 0.6.0 | 10.10.2026 | update | Update 0.6.0
+@banner u060_banner_en.png
+@art u060_art_en.png
+Knox Inventory now runs only with ZombieBuddy: the fonts, tooltips, cursor and the live character are a required part of the mod.
+
+## Important
+! ZombieBuddy is required. Without it the mod stays off, the game's own inventory is used and a message tells you what to do.
+! There is no separate "Knox Inventory: Java" mod any more - it is built into the main one.
+
+## New
+@ u060_fluid_en.png
++ The fluid pouring window in Knox's style: tanks in the fluid's color with a preview, containers dragged in from the grids, 25 / 50 / 75% / All buttons.
+@ u060_split_en.png
++ News and change lists - right here, with a click on "Knox Inventory · Stage 1".
++ The split window got a thread to its stack, a frame like the other windows and a close button.
++ The mod's name and stage in the top bar.
+
+## Changed
+* The "Accessories" slot is now "Misc" and no longer runs into the layer counter.
+* Main buttons (such as OK) light up under the mouse.
+* Pens, pencils, spoons and other small stuff are no longer offered for the hands.
+
+## Fixed
+- R in the inventory turns the item and no longer reloads the weapon in your hands.
+- Ctrl + click to select no longer makes your character aim.
+- A slot's name no longer runs into its "1/2" counter.
+
+# | 10.10.2026 | news | Stage 1: Public test
+@banner s1_banner_en.png
+@art s1_art_en.png
+Knox Inventory redesigns the whole Project Zomboid UI in the style of Escape From Tarkov - one stage at a time. The first one is here: the inventory.
+
+Each stage is tested in public before the next one begins. Until a stage lands, its tab opens the game's own window.
+@ s1_tabs_en.png
+
+## How to help
++ Tell us in the comments on the mod's page what feels awkward and what is missing.
++ Found a bug? Describe what you did and attach Zomboid/console.txt.
+
+Thank you for testing!
+
+# | | plans | What's next?
+@banner plans_banner_en.png
+@art plans_art_en.png
+## Stage 2 - Health
+* Your injuries on your character's body, treatment in a click or by dropping an item on a wound.
+
+## Stage 3 - Skills and map
+* Skills and progress, and the world map, in the Knox style.
+
+## Stage 4 - The whole UI
+* Crafting, building, vehicles, menus - the rest of the game's windows, one by one.
+
+Your feedback decides what comes first.

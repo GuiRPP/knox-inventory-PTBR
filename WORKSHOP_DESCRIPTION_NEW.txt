@@ -1,0 +1,69 @@
+Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+
+[h1]What is Knox[/h1]
+[b]Knox is a new interface for Project Zomboid in the style of Escape From Tarkov.[/b] It doesn't replace one window - it replaces most of what you look at: the main menu, the inventory, the TV and radio, right-click menus, tooltips. Everything shares one look, and every part can be switched off if you don't want it.
+[img]{gif_overview}[/img]
+
+[h1]Main menu[/h1]
+[img]{gif_menu}[/img]
+[list]
+[*][b]A camp by the fire.[/b] Instead of a list of saves, a night camp where the survivors of your three latest games sit - dressed exactly as you left them, weapon at their side.
+[*][b]Survivor's passport.[/b] Hover a hero to see how many days they lasted, how many they killed and how they're doing.
+[*][b]One click to play.[/b] Click a hero - they get up, walk into the dark, and the save loads.
+[*][b]The fallen are remembered.[/b] The dead wander as zombies behind the fence; the oldest lie under the crosses.
+[*][b]New game[/b] in the same style: game mode, spawn point on the map, sandbox options and a single character screen.
+[/list]
+
+[h1]Inventory[/h1]
+[img]{gif_space_weight}[/img]
+[list]
+[*][b]Every item takes space.[/b] A jacket is 2x3 cells, a can is one, a rifle is 1x6. Pockets, bags, cupboards and car trunks each have their own grid.
+[*][b]Space and weight.[/b] Bags keep their weight limit from the base game. Clothes and food fill the space, ammo and tools fill the weight. When something doesn't fit, Knox tells you why.
+[*][b]Backpacks with compartments:[/b] main section, lid, side pockets. Bags go inside bags - but a full one takes up more room.
+[/list]
+[img]{gif_equipment}[/img]
+[list]
+[*][b]Equipment[/b] around a 3D model of your character: clothing by layer, both hands, the back slot. Hover an empty slot and Knox shows what you carry that fits it.
+[*][b]Searching.[/b] In a cupboard you haven't opened before, items turn up one at a time - and you hear each one.
+[*][b]Time savers:[/b] stacks, box selection, quick transfer, sorting, search by name, locking items in place.
+[/list]
+
+[h1]Game windows[/h1]
+[img]{gif_windows}[/img]
+The TV and radio with subtitles and a transcript, the stove, pouring liquids, item tooltips, right-click menus, the car dashboard, the hotbar with your hands - all redone in one style.
+
+[h1]Modules[/h1]
+[img]{gif_modules}[/img]
+Knox is built from modules, and you turn each one on or off in the "Knox Inventory | Modules" tab at the top of the main menu. Only want the camp? Only the inventory? Using another radio mod? Turn off what you don't need and the game's own window comes back.
+
+[h1]What's next[/h1]
+Stage one - the inventory - wraps up with version 1.0. After that, one at a time: health, skills, crafting and the map. Until a stage is ready, its tab opens the game's usual window. Roadmap, bug reports and ideas live in Discussions.
+
+[h1]Installation[/h1]
+[olist]
+[*]Install [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3619862853]ZombieBuddy[/url], following its page exactly.
+[*]Subscribe to Knox Inventory, enable it in Mods and restart the game.
+[*]ZombieBuddy will ask to allow Knox's Java part - allow it. It asks again after every update.
+[/olist]
+Loading a save that started without Knox? The mod offers to add itself to it. The inventory opens with Tab.
+
+[h1]Compatibility[/h1]
+[list]
+[*][b]Viewpoint[/b] and Project Viewpoint QOL work alongside Knox.
+[*][b]Grid Inventory and Inventory Tetris[/b] don't: they replace the same windows.
+[*]Clashing with a radio, hotbar or character creation mod? Turn off that Knox module.
+[*]Singleplayer only. Controller, split-screen and the tutorial keep the standard inventory.
+[/list]
+
+[h1]FAQ[/h1]
+[list]
+[*][b]Why ZombieBuddy?[/b] The fonts, tooltips, cursor, live character model and the camp need Java code - Lua alone can't do it.
+[*][b]Can I add it to my current save?[/b] Yes, any time.
+[*][b]Too cramped or too roomy?[/b] Settings, Game tab, the "Size of bags and pockets" slider.
+[*][b]I want a different size for an item.[/b] Edit Zomboid/Lua/knox_overrides.txt - instructions are inside.
+[*][b]Multiplayer?[/b] After 1.0.
+[*][b]Found a bug?[/b] Describe what you did in Discussions and attach Zomboid\console.txt.
+[/list]
+[b]Enjoying Knox? Give it a thumbs up[/b] - that's how other players find it.
+
+Please don't re-upload Knox Inventory or any part of it (code, models, art), and don't include it in modpacks. Share a link to this page instead.

@@ -1,0 +1,20 @@
+/* Knox Inventory: the health tab's 3D skeleton (Knox Inventory Java/tools/healthpaint/SkeletonGen.java),
+   worn by the tab's model copy only; invisible until Java shows a part's bones (KnoxHealthPaint). */
+module KnoxHealth
+{
+    imports
+    {
+        Base
+    }
+
+    item KH_Skeleton
+    {
+        DisplayCategory = Bandage,
+        ItemType = base:clothing,
+        Weight = 0.0,
+        BodyLocation = base:bandage,
+        ClothingItem = KH_Skeleton,
+        WorldRender = false,
+        hidden = true,
+    }
+}

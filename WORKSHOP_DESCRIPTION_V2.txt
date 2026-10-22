@@ -1,0 +1,105 @@
+Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+
+[h1]Knox Inventory[/h1]
+[b]Not just a Tarkov-style inventory: one interface for the whole of Project Zomboid, in one style.[/b] Its own fonts, plates, frames, tooltips, cursor and sounds - from your bags to the car's dashboard and the main menu. The inventory is one module of ten, and each can be switched off.
+[img]{hero}[/img]
+
+[h1]1.0 BETA and 0.9.8.7[/h1]
+This item has two mods: [b]Knox Inventory[/b] (0.9.8.7, released) and [b]Knox Inventory 1.0 BETA[/b] (all that is new on this page). Enable only one. [b]The beta is a test version - back up your saves.[/b]
+[list]
+[*]New game: Mods - swap Knox Inventory for the beta, restart the game.
+[*]Existing save: Load, pick it, Mods - swap there (a save keeps its own mod list).
+[*]The beta's inventory corner says 1.0 BETA; Stage 1 means 0.9.8.7.
+[/list]
+
+[h1]Modules[/h1]
+[img]{modules}[/img]
+Settings > Modules, or the Knox Inventory plate at the top of the main menu. A module switched off gives you the game's own window back - or another mod's.
+
+[h1]Inventory[/h1]
+[img]{rigs}[/img]
+[list]
+[*][b]Grids[/b] for every pocket, bag and shelf: items take their real size, turn with R, stack, split and merge.
+[*][b]Rigs[/b]: 33 kinds of bags with compartments, bags in bags, a key ring, cubes in each header for cells and weight.
+[*]Equipment around your 3D character, quick pick, [b]quick slots[/b] (Alt+drag to reorder) and the Knox hotbar.
+[/list]
+[img]{search}[/img]
+[list]
+[*][b]Search[/b]: things turn up one by one, found loot lies scattered, [b]Ctrl+S[/b] sorts by your rules.
+[*][b]Surroundings[/b]: furniture, the floor, bodies and the car in one column.
+[*]Take all, Shift+click, frame select, bag windows, 3D inspect, item search. Moves take game time: a thing waits in place with its progress.
+[/list]
+[img]{space}[/img]
+
+[h1]Right-click menu[/h1]
+[img]{menu}[/img]
+Knox's own menu opens out of the tooltip: the item's header, groups, 81 icons, Eat and Drink portions as squares, the reason under an unavailable entry, recipes in Interact, a world menu. The game's and other mods' entries stay. The game's question boxes get the same look.
+
+[h1]Device windows[/h1]
+[img]{devices}[/img]
+TV with subtitles, radio with a dial and a broadcast tape, walkie-talkie, stove and microwave, pouring, fluid container info, alarm clock.
+
+[h1]Car dashboard[/h1]
+[img]{dash}[/img]
+Like a 90s car's, sedan or pickup: the key or the wires, tachometer, speedometer with the gear and cruise, fuel, lamps, a cassette radio, the heater. Needles on springs, a lamp check with the key, dials lit by the headlights at night. The mouse wheel turns every knob.
+
+[h1]Music[/h1]
+[img]{music}[/img]
+The radio by the camp fire plays the game's music or yours (Zomboid/knox_music). In a car your music is a tape: it plays on when you get out, quieter with the distance, and two cars can play at once. [b]Multiplayer (test)[/b]: players near the car hear it.
+
+[h1]Main menu: the camp by the fire[/h1]
+[img]https://images.steamusercontent.com/ugc/10696727666732072207/A5B199B09497E702C92676AB0CD54BF5932AE77F/[/img]
+[list]
+[*][b]Your heroes[/b]: the three latest survivors of your saves sit by the fire exactly as you left them - face, hair, clothes, their weapon beside them.
+[*][b]Click to load[/b]: the hero gets up and walks off into the dark, the screen fades, the save loads. Back in the menu, they walk in and sit down again.
+[*][b]Passport[/b]: point at a hero - portrait, name, profession, mode and town, days survived, kills, health and mood.
+[*][b]The fallen[/b] never return to the fire: the last three wander behind the fence as zombies, older ones lie under crosses by a grave lantern.
+[*]The radio by the fire, the mod's news with pictures, the tent for a new game; Load, Options and Mods in Knox's look.
+[/list]
+[img]https://images.steamusercontent.com/ugc/12967718575779563748/67290102213807B7E71391F888AB573708AF6AD6/[/img]
+[b]New game[/b]: modes turned by the wheel with their video, spawn on the world map, sandbox with every setting a row and help on the right, one character screen (occupation, traits with filters, looks, clothes), the loading screen. The game's own screens redrawn, so what mods add stays.
+
+[h1]Tooltips, sounds, SaveGuard[/h1]
+[img]{extras}[/img]
+Item tooltips in Knox's look. Search and interface sounds by material: 24 materials for ~5100 items. If a save lost Knox (Steam updated it mid-game), Knox offers to add it back.
+
+[h1]Why Knox[/h1]
+[list]
+[*]One style everywhere, not one reskinned window.
+[*]Breaks nothing: every move goes through the game's own actions and takes game time.
+[*]Modules on their own; settings for look, controls, sorting and bag size.
+[*]Fast even with hundreds of things on the floor.
+[*]Bag mods work; item sizes and sounds can be set in Zomboid/Lua/knox_overrides.txt.
+[/list]
+
+[h1]Stages and plans[/h1]
+Knox is built a stage at a time, each tested in public; until a stage lands, its tab opens the game's own window.
+[list]
+[*][b]Stage 1 - Inventory[/b]: now. 1.0 completes it; the beta is its test. Still to do: some item sizes, bag balance, menu tooltips.
+[*][b]Stage 2 - Health[/b] (2.0): wounds on your character's body, treated with a click or by dropping an item on them.
+[*][b]Stage 3 - Skills and the map[/b].
+[*][b]Stage 4 - Crafting[/b], building and the rest of the game's windows.
+[/list]
+Your feedback decides what comes first.
+
+[h1]Install[/h1]
+[olist]
+[*]Install [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3619862853]ZombieBuddy[/url] exactly as its page says.
+[*]Subscribe, enable Knox Inventory or the beta, restart the game.
+[*]On the first start and after updates ZombieBuddy asks about KnoxInventoryJava.jar - answer [b]Allow[/b].
+[/olist]
+Without ZombieBuddy Knox stays off and says what is missing.
+
+[h1]Servers, compatibility[/h1]
+The beta works on servers (test): the server needs ZombieBuddy and the beta. Its Zomboid/Lua/knox_server.txt sets grid.scale (bag size for all) and music.* (music.share = 0 - no shared music); its knox_overrides.txt applies to all.
+[b]Viewpoint[/b], [b]OldPoint[/b], Project Viewpoint QOL: supported. Not with Grid Inventory or Inventory Tetris. Controller and split-screen keep the game's windows.
+
+[h1]FAQ and bugs[/h1]
+[list]
+[*]Existing save? Yes, any time. A dark hero in the menu? Load that save once.
+[*]Only the camp menu, or only the inventory? Switch the other modules off.
+[*]More answers and all server settings: the pinned FAQ in [url=https://steamcommunity.com/workshop/filedetails/discussions/3816775774]Discussions[/url].
+[*]Bugs: the [url=https://steamcommunity.com/workshop/filedetails/discussion/3816775774/563671129707924284/]1.0 BETA thread[/url] - what you did, Zomboid\console.txt, your mod list.
+[/list]
+
+[b]Like it? Rate it up[/b] - that is how others find it. Please don't re-upload Knox Inventory or its parts, or put it in modpacks - link here.

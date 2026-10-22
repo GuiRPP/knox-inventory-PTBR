@@ -1,0 +1,86 @@
+Three pinned threads in the item's Discussions tab. Edit each pinned post and replace its text
+(Steam: open the thread > Edit on the first post). BBCode works in discussions.
+Updated 2026-10-17: bug reports get a "Known issues" part, the roadmap is brought up to date.
+
+==================================================================
+1. TITLE: Bug reports
+==================================================================
+Found something broken? Post it here - one bug per post.
+
+[b]Bugs are fixed in batches: they are gone through before every release, and the fixes ship with it.[/b] A report with a mod list and console.txt gets fixed first - without them most bugs can't be found.
+
+Please include:
+[list]
+[*][b]What you did[/b] and what happened instead.
+[*][b]Your console.txt[/b]: C:\Users\<you>\Zomboid\console.txt - upload it to pastebin.com and post the link. Lines with [Knox] are the ones that matter.
+[*][b]Your mod list[/b] (at least the ones that change the UI, inventory, clothes or body).
+[*]A screenshot, if it is something you can see.
+[/list]
+
+[h2]Known issues - try these first[/h2]
+[list]
+[*][b]Knox is gone from my save / the inventory is the game's own again.[/b] When Steam updates the mod while the game runs, the game can save without it. Restart the game: the main menu offers to put Knox back into such saves.
+[*][b]Tab does nothing.[/b] Since 0.9.8.7 Knox writes the reason into console.txt: look for "[Knox] inventory key:". The game must not be paused; the key is the game's own inventory key (Options > Keyboard).
+[*][b]The game's inventory opens, Knox doesn't.[/b] ZombieBuddy is not running or the Java part was not allowed: install ZombieBuddy as its page says, restart, answer Allow when it asks about KnoxInventoryJava.jar.
+[*][b]A hero in the menu is dark or in underwear.[/b] Load that save once - the hero's look is recorded while you play. With mods that add clothes or bodies, enable those mods in the main menu's mod list too, not only in the save.
+[*][b]Grid Inventory or Inventory Tetris.[/b] Turn them off - they replace the same windows.
+[/list]
+
+==================================================================
+2. TITLE: Suggestions and mod compatibility requests
+==================================================================
+What is awkward, what is missing, which mod should Knox work with?
+
+[list]
+[*]One idea per post, and say [b]why[/b] you need it - it helps to pick the right solution.
+[*]For compatibility: name the mod, link its Workshop page and say what goes wrong.
+[*]If someone already posted your idea, reply to it - what many players ask for goes first.
+[/list]
+
+[b]How ideas are picked.[/b] Knox is the Project Zomboid UI in the spirit of Tarkov: one consistent look, things that take real space and feel physical. An idea goes on the list when it fits that, helps many players, and can't be done with a setting. The list is gone through every couple of weeks.
+
+[b]Item sizes and sounds[/b] can be changed by yourself, no mod update needed: Zomboid/Lua/knox_overrides.txt (the instructions are inside the file).
+
+[b]Not planned:[/b] a windowed (not fullscreen) inventory - use the opacity sliders in Settings > Look; resizing the window or the icons.
+
+==================================================================
+3. TITLE: Roadmap - what comes next
+==================================================================
+Knox Inventory redesigns the whole Project Zomboid UI one stage at a time. One release - one theme.
+
+[b]Stage 1: Inventory (now)[/b]
+[list]
+[*][b]Done:[/b] grids with real item sizes, search and filters, favorites and locks, sorting, immersive container search, sounds, settings and modules, Viewpoint support, TV and radio windows, the camp main menu.
+[*][b]Before 1.0:[/b] the walkie-talkie in your hands opens a Knox window; finer modules (Knox windows with the game's inventory); polish.
+[*][b]1.0[/b]: Stage 1 is complete - and it comes with something new of its own.
+[/list]
+
+[b]After 1.0:[/b] put things in their places - labels on containers and one button to put your loot where it belongs.
+[b]Stage 2: Health[/b] - your injuries on your character's body, treatment in a click or by dropping an item on a wound.
+[b]Stage 3: Skills and map[/b]
+[b]Stage 4: The rest of the UI[/b] - crafting, building, vehicles, one window per release.
+
+Multiplayer is planned after 1.0. Controller support - later.
+
+No dates here on purpose: a release is announced when it is ready. This post is updated after every release.
+
+[h1]RU[/h1]
+
+Knox Inventory переделывает весь интерфейс Project Zomboid по этапам. Один релиз - одна тема.
+
+[b]Этап 1: Инвентарь (сейчас)[/b]
+[list]
+[*][b]Уже есть:[/b] сетки с настоящими размерами вещей, поиск и фильтры, избранное и замок, сортировка, обыск контейнеров, звуки, настройки и модули, поддержка Viewpoint, окна телевизора и радио, лагерь в главном меню.
+[*][b]До 1.0:[/b] рация в руках открывает окно Knox; модули мельче (окна Knox при инвентаре игры); полировка.
+[*][b]1.0[/b]: этап 1 закрыт - и в нём будет кое-что новое.
+[/list]
+
+[b]После 1.0:[/b] всё по местам - ярлыки на контейнерах и одна кнопка, которая разложит добычу туда, где ей место.
+[b]Этап 2: Здоровье[/b] - раны прямо на теле персонажа, лечение одним щелчком или переносом предмета на рану.
+[b]Этап 3: Навыки и карта[/b]
+[b]Этап 4: Остальной интерфейс[/b] - крафт, строительство, транспорт, по одному окну на релиз.
+
+Сетевая игра - после 1.0. Геймпад - позже.
+
+Дат здесь нет намеренно: о релизе говорим, когда он готов. Пост обновляется после каждого релиза.
+(Published on Steam 2026-10-17: all three pinned posts.)

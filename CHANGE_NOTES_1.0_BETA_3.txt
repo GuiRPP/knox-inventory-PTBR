@@ -1,0 +1,17 @@
+[h1]Knox Inventory 1.0 BETA - update 2: Viewpoint, OldPoint and fixes[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+[h2]Viewpoint and OldPoint[/h2]
+[list]
+[*]The cursor is there at once with every Knox window and dialog open (the alarm clock, the split dialog, bag windows and others too), and the view comes back when you close it.
+[*]Pick a row in Viewpoint's loot panel with the wheel, and its loot key opens that compartment: the fridge or the freezer, the trunk or the glove box.
+[*][b]OldPoint[/b]: the middle button stays Knox's inside its windows - the cursor no longer vanishes and the camera doesn't turn behind the screen. In its overhead camera, Surroundings set to "Auto" shows everything around, bodies included.
+[*]A controller taking over (Viewpoint switches to a pad when it is touched) closes the Knox screen; the pad gets the game's windows.
+[*]If a Viewpoint update changes something Knox uses, only that part of the integration switches off, with one line in console.txt.
+[*]Knox does less every frame while its windows are closed.
+[/list]
+[h2]Fixed[/h2]
+[list]
+[*][b]The hotbar and the car dashboard could be gone for good.[/b] The game's furniture button tooltip broke when the "Toggle mode" key had no name (often after Tab was given to the inventory), and the game stopped building the hotbar and the dashboard. Knox now guards against it.
+[*]The hotbar and the dashboard hidden while the inventory is open always come back when it closes.
+[*]In a car you can drop things outside again: with the door or its window open, Surroundings shows the floor - drag a thing onto it and the character drops it through the door.
+[/list]

@@ -1,0 +1,29 @@
+[h1]Knox Inventory 1.0 BETA - update 4: lighter and steadier[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, answer Allow.
+
+[h2]Faster[/h2]
+[list]
+[*]Moving lots of things at once no longer drags the FPS down: thirty things on their way cost almost 30 ms a frame, now about one.
+[*]The right-click menu, item tooltips, Surroundings, Equipment, the TV and the radio do less work every frame.
+[/list]
+
+[h2]Fixed[/h2]
+[list]
+[*]A battery can be taken out of a radio or a walkie-talkie lying in a bag again.
+[*]Multiplayer: the things in a car's trunk nobody has opened lie scattered, as in furniture.
+[*]Multiplayer: a thing left behind by Take for lack of room stays in its stack for the other player too.
+[*]Inspect from the hotbar with the inventory closed can no longer break the Knox screen.
+[*]An error in the game's tooltip goes to console.txt once, not every frame.
+[*]The hidden Health tab no longer counts anything in the background or writes into the save.
+[/list]
+
+[h2]Small things[/h2]
+[list]
+[*]Grass stacks 10 to a tile.
+[*]1x1: chocolate, butter, the fillet knife, the oven mitt, the toothbrush and toothpaste, tissues, letters, fliers, paperwork, a sheet of paper. 1x2: the strainer, the rolling pin, the bread knife, the sewing kit. The TV remote and tweezers no longer stack.
+[*]New menu icons: the light bulb, the sort rule, the layout, the order of sections. A stove's Settings sit next to Turn off.
+[*]Tall grids in Surroundings (a trunk, a big cupboard) fade at their edges as you scroll.
+[*]Long news titles in the main menu glide along instead of being cut off.
+[*]Chinese: the dashboard is translated, its numbers back to their normal size.
+[/list]

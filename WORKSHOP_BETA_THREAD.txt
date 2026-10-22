@@ -1,0 +1,61 @@
+Title: 1.0 BETA - feedback and bugs / отзывы и ошибки
+
+[h1]Knox Inventory 1.0 BETA[/h1]
+[b]A test version, not for a full playthrough. Back up your saves.[/b] The full list of changes is in the in-game news and in Change Notes.
+
+[h2]How to switch[/h2]
+[list]
+[*]This item now has two mods: [b]Knox Inventory[/b] (0.9.8.7, as before) and [b]Knox Inventory 1.0 BETA[/b]. Enable only one - the game won't let you enable both.
+[*]New game: main menu, Mods - turn Knox Inventory off, turn the beta on, restart the game.
+[*]Existing save: Load, pick the save, Mods - swap Knox Inventory for the beta there (a save keeps its own mod list).
+[*]ZombieBuddy asks about KnoxInventoryJava.jar again on the beta's first start - answer Allow.
+[*]In the beta the inventory screen's corner says [b]1.0 BETA[/b]. "Stage 1" means you are on 0.9.8.7.
+[/list]
+
+[h2]Known: not finished yet[/h2]
+[list]
+[*]The car dashboard - it works, but will be reworked.
+[*]Some item sizes, the balance of bags, the tooltips of menu entries.
+[*]Clothing has two "Inspect" entries.
+[*]No Health tab in 1.0 - it comes in 2.0.
+[/list]
+
+[h2]Reporting a bug[/h2]
+Post here with:
+[olist]
+[*]what you did and what happened (a screenshot helps);
+[*][b]Zomboid\console.txt[/b] right after the bug (upload it to pastebin or similar and link it);
+[*]your mod list.
+[/olist]
+Reports without console.txt and the mod list can't be sorted out. Item size wishes: the item's name and the size you'd expect.
+
+----------------------------------------
+
+[h1]Knox Inventory 1.0 BETA[/h1]
+[b]Тестовая версия, не для полноценной игры. Сделайте копии сохранений.[/b] Полный список изменений - в новостях в игре.
+
+[h2]Как переключиться[/h2]
+[list]
+[*]В предмете теперь два мода: [b]Knox Inventory[/b] (0.9.8.7, как была) и [b]Knox Inventory 1.0 BETA[/b]. Включайте только один - игра не даст включить оба.
+[*]Новая игра: главное меню, «Моды» - выключите Knox Inventory, включите бету, перезапустите игру.
+[*]Старое сохранение: «Загрузить», выберите сохранение, «Моды» - замените в нём Knox Inventory на бету (сохранение помнит свой список модов).
+[*]При первом запуске беты ZombieBuddy снова спросит про KnoxInventoryJava.jar - ответьте «Разрешить».
+[*]В бете в углу экрана инвентаря написано [b]1.0 BETA[/b]. «Стадия 1» - значит, включена 0.9.8.7.
+[/list]
+
+[h2]Известно: ещё не готово[/h2]
+[list]
+[*]Приборная панель машины - работает, но будет переделываться.
+[*]Размеры части вещей, баланс сумок, подсказки у пунктов меню.
+[*]У одежды два пункта «Осмотреть».
+[*]Вкладки «Здоровье» в 1.0 нет - она придёт в 2.0.
+[/list]
+
+[h2]Как сообщить об ошибке[/h2]
+Пишите сюда:
+[olist]
+[*]что вы делали и что случилось (скриншот помогает);
+[*][b]Zomboid\console.txt[/b] сразу после ошибки (залейте на pastebin или похожий сайт и дайте ссылку);
+[*]список ваших модов.
+[/olist]
+Отчёты без console.txt и списка модов мы разобрать не сможем. Пожелания по размерам вещей: название вещи и какой размер вы ждёте.

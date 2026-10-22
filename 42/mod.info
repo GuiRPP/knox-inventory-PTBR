@@ -1,0 +1,10 @@
+name=Knox Inventory
+id=KnoxInventory
+description=Stage 1 public test of a Tarkov-style UI overhaul: one full-screen inventory with equipment slots around your live 3D character, grid containers, nested bag windows, surroundings, quick slots, Knox's own fonts, tooltips, context menus and cursor - and a main menu that is a night camp with the heroes of your latest saves by the fire. Requires ZombieBuddy.
+require=\ZombieBuddy
+javaJarFile=media/java/client/KnoxInventoryJava.jar
+javaPkgName=knox.java
+versionMin=42.0.0
+modversion=0.9.8.7
+poster=poster.png
+icon=icon.png

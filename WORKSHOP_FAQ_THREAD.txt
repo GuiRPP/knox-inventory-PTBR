@@ -1,0 +1,45 @@
+Title: FAQ and server settings / Вопросы и настройки сервера
+
+[h1]FAQ[/h1]
+[list]
+[*][b]Why ZombieBuddy?[/b] Knox's fonts, tooltips, cursor, 3D framing, the live character, the menu's camp and the car music need Java code that Lua alone can't reach. ZombieBuddy loads KnoxInventoryJava.jar - answer Allow when it asks (on the first start and after updates).
+[*][b]Without ZombieBuddy?[/b] Knox stays off, keeps the game's own inventory and menu, and tells you what is missing.
+[*][b]Existing save?[/b] Yes, add it any time. If a save loses Knox (Steam updated the mod while the game was running), Knox offers to add it back.
+[*][b]0.9.8.7 or the beta?[/b] Both are in this item; enable only one. The beta is for testing - back up your saves. A save keeps its own mod list: Load, pick it, Mods - swap there.
+[*][b]Only the camp menu, or only the inventory?[/b] Settings > Modules (in the main menu: the Knox Inventory plate at the top) switches every part on and off. A part switched off gives the game's own window back.
+[*][b]My hero is a dark figure in the menu?[/b] Load that save once: the hero's look is recorded while you play. With mods that add clothes or bodies, enable them in the main menu's mod list too.
+[*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers and hosted games, still in testing - tell us how it goes in the 1.0 BETA thread, with the server's console.txt.
+[*][b]A windowed inventory?[/b] Not planned - the opacity sliders in Settings > Look let you see the world through it.
+[*][b]An item's size or sound?[/b] Set your own in Zomboid/Lua/knox_overrides.txt (the file explains itself). Bags from mods are one grid; a parts line there gives them compartments.
+[*][b]My own music?[/b] Put files in Zomboid/knox_music (the radio card's folder button opens it); each subfolder is a playlist. In a car the music is a tape in its radio.
+[*][b]With Grid Inventory / Inventory Tetris?[/b] No: they replace the same windows.
+[*][b]Viewpoint, OldPoint?[/b] Supported: Knox windows give you the cursor, Viewpoint's loot key opens Knox on what you look at.
+[*][b]Controller?[/b] Controller and split-screen keep the game's windows.
+[*][b]Found a bug?[/b] The 1.0 BETA thread: what you did, Zomboid\console.txt right after the bug, your mod list.
+[*][b]Can I re-upload it or parts of it?[/b] No - not here, not elsewhere, not in modpacks. Link to the mod's page instead.
+[/list]
+
+[h1]Server settings (1.0 BETA)[/h1]
+The server needs ZombieBuddy and Knox Inventory 1.0 BETA in its mod list. Knox writes Zomboid/Lua/knox_server.txt on the server's first start; edit it and restart the server.
+[list]
+[*][b]grid.scale = 100[/b] - the size of bags and pockets for every player, 50..200 % (players' own slider says "Set by the server").
+[*][b]music.share = 1[/b] - players near a car hear its own music; 0 - each player's music for themselves only.
+[*][b]music.files = 1[/b] - a file another player lacks is sent through the server; 0 - heard only by those who have it. File names are never sent.
+[*][b]music.max_mb = 15[/b] - the largest file sent, MB.
+[*][b]music.rate_kb = 128[/b] - the speed of one file to one player, KB/s.
+[*][b]music.total_kb = 512[/b] - all the music the server sends at once, KB/s.
+[*][b]music.cache_mb = 64[/b] - the files the server keeps in memory, MB.
+[/list]
+The server's own Zomboid/Lua/knox_overrides.txt (item sizes) applies to every player. Every part of a music file is a line of the server's cmd log; ClientCommandFilter -KnoxMusic.up leaves them out.
+
+[h1]По-русски[/h1]
+[list]
+[*][b]Зачем ZombieBuddy?[/b] Шрифты, подсказки, курсор, 3D, живой персонаж, лагерь в меню и музыка в машине Knox сделаны на Java. На вопрос о KnoxInventoryJava.jar - «Разрешить» (при первом запуске и после обновлений).
+[*][b]0.9.8.7 или бета?[/b] Обе в этом предмете, включайте одну. Бета - для проверки, сделайте копию сохранений. У сохранения свой список модов: «Загрузить», выбрать, «Моды» - поменять там.
+[*][b]Только меню-лагерь или только инвентарь?[/b] Настройки > «Модули» (в главном меню - плашка Knox Inventory сверху): каждая часть включается отдельно.
+[*][b]Сетевая игра?[/b] 0.9.8.7 - одиночная. 1.0 BETA работает на серверах, это тест - пишите в тему 1.0 BETA с console.txt сервера.
+[*][b]Размер или звук вещи?[/b] Zomboid/Lua/knox_overrides.txt.
+[*][b]Своя музыка?[/b] Файлы в Zomboid/knox_music, каждая подпапка - свой список.
+[*][b]Ошибка?[/b] Тема 1.0 BETA: что делали, Zomboid\console.txt сразу после ошибки, список модов.
+[*][b]Сервер[/b]: Zomboid/Lua/knox_server.txt - grid.scale (размер сумок для всех), music.share = 0 (своя музыка не слышна другим), music.files, music.max_mb, music.rate_kb, music.total_kb, music.cache_mb.
+[/list]
