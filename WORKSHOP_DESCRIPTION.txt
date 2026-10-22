@@ -91,8 +91,8 @@ Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, 
 [h2]FAQ[/h2]
 [list]
 [*][b]Why ZombieBuddy?[/b] Knox's fonts, tooltips, cursor, 3D framing, the live character and the menu's camp need Java code that Lua alone can't reach.
-[*][b]Only want the camp menu, or only the inventory?[/b] You can have that right now: the "Knox Inventory | Modules" plate at the top of the main menu switches the in-game interface, the main menu and the new game screens on and off separately. Turn off everything but the main menu and you keep just the camp - it stays part of Knox, not a separate mod.
-[*][b]Can I re-upload it or parts of it?[/b] No (see below).
+[*][b]Only want the camp menu, or only the inventory?[/b] Yes: the "Knox Inventory | Modules" plate at the top of the main menu switches the in-game interface, the main menu and the new game screens on and off separately. Turn off everything but the main menu and you keep just the camp.
+[*][b]Source code?[/b] Open on [url=https://github.com/SVNTHETIK/knox-inventory]GitHub[/url]. Addons, patches, translations welcome; no re-uploads.
 [*][b]Existing save?[/b] Yes, add it any time.
 [*][b]My hero is a dark figure in the menu?[/b] Load that save once: the hero's look is recorded while you play.
 [*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers, in testing - tell us how it goes.
@@ -103,4 +103,4 @@ Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, 
 [*][b]Found a bug?[/b] Post in Discussions with what you did and your [i]Zomboid\console.txt[/i].
 [/list]
 
-Please don't re-upload Knox Inventory or any part of it (code, models, art), here or elsewhere, and don't put it in modpacks. Link to this page instead.
+Please don't re-upload Knox Inventory or large parts of it, here or elsewhere, or put it in modpacks - link to this page. Terms: LICENSE.md.
