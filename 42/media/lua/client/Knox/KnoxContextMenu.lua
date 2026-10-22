@@ -238,6 +238,9 @@ local WORLD_TEXT = {
     use = {"Fluid_Show_Info", "Fluid_Transfer_Fluids", "ContextMenu_Drink", "ContextMenu_Fill", "ContextMenu_FillOne",
            "ContextMenu_FillAll", "ContextMenu_RefillContainer", "ContextMenu_Wash", "ContextMenu_Turn_On", "ContextMenu_Turn_Off",
            "ContextMenu_StoveSetting",
+           -- (a generator's own, the author 2026-10-22: in the main list, not under "Other")
+           "ContextMenu_GeneratorInfo", "ContextMenu_GeneratorPlug", "ContextMenu_GeneratorUnplug", "ContextMenu_GeneratorAddFuel",
+           "ContextMenu_GeneratorFix",
            "ContextMenu_Open_window", "ContextMenu_Close_window", "ContextMenu_Open_curtains", "ContextMenu_Close_curtains", "ContextMenu_Remove_curtains",
            "ContextMenu_Open_door", "ContextMenu_Close_door", "ContextMenu_LockDoor", "ContextMenu_UnlockDoor",
            "ContextMenu_Lock_Doors", "ContextMenu_Unlock_Doors", "ContextMenu_OpenLid", "ContextMenu_CloseLid",
@@ -311,6 +314,11 @@ local ICON_TEXT = {
     ContextMenu_Turn_On = "light", ContextMenu_Turn_Off = "light",
     -- (the author, 2026-10-22: a lamp's bulb, a stove's settings and a grid's header menu had none)
     ContextMenu_RemoveLightbulb = "bulb_out", ContextMenu_AddLightbulb = "bulb_in", ContextMenu_StoveSetting = "device",
+    -- (the author, 2026-10-22: a generator's options had none)
+    ContextMenu_GeneratorInfo = "device", ContextMenu_GeneratorPlug = "plug_in", ContextMenu_GeneratorUnplug = "plug_out",
+    ContextMenu_GeneratorAddFuel = "fill", ContextMenu_GeneratorFix = "repair", ContextMenu_GeneratorTake = "grab",
+    -- (the author, 2026-10-22: the ground's gardening and an item's "unwanted" had none)
+    ContextMenu_Gardening = "garden", ContextMenu_Unwanted = "unwanted",
     IGUI_Knox_Order_Rule = "sort_rule", IGUI_Knox_Order_SaveLayout = "layout_save", IGUI_Knox_Order_ForgetLayout = "layout_forget",
     IGUI_Knox_MoveTop = "move_top", IGUI_Knox_MoveUp = "move_up", IGUI_Knox_MoveDown = "move_down",
 }
@@ -373,6 +381,7 @@ local function knownTables()
     known.attach = getText("ContextMenu_Attach")
     for key, frac in pairs(CHIP_TEXT) do known.chip[getText(key)] = frac end
     known.inspect = getText("IGUI_Knox_Inspect")
+    known.take = getText("ContextMenu_GeneratorTake")
     known.iconText, known.iconFn, known.tex = {}, {}, {}
     for key, icon in pairs(ICON_TEXT) do
         local text = getText(key)
@@ -798,18 +807,22 @@ local function buildLayout(menu)
         addOption(first)
         first = first + 1
     end
-    -- what stays out of Knox's menus; "Inspect" (the 3D look) always first
-    local rest, inspect = {}, nil
+    -- what stays out of Knox's menus; "Inspect" (the 3D look) always first; "Take the
+    -- generator", when it can be done, before everything (the author, 2026-10-22)
+    local rest, inspect, take = {}, nil, nil
     for i = first, #menu.options do
         local o = menu.options[i]
         if o.onSelect and kt.hidden[o.onSelect] then
             -- (left out)
+        elseif o.name == kt.take and not take and not o.notAvailable then
+            take = i
         elseif o.name == kt.inspect and not inspect then
             inspect = i
         else
             table.insert(rest, i)
         end
     end
+    if take then addOption(take) end
     local labelH = T.fontH(T.fontTile) + math.floor(ih * 0.55)
     if wh and wh.kind ~= "title" then
         -- the world's menu: the place's objects on top (the sink, the curtains),

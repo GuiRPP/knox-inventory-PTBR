@@ -24,7 +24,7 @@ foreach ($l in 'EN', 'RU', 'CN') {
     $f = Join-Path $mod "42\media\lua\shared\Translate\$l\IG_UI.json"
     try { $o = [IO.File]::ReadAllText($f, [Text.Encoding]::UTF8) | ConvertFrom-Json; "JSON ${l}: ok, " + @($o.PSObject.Properties).Count + " keys" } catch { "JSON ${l}: BROKEN " + $_ }
 }
-foreach ($s in 'footprint', 'order', 'search', 'saveguard', 'net', 'carradio', 'dash', 'menu') {
+foreach ($s in 'footprint', 'order', 'search', 'saveguard', 'net', 'carradio', 'dash', 'menu', 'gen') {
     $out = & (Join-Path $mod "tools\$s\test.ps1") 2>&1 | Out-String
     $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' }
     "${s}: " + ($lines -join ' | ')

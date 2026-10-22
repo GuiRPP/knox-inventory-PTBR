@@ -18,6 +18,7 @@ require "ISUI/ISPanel"
 require "OptionScreens/MainScreen"
 require "Knox/KnoxTheme"
 require "Knox/KnoxNews"
+require "Knox/KnoxNewsBack"
 
 local T = KnoxTheme
 local DOT = string.char(183)
@@ -220,6 +221,13 @@ local function prepare(post)
                                b = tonumber(frame:sub(5, 6), 16) / 255}
         elseif banner then
             post.bannerFile = trim(banner)
+        elseif string.match(s, "^@back%s+(%a+)") then
+            -- "@back power": a drawn backdrop of the post (KnoxNewsBack), lit by its generators
+            post.back = string.match(s, "^@back%s+(%a+)")
+        elseif art and trim(art) == "gen" then
+            -- "@art gen": the post's generator itself in the frame, drawn by its window -
+            -- sharp on any screen (a picture of it was soft, the author 2026-10-22)
+            post.artGen = true
         elseif art then
             post.artFile = trim(art)
         elseif not post.lead and s ~= "" and not MARK[string.sub(s, 1, 1)] and string.sub(s, 1, 1) ~= "#"
@@ -259,7 +267,9 @@ local function layout(post, width)
             flush()
         elseif string.sub(s, 1, 2) == "##" then
             flush()
-            table.insert(blocks, {kind = "heading", text = trim(string.sub(s, 3))})
+            -- (every heading on its plate - not only one that opens a picture: the author,
+            -- 2026-10-22, "frame these headings too")
+            table.insert(blocks, {kind = "heading", text = trim(string.sub(s, 3)), framed = true})
         elseif MARK[mark] and string.sub(s, 2, 2) == " " then
             flush()
             local indent = math.floor(T.fontH(T.fontText) * 0.9)
@@ -278,6 +288,13 @@ local function layout(post, width)
                 local last = blocks[#blocks]
                 if last and last.kind == "heading" then last.framed = true end
                 table.insert(blocks, {kind = "dash", body = body, hot = hot == "hot", key = dashes})
+            elseif string.match(s, "^@gen") then
+                -- the generator's window itself, live: "@gen" / "@gen worn"
+                -- (KnoxGeneratorWindow.newsDemo); a section opened by it, as by a picture
+                dashes = dashes + 1
+                local last = blocks[#blocks]
+                if last and last.kind == "heading" then last.framed = true end
+                table.insert(blocks, {kind = "gen", worn = string.match(s, "^@gen%s+worn") ~= nil, key = dashes})
             elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then
@@ -407,6 +424,17 @@ function R:prerender()
     self.escDown = esc
 
     self:drawRect(0, 0, W, H, 0.88, 0.02, 0.022, 0.022)
+    -- a drawn backdrop ("@back power", KnoxNewsBack): lit while a generator of the post runs
+    local backLit, backC = 0, post.frameColor or T.color.accent
+    if post.back and KnoxNewsBack then
+        local on = false
+        for _, d in pairs(self.knoxGenDemos or {}) do
+            if d.demo and d.demo.g.on and d:getIsVisible() then on = true end
+        end
+        self.backSt = self.backSt or {}
+        backLit = KnoxNewsBack.litFor(self.backSt, on, getTimestampMs())
+        KnoxNewsBack.grid(self, 0, 0, W, H, backC, backLit, 0.45)
+    end
 
     -- the post's card on top
     local cw, ch = cardSize()
@@ -426,8 +454,18 @@ function R:prerender()
     -- on the frame's own color, so the strips left over don't show.
     local ax, ay = side + textPanelW + gap, top
     T.rect(self, ax, ay, artW, panelH, T.color.cell)
-    local art = newsTexture(post.artFile, "news_art.png")
-    if art then
+    if post.back and KnoxNewsBack then KnoxNewsBack.grid(self, ax, ay, artW, panelH, backC, backLit, 1) end
+    local art = not post.artGen and newsTexture(post.artFile, "news_art.png") or nil
+    if post.artGen and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
+        -- the generator itself in the middle of the frame, standing (live: started, it
+        -- lights the post's backdrop up - the author, 2026-10-22)
+        local d = KnoxGeneratorWindow.newsDemo(self, "art", false, false)
+        local dw, dh = d:demoSize(artW - pad * 4)
+        self.artView = self.artView or {0, 0, 0, 0}
+        local v = self.artView
+        v[1], v[2], v[3], v[4] = ax, ay, artW, panelH
+        d:hostAt(self, ax + math.floor((artW - dw) / 2), ay + math.floor((panelH - dh) / 2), v)
+    elseif art then
         local tw, th = art:getWidth(), art:getHeight()
         local k = math.min(artW / math.max(1, tw), panelH / math.max(1, th))
         local dw, dh = tw * k, th * k
@@ -440,6 +478,13 @@ function R:prerender()
     -- the text on the left
     local px, pw = side, textPanelW
     T.rect(self, px, top, pw, panelH, T.color.window, 0.97)
+    self.backGrid = nil
+    if post.back and KnoxNewsBack then
+        self:setStencilRect(px, top, pw, panelH)
+        KnoxNewsBack.draw(self, post.back, px, top, pw, panelH, backC, backLit)
+        self.backGrid = {backC, backLit, post.back}
+        self:clearStencilRect()
+    end
     T.tileFrame(self, px, top, pw, panelH, T.color.tileFrame)
     self.panel = {px, top, pw, panelH}
     self.artRect = {ax, ay, artW, panelH}
@@ -451,6 +496,13 @@ function R:prerender()
         self.blocksW = textW
         self.titleLines = T.wrap(T.upper(post.title), titleFont, pw - pad * 6)
     end
+    -- the head (title, tag, date) on a band of its own over the whole panel, a line of the
+    -- post's colour under it: a thin grey line alone did not part it from the post (the
+    -- author, 2026-10-22)
+    local pc = post.frameColor or T.color.accent
+    local headH = pad * 2 + #self.titleLines * T.fontH(titleFont) + math.floor(pad / 2) + T.fontH(T.fontTab) + pad + math.floor(pad / 2)
+    T.rect(self, px + 2, top + 2, pw - 4, headH - 2, T.color.header)
+    T.rect(self, px + 2, top + headH, pw - 4, 4, pc)   -- (2 px read thin: the author, 2026-10-22)
     local y = top + pad * 2
     for _, l in ipairs(self.titleLines) do
         T.textCentre(self, l, centre, y, T.color.bright, titleFont)
@@ -461,12 +513,9 @@ function R:prerender()
     if post.date ~= "" then meta = meta .. "  " .. DOT .. "  " .. post.date end
     y = y + math.floor(pad / 2)
     -- (a post with a colour of its own - @frame - has it here too: the line under the
-    -- title, its headings, its pictures' frames, the scroll bar)
-    local pc = post.frameColor or T.color.accent
+    -- head, its headings, its pictures' frames, the scroll bar)
     T.textCentre(self, meta, centre, y, pc, T.fontTab)
-    y = y + T.fontH(T.fontTab) + pad
-    T.rect(self, px + pad * 3, y, pw - pad * 6, 1, T.color.border)
-    y = y + pad
+    y = top + headH + 4 + pad
 
     -- the body scrolls under the title
     local viewTop, viewH = y, top + panelH - pad - y
@@ -529,6 +578,14 @@ function R:prerender()
             y = y + math.floor(lh * 0.4)
             d:hostAt(self, ix, y, self.view)
             y = y + h + pad + math.floor(lh * 0.4)
+        elseif b.kind == "gen" and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
+            -- the live generator: its window itself on a pretend generator, in the view only
+            local d = KnoxGeneratorWindow.newsDemo(self, b.key, b.worn)
+            local w, h = d:demoSize(textW)
+            local ix = centre - math.floor(w / 2)
+            y = y + math.floor(lh * 0.4)
+            d:hostAt(self, ix, y, self.view)
+            y = y + h + pad + math.floor(lh * 0.4)
         end
     end
     self:clearStencilRect()
@@ -553,11 +610,13 @@ function R:prerender()
         -- (a wider strip than the thin line takes the mouse)
         self.bar = {track = {px + pw - 18, viewTop, 18, viewH}, knobY = barY, knobH = barH, top = viewTop, h = viewH}
         local hot = drag or T.inRect(mx, my, self.bar.track)
-        T.rect(self, px + pw - 7, viewTop, 2, viewH, T.color.border)
         -- (in the post's colour; under the mouse a lighter shade of it, not white)
         local kc = pc
         if hot then kc = {r = pc.r + (1 - pc.r) * 0.35, g = pc.g + (1 - pc.g) * 0.35, b = pc.b + (1 - pc.b) * 0.35} end
-        T.rect(self, px + pw - (hot and 9 or 8), barY, hot and 6 or 4, barH, kc)
+        -- (painted in render, over the fades at the view's ends)
+        self.barPaint = {px + pw - 7, viewTop, viewH, px + pw - (hot and 9 or 8), barY, hot and 6 or 4, barH, kc}
+    else
+        self.barPaint = nil
     end
 
     -- how to leave
@@ -567,6 +626,63 @@ function R:prerender()
     self.hint = {hx - pad, hy - pad, hintW + pad * 2, T.fontH(T.fontTile) + pad * 2}
     if T.inRect(mx, my, self.hint) then T.border(self, self.hint[1], self.hint[2], self.hint[3], self.hint[4], pc) end
     T.keyHint(self, hx, hy, "Esc", label)
+end
+
+--- Where the post goes on past its view (scrolled), it fades into the panel instead of
+--- being cut off - as the inventory's columns do (T.edgeFades). Drawn here, after the
+--- children: a live demo in the post (the generator, the dashboard) is one of them and
+--- stood cut over a fade drawn with the text (the author, 2026-10-22).
+function R:render()
+    ISPanel.render(self)
+    self:drawFades()
+    local b = self.barPaint
+    if b then
+        T.rect(self, b[1], b[2], 2, b[3], T.color.border)
+        T.rect(self, b[4], b[5], b[6], b[7], b[8])
+    end
+end
+
+--- Where the post goes on past its view (scrolled), it fades into its panel instead of
+--- being cut off, as the inventory's columns do. Not a fill laid over it: the panel
+--- itself (its colour, and a drawn backdrop - the grid, the light, the bulb) is painted
+--- back over the post strip by strip, more of it towards the edge, so only the post
+--- fades. (A flat fill showed as a dark band over the backdrop with a visible edge -
+--- the author, 2026-10-22.) Drawn after the children: a live demo in the post (the
+--- generator, the dashboard) is one of them.
+function R:drawFades()
+    local v, pnl = self.view, self.panel
+    if not v or not pnl then return end
+    local now = getTimestampMs()
+    local dt = math.min(100, now - (self.fadeMs or now))
+    self.fadeMs = now
+    local step = T.anim(math.min(1, dt / 120))
+    local below = (self.scrollMax or 0) - (self.scroll or 0) > 1
+    local above = (self.scroll or 0) > 1
+    self.fadeBottom = (self.fadeBottom or 0) + ((below and 1 or 0) - (self.fadeBottom or 0)) * step
+    self.fadeTop = (self.fadeTop or 0) + ((above and 1 or 0) - (self.fadeTop or 0)) * step
+    if self.fadeBottom <= 0.01 and self.fadeTop <= 0.01 then return end
+    -- (inside the panel's frame: its 2 px stay)
+    local x, w = pnl[1] + 2, pnl[3] - 4
+    local band = math.min(math.floor(T.cell * 1.3), math.floor(v[4] / 3))
+    local c = T.color.window
+    local bg = self.backGrid
+    local sh = 3   -- (3 px strips: smooth enough, and each paints the backdrop again)
+    local function strip(y, am)
+        if am <= 0.003 then return end
+        self:setStencilRect(x, y, w, sh)
+        self:drawRect(x, y, w, sh, 0.97 * am, c.r, c.g, c.b)
+        if bg and KnoxNewsBack then
+            KnoxNewsBack.drawStrip(self, bg[3], pnl[1], pnl[2], pnl[3], pnl[4], bg[1], bg[2], y, sh, am)
+        end
+        self:clearStencilRect()
+    end
+    for i = 0, band - 1, sh do
+        -- (eased: nothing where it starts, nearly the panel itself at the edge)
+        local f = 1 - (i + sh / 2) / band
+        local a = f * f * (3 - 2 * f) * 0.96
+        if self.fadeBottom > 0.01 then strip(v[2] + v[4] - i - sh, a * self.fadeBottom) end
+        if self.fadeTop > 0.01 then strip(v[2] + i, a * self.fadeTop) end
+    end
 end
 
 function R:onMouseDown(x, y)

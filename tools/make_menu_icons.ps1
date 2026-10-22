@@ -518,6 +518,40 @@ function Bulb($g) {
 Icon "bulb_out" { param($g); Bulb $g; Arrow $g 42 22 58 6 9 }
 Icon "bulb_in" { param($g); Bulb $g; Arrow $g 58 6 44 20 9 }
 
+# a generator to the house and off it (the author, 2026-10-22: its options had none):
+# a plug, its two pins, its cord; the arrow - in or out
+function Plug($g) {
+    RRect $g 10 24 28 22 4
+    Line $g 18 10 18 24; Line $g 30 10 30 24
+    Line $g 24 46 24 58
+}
+Icon "plug_in" { param($g); Plug $g; Arrow $g 52 42 52 10 9 }
+Icon "plug_out" { param($g); Plug $g; Arrow $g 52 10 52 42 9 }
+
+# the ground's gardening and an item marked unwanted (the author, 2026-10-22: none)
+Icon "garden" {
+    param($g)
+    # a sprout from the soil: a stem, two leaves, the ground's line
+    Line $g 8 56 56 56
+    Line $g 32 56 32 24
+    $p = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $p.AddBezier((F 32), (F 34), (F 18), (F 34), (F 10), (F 24), (F 10), (F 14))
+    $p.AddBezier((F 10), (F 14), (F 24), (F 14), (F 32), (F 22), (F 32), (F 34))
+    $g.DrawPath((Pen), $p)
+    $q = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $q.AddBezier((F 32), (F 26), (F 44), (F 26), (F 54), (F 18), (F 54), (F 6))
+    $q.AddBezier((F 54), (F 6), (F 42), (F 6), (F 32), (F 14), (F 32), (F 26))
+    $g.DrawPath((Pen), $q)
+}
+Icon "unwanted" {
+    param($g)
+    # a bin: its lid and handle, the body narrowing down, two ribs
+    Line $g 8 16 56 16
+    Lines $g @(24, 16, 26, 8, 38, 8, 40, 16)
+    Shape $g @(14, 16, 50, 16, 46, 58, 18, 58)
+    Line $g 26 26 27 48; Line $g 38 26 37 48
+}
+
 # a grid's header menu (the author, 2026-10-22: the bag's menu had no icons)
 function Grid3($g) {
     Box $g 8 8 40 40

@@ -11,9 +11,51 @@
 ;   @banner picture.png                 - the background of the post's card in the main menu (912 x 204)
 ;   @art picture.png                    - the large picture on the right of the opened post (960 x 1080, shown whole on the frame's colour)
 ;   @frame #rrggbb                      - the post card's frame in a colour of its own in the main menu (default: the main colour)
+;   @dash sedan / @dash pickup hot      - the car's dashboard, live, in the post's text
+;   @gen / @gen worn                    - the generator's window, live, in the post's text (new / worn)
+;   @art gen                            - the generator itself on the right instead of a picture (live, sharp on any screen)
+;   @back power                         - a drawn backdrop of the post: a grid and a bulb that light up when a generator of the post runs
 ;   plain text                          - a paragraph; an empty line starts a new one
 ;   ; ...                               - a comment, not shown in game
 ; A post counts as read by its version, date and title: change them and it shows as new again.
+
+# | 22.10.2026 | update | Keep the Lights On
+@banner g1_banner_en.png
+@art gen
+@back power
+Flip the switch, yank the cord - and the generator rattles to life. The needles jump, the body trembles, the hour meter starts counting down. The lights are on.
+
+The generator no longer shows a plain info box. It has a window of its own: a portable generator you work with your hands.
+
+## The generator
+@gen
+This is not a picture, it is the generator itself. Turn the switch to RUN, grab the cord's handle and jerk it down hard. Click the can by the tank to pour gasoline.
++ A tank with a fuel gauge, an OFF / RUN switch, a starter cord, a load needle, an hour meter, RUN, OIL and CO GAS lamps, outlets and a HOUSE lever.
++ It starts only with a jerk: pull the cord all the way and fast. Too slow or not far enough - the engine won't catch.
++ The outlets hold the plugs of what the generator powers right now: a fridge, the lights, a stove. Hover a plug for its name and use.
++ TIME LEFT counts how many hours the fuel lasts at this load. The light drum on the right is tenths of an hour.
++ Running, the body shakes and the scales light up. Indoors, the CO GAS lamp blinks.
+
+## An old generator
+@gen worn
+This one has seen better days: 30% condition. It doesn't always start on the first pull.
++ The worse the condition, the more often a start fails: at 30% every other pull, from 60% up always on the first one. Below 40% the OIL lamp blinks.
+* One rule for every start, the right click menu's too.
+
+## How to work it
++ Left click a generator: the character walks up and the window opens.
++ While the window is open the character crouches at the generator, and everything in it works at once - no action bar for every click.
++ Refuelling looks like the game's: the character pours from the can, gasoline goes in portions, the needle creeps to F. Click the can again to stop. The can has to be on you: in your hands, a pocket or a bag.
++ Only someone who knows electrics (skill 3) or has read the generator magazine can connect it to a house. Anyone can disconnect it.
++ Close the window or walk away - the character stands up.
++ Don't like it? Switch the Generator module off in Knox's settings and the game's window is back.
+
+## The right click menu
+* Everything about the generator is in the main group, not under Other. Turn On and Turn Off are gone: you start it in the window now.
+* Take Generator comes first when it can be taken (only when disconnected).
++ New icons: info, connect and disconnect, add fuel, fix, take, Gardening and Unwanted.
+
+A full tank and warm lights in the windows.
 
 # | 22.10.2026 | tech | Lighter and steadier
 A technical update of the beta: nothing new to play with, but the inventory is easier on your computer, and a handful of small breakages are fixed.

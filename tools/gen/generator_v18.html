@@ -1,0 +1,224 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Knox generator v18</title>
+<link id="ff" href="https://fonts.googleapis.com/css2?family=Fira+Sans+Extra+Condensed:wght@500;600;700&display=block" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0c0c}
+.gbox{background:#0b0c0c;padding:12px 8px 10px;max-width:900px;margin:0 auto}
+.gctl{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.gctl button{font:14px sans-serif;padding:6px 10px}
+#g{width:100%;height:auto;display:block;touch-action:none;user-select:none;opacity:0;transition:opacity .2s}
+#g.ready{opacity:1}
+#g .hot{cursor:pointer}#hg{cursor:grab}
+@keyframes shake{0%{transform:translate(0,0)}25%{transform:translate(.7px,-.5px)}50%{transform:translate(-.6px,.4px)}75%{transform:translate(.4px,.7px)}100%{transform:translate(0,0)}}
+.run #frame{animation:shake .08s linear infinite}
+@keyframes blink{50%{opacity:.2}}.blink{animation:blink .8s steps(2) infinite}
+</style></head><body>
+<div class="gbox">
+<svg id="g" viewBox="0 0 700 500" xmlns="http://www.w3.org/2000/svg" font-family="'Fira Sans Extra Condensed', sans-serif" font-weight="600">
+<defs id="defs"><linearGradient id="glint" gradientUnits="userSpaceOnUse" x1="84" y1="0" x2="404" y2="0"><stop offset="0" stop-color="#565947" stop-opacity="0"/><stop offset=".12" stop-color="#565947"/><stop offset=".7" stop-color="#565947"/><stop offset="1" stop-color="#565947" stop-opacity="0"/></linearGradient><linearGradient id="shade" gradientUnits="userSpaceOnUse" x1="84" y1="0" x2="404" y2="0"><stop offset="0" stop-color="#1a1b16" stop-opacity="0"/><stop offset=".12" stop-color="#1a1b16"/><stop offset=".7" stop-color="#1a1b16"/><stop offset="1" stop-color="#1a1b16" stop-opacity="0"/></linearGradient><linearGradient id="glintF" gradientUnits="userSpaceOnUse" x1="431.09" y1="89.22" x2="462.72" y2="83.65"><stop offset="0" stop-color="#ece8d8" stop-opacity="0"/><stop offset=".45" stop-color="#ece8d8" stop-opacity=".22"/><stop offset="1" stop-color="#ece8d8" stop-opacity="0"/></linearGradient><linearGradient id="glintL" gradientUnits="userSpaceOnUse" x1="216.57" y1="252" x2="302.05" y2="227.49"><stop offset="0" stop-color="#ece8d8" stop-opacity="0"/><stop offset=".45" stop-color="#ece8d8" stop-opacity=".25"/><stop offset="1" stop-color="#ece8d8" stop-opacity="0"/></linearGradient></defs>
+<text data-c="350,16" fill="#8f9289" font-size="12" font-weight="500" id="msg">Поверни переключатель на «РАБОТА», зажми ручку шнура и резко дёрни вниз.</text>
+<g id="frame">
+ <rect x="26" y="42" width="648" height="420" rx="26" fill="none" stroke="#1d2120" stroke-width="16"/>
+ <rect x="26" y="42" width="648" height="420" rx="26" fill="none" stroke="#3a403f" stroke-width="10"/>
+ <rect x="24" y="40" width="648" height="420" rx="26" fill="none" stroke="#56605c" stroke-width="2"/>
+ <g fill="#2a2e2e" stroke="#141414" stroke-width="2"><rect x="58" y="462" width="44" height="14" rx="4"/><rect x="598" y="462" width="44" height="14" rx="4"/></g>
+ <g id="fins" fill="#2b302f" stroke="#141414" stroke-width="1.5"></g>
+ <rect x="602" y="196" width="54" height="96" rx="10" fill="#2f3534" stroke="#4a5452" stroke-width="2"/>
+ 
+ <g id="vents" stroke="#151716" stroke-width="3" stroke-linecap="round"></g>
+ <circle cx="629" cy="244" r="7" fill="#3a403f" stroke="#141414" stroke-width="2"/><path d="M625 244 h8 M629 240 v8" stroke="#141414" stroke-width="1.5"/>
+ <g id="tank" transform="translate(0,9)">
+ <rect x="62" y="54" width="452" height="104" rx="34" fill="#141614"/>
+ <rect x="64" y="54" width="448" height="100" rx="32" fill="#2a2c23" stroke="#4c4e3f" stroke-width="2"/>
+ <path d="M84 58.5 H404" stroke="url(#glint)" stroke-width="3" stroke-linecap="round"/><path d="M84 149.5 H404" stroke="url(#shade)" stroke-width="3" stroke-linecap="round"/>
+ <rect x="84" y="76" width="290" height="56" rx="4" fill="#191a15" stroke="#3a3c30" stroke-width="1.5"/>
+ <text data-c="229,93" data-w="266" fill="#d4c38a" class="lit" data-on="#f3e3a6" font-size="27" font-weight="700" letter-spacing="7">KNOX POWER</text>
+ <line x1="96" y1="110.5" x2="362" y2="110.5" stroke="#3a3c30" stroke-width="1"/>
+ <text data-c="229,121" data-w="266" fill="#8f9289" font-size="11" font-weight="500" letter-spacing="3">5500 W · 4-ТАКТ · БЕНЗИН · 120 В</text>
+ <circle cx="450" cy="104" r="40" fill="#1e1f19"/><circle cx="450" cy="104" r="38" fill="#141510"/>
+ <circle cx="450" cy="104" r="35" fill="#3b3d33" stroke="#5c5f4e" stroke-width="2"/>
+ <circle cx="450" cy="104" r="29" fill="#262820"/><circle cx="450" cy="104" r="27" fill="#0b0c0a"/>
+ <g id="fscale" stroke-linecap="round"></g>
+ <text id="fE" fill="#be463c" font-size="9">E</text><text id="fF" fill="#d4c38a" font-size="9" class="lit">F</text>
+ <text data-c="450,118" fill="#8f9289" class="lit" font-size="7" letter-spacing="1">ТОПЛИВО</text>
+ <path id="fneedle" d="M448.8 109 L449.2 86 L450 83 L450.8 86 L451.2 109 Z" fill="#ffb547"/>
+ <circle cx="450" cy="104" r="4" fill="#2a2e2e" stroke="#5b615c" stroke-width="1.5"/><circle cx="449" cy="103" r="1.2" fill="#fff" fill-opacity=".2"/>
+ <path d="M431.09 89.22 A24 24 0 0 1 462.72 83.65" fill="none" stroke="url(#glintF)" stroke-width="2.5" stroke-linecap="round"/>
+ <g class="hot" onclick="refuel()">
+  <rect id="canf" x="550" y="66" width="64" height="80" rx="6" fill="#0e1010" stroke="#3c4141" stroke-width="2" pathLength="120" stroke-dasharray="3 3" stroke-dashoffset="2.27"/>
+  <g id="can"><rect x="0" y="6" width="38" height="48" rx="5" fill="#6b2b24" stroke="#3d1612" stroke-width="2"/><rect x="2" y="8" width="34" height="6" rx="2" fill="#8a3a31"/>
+   <rect x="8" y="22" width="22" height="22" rx="2" fill="none" stroke="#3d1612" stroke-width="2"/><line x1="8" y1="22" x2="30" y2="44" stroke="#3d1612" stroke-width="2"/><line x1="30" y1="22" x2="8" y2="44" stroke="#3d1612" stroke-width="2"/>
+   <rect x="13" y="0" width="12" height="8" rx="2" fill="#8f9289"/></g>
+ </g>
+ </g>
+ <rect x="62" y="176" width="530" height="252" rx="8" fill="#101212"/>
+ <rect x="64" y="176" width="526" height="248" rx="7" fill="#1c1f1f" stroke="#363b3a" stroke-width="2"/>
+<g id="screws"></g><g id="plates"></g>
+ <circle cx="138" cy="267" r="40" fill="#121414" stroke="#2a2e2e" stroke-width="2"/>
+ <g id="swticks" stroke="#5b615c" stroke-width="2"></g>
+ <text data-c="104,220" fill="#8f9289" font-size="9" letter-spacing="1">ВЫКЛ</text>
+ <text data-c="174,220" fill="#d4c38a" class="lit" data-on="#f3e3a6" font-size="9" letter-spacing="1">РАБОТА</text>
+ <g class="hot" onclick="toggleSw()">
+  <circle cx="138" cy="267" r="30" fill="#0b0c0c"/>
+  <g id="knob"><circle cx="138" cy="267" r="26" fill="#2c3030" stroke="#4a5050" stroke-width="2"/><g id="ribs" stroke="#1b1e1e" stroke-width="2"></g>
+   <rect x="133" y="241" width="10" height="52" rx="4" fill="#3a3f3f" stroke="#1b1e1e" stroke-width="1.5"/><rect x="136" y="243" width="4" height="16" rx="2" fill="#d4c38a"/></g>
+ </g>
+ <circle cx="138" cy="325" r="12" fill="#121414" stroke="#2f3433" stroke-width="2"/>
+ <g stroke="#2a2e2e" stroke-width="1.5"><line x1="131" y1="319" x2="145" y2="319"/><line x1="129" y1="324" x2="147" y2="324"/><line x1="131" y1="329" x2="145" y2="329"/></g>
+ <circle cx="138" cy="334" r="3" fill="#0b0c0c"/>
+ <circle cx="272" cy="284" r="72" fill="#0d0e0e"/><circle cx="272" cy="284" r="68" fill="#2a2e2e" stroke="#46504c" stroke-width="2"/>
+ <circle cx="272" cy="284" r="60" fill="#0a0b0b"/>
+ <g id="lzone"></g><g id="lscale" stroke-linecap="round"></g><g id="lnums"></g>
+ <rect id="lvr" x="246" y="318" width="52" height="16" rx="2" fill="#141414" stroke="#2a2e2e" stroke-width="1.5"/>
+ <text id="lv" data-c="272,326" fill="#ece8d8" font-size="11" font-weight="500">0,030 л/ч</text>
+ <path id="lneedle" d="M268 298 L270.4 284 L271 236 L272 230 L273 236 L273.6 284 L276 298 Z" fill="#ffb547" stroke="#a8722a" stroke-width=".6"/>
+ <circle cx="272" cy="284" r="8" fill="#2a2e2e" stroke="#5b615c" stroke-width="2"/><circle cx="270" cy="282" r="2.5" fill="#fff" fill-opacity=".18"/>
+ <path d="M216.57 252 A64 64 0 0 1 302.05 227.49" fill="none" stroke="url(#glintL)" stroke-width="3" stroke-linecap="round"/>
+ <g id="meter"></g>
+ <text data-c="420,264.5" fill="#8f9289" class="lit" font-size="8" letter-spacing="1">ЧАСЫ</text>
+ <rect x="370" y="276" width="100" height="98" rx="4" fill="#0f1010" stroke="#2a2e2e" stroke-width="1.5"/><g id="lamps"></g>
+ <rect x="488" y="208" width="96" height="114" rx="4" fill="#141616" stroke="#2f3433" stroke-width="2"/>
+ <g id="outs"></g>
+ <g class="hot" onclick="toggleHouse()">
+  <rect x="488" y="330" width="96" height="50" rx="4" fill="#121414" stroke="#2f3433" stroke-width="2"/>
+  <text data-c="536,339" fill="#8f9289" class="lit" font-size="8" letter-spacing="1">СЕТЬ ДОМА</text>
+  <rect x="502" y="347" width="68" height="24" rx="12" fill="#0a0b0b" stroke="#3c4141" stroke-width="1.5"/>
+  <text id="hvOn" data-c="520,359" fill="#6ca050" font-size="9" letter-spacing="1">ВКЛ</text>
+  <text id="hvOff" data-c="548,359" fill="#8f9289" font-size="9" letter-spacing="1" opacity="0">ВЫКЛ</text>
+  <g id="lever"><circle cx="557" cy="359" r="11" fill="#d4c38a" stroke="#8a7d52" stroke-width="2"/><rect x="553" y="350" width="8" height="18" rx="3" fill="#b5a672"/></g>
+ </g>
+</g>
+<path id="cord" stroke="#9b9d92" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="hg"><rect x="-32" y="-2" width="64" height="20" rx="10" fill="#141414" opacity=".6"/><rect x="-30" y="-4" width="60" height="18" rx="9" fill="#a83c33" stroke="#5e211c" stroke-width="2"/>
+ <g stroke="#7a2a24" stroke-width="2"><line x1="-16" y1="0" x2="-16" y2="10"/><line x1="-8" y1="0" x2="-8" y2="10"/><line x1="0" y1="0" x2="0" y2="10"/><line x1="8" y1="0" x2="8" y2="10"/><line x1="16" y1="0" x2="16" y2="10"/></g>
+ <circle cx="0" cy="-4" r="3" fill="#5e211c"/></g>
+<g id="tip" opacity="0" pointer-events="none"><rect id="tipr" rx="3" fill="#1a1d1d" stroke="#d4c38a" stroke-width="1.5"/><text id="tipt" fill="#ece8d8" font-size="11" font-weight="500"></text></g>
+<g id="dbg" pointer-events="none"></g>
+</svg>
+<div class="gctl"><button onclick="setFuel(0.07)">Почти пустой бак</button><button onclick="worn()">Изношен (30%)</button><button onclick="indoors()">Внутри дома</button><button onclick="reset()">Сбросить</button></div>
+</div>
+<script>
+const $=i=>document.getElementById(i),g=$('g'),NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||g).appendChild(e);return e}
+let S={sw:false,run:false,fuel:.62,cond:.82,inside:false,house:true};
+const knobC=[138,267],LC=[272,284],FC=[450,104];
+const FAM="'Fira Sans Extra Condensed', sans-serif",SC=4,pc=document.createElement('canvas'),px=pc.getContext('2d',{willReadFrequently:true});let cache={};
+function wOf(t){let n=t;while(n&&n.getAttribute&&!n.getAttribute('font-weight'))n=n.parentNode;return (n&&n.getAttribute&&n.getAttribute('font-weight'))||'600'}
+function inkOf(txt,fs,ls,wt){const key=txt+'|'+fs+'|'+ls+'|'+wt;if(cache[key])return cache[key];const W=Math.ceil((fs*(txt.length+2)+ls*txt.length)*SC),H=Math.ceil(fs*3*SC);pc.width=W;pc.height=H;
+ px.font=wt+' '+(fs*SC)+'px '+FAM;px.letterSpacing=(ls*SC)+'px';px.fillStyle='#000';const ox=fs*SC,oy=fs*2*SC;px.fillText(txt,ox,oy);
+ const d=px.getImageData(0,0,W,H).data;let x0=W,x1=-1,y0=H,y1=-1;for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>40){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+ const r={l:(x0-ox)/SC,r:(x1+1-ox)/SC,t:(oy-y0)/SC,b:(y1+1-oy)/SC};cache[key]=r;return r}
+function capH(fs,wt){return inkOf('Н',fs,0,wt).t}
+function place(t){const c=t.getAttribute('data-c').split(',').map(Number),maxw=parseFloat(t.getAttribute('data-w')||0),wt=wOf(t);if(!t.dataset.fs){t.dataset.fs=t.getAttribute('font-size');t.dataset.ls=t.getAttribute('letter-spacing')||'0'}
+ let fs=parseFloat(t.dataset.fs),ls=parseFloat(t.dataset.ls),m=inkOf(t.textContent,fs,ls,wt);
+ if(maxw&&m.r-m.l>maxw){const k=maxw/(m.r-m.l);fs=+(fs*k).toFixed(2);ls=+(ls*k).toFixed(2);m=inkOf(t.textContent,fs,ls,wt)}
+ t.setAttribute('font-size',fs);t.setAttribute('letter-spacing',ls);t.setAttribute('text-anchor','start');t.setAttribute('dominant-baseline','alphabetic');
+ const vh=/^[0-9!]$/.test(t.textContent)?m.t:capH(fs,wt);
+ t.setAttribute('x',(c[0]-(m.l+m.r)/2).toFixed(2));t.setAttribute('y',(c[1]+vh/2).toFixed(2));return m}
+function fitBox(){const m=inkOf('0,030 л/ч',11,0,'500'),w=Math.ceil(m.r-m.l)+14;$('lvr').setAttribute('x',272-w/2);$('lvr').setAttribute('width',w)}
+function centreG(q,box){q.removeAttribute('transform');const bb=q.getBBox();q.setAttribute('transform','translate('+(box[0]+box[2]/2-(bb.x+bb.width/2)).toFixed(2)+','+(box[1]+box[3]/2-(bb.y+bb.height/2)).toFixed(2)+')')}
+function placeAll(){fitBox();centreG($('can'),[550,66,64,80]);g.querySelectorAll('text[data-c]').forEach(place)}
+const P=(c,r,a)=>[c[0]+r*Math.sin(a*Math.PI/180),c[1]-r*Math.cos(a*Math.PI/180)];
+for(let i=0;i<=8;i++){const a=-60+i*15,b=i%2==0,p1=P(FC,b?15.5:18,a),p2=P(FC,20.5,a);el('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],'stroke-width':b?1.8:1,stroke:i==0?'#be463c':'#8f9289',class:i?'lit':''},$('fscale'))}
+(function(){const e=P(FC,15,-95),f=P(FC,15,95);$('fE').setAttribute('data-c',e[0]+','+e[1]);$('fF').setAttribute('data-c',f[0]+','+f[1])})();
+for(let i=0;i<=40;i++){const a=-120+i*6,m=i%10==0,h=i%5==0,p1=P(LC,m?45:h?49:52,a),p2=P(LC,57,a);el('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],'stroke-width':m?2.5:h?1.5:1,stroke:'#8f9289',class:'lit'},$('lscale'));if(m){const q=P(LC,37,a);el('text',{'data-c':q[0]+','+q[1],fill:'#8f9289',class:'lit','font-size':10},$('lnums')).textContent=['0','0,025','0,05','0,075','0,1'][i/10]}}
+[[-120,24,'#6ca050'],[24,72,'#c9a24a'],[72,120,'#be463c']].forEach(z=>{const a=P(LC,59,z[0]),b=P(LC,59,z[1]);el('path',{d:'M'+a[0]+' '+a[1]+' A59 59 0 0 1 '+b[0]+' '+b[1],fill:'none',stroke:z[2],'stroke-width':3},$('lzone'))});
+[-40,40].forEach(a=>{const p1=P(knobC,32.5,a),p2=P(knobC,36.5,a);el('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1]},$('swticks'))});
+for(let i=0;i<18;i++){const a=i*20,p1=P(knobC,22,a),p2=P(knobC,26,a);el('line',{x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1]},$('ribs'))}
+for(let i=0;i<8;i++)el('rect',{x:603,y:298+i*11,width:52,height:7,rx:3},$('fins'));
+[206,213,220,268,275,282].forEach(y=>el('line',{x1:612,y1:y,x2:646,y2:y},$('vents')));
+[[76,412],[578,412]].forEach(s=>{el('circle',{cx:s[0],cy:s[1],r:5,fill:'#3a403f',stroke:'#141414','stroke-width':1.5},$('screws'));el('line',{x1:s[0]-3,y1:s[1]-1,x2:s[0]+3,y2:s[1]+1,stroke:'#141414','stroke-width':1.5},$('screws'))});
+[[88,188,100,'ДВИГАТЕЛЬ'],[222,188,100,'НАГРУЗКА'],[370,188,100,'ОСТАЛОСЬ'],[488,188,96,'РОЗЕТКИ 120 В']].forEach(p=>{el('rect',{x:p[0],y:p[1],width:p[2],height:16,rx:2,fill:'#141616',stroke:'#2a2e2e'},$('plates'));el('text',{'data-c':(p[0]+p[2]/2)+','+(p[1]+8),'data-w':p[2]-12,fill:'#8f9289','font-size':10,'letter-spacing':2,class:'lit'},$('plates')).textContent=p[3]});
+/* meter: housing 370..470 x 210..254, rim 4 on every side, window 374..466 x 214..250, digits 5 px inside the window on every side */
+const MT=$('meter'),DW=16,DH=26,MY=219,DX=[379,398,417,445],DIG=[],STEP=DH;
+el('rect',{x:371,y:211,width:98,height:42,rx:5,fill:'#3b3f3f',stroke:'#141414','stroke-width':2},MT);
+el('rect',{x:374.5,y:214.5,width:91,height:35,rx:2,fill:'#0e1010',stroke:'#5b615c','stroke-width':1},MT);
+/* the hour meter: three drums of hours, the point (white - the author, 2026-10-22), the tenths' drum light with a dark figure (as real hour meters) */
+el('circle',{cx:439,cy:MY+DH-4,r:1.7,fill:'#f2ecd8'},MT);
+DX.forEach((x,i)=>{const cid='dc'+i,cp=el('clipPath',{id:cid},$('defs'));el('rect',{x:x,y:MY,width:DW,height:DH},cp);
+ el('rect',{x:x,y:MY,width:DW,height:DH,fill:i==3?'#d9d2bc':'#2e3232'},MT);const wrap=el('g',{'clip-path':'url(#'+cid+')'},MT),strip=el('g',{},wrap);
+ for(let n=0;n<=10;n++){const t=el('text',{'data-c':(x+DW/2)+','+(MY+DH/2+n*STEP),fill:i==3?'#1c1e1e':'#f2ecd8','font-size':17,'font-weight':'600'},strip);t.textContent=String(n%10)}
+ el('rect',{x:x,y:MY,width:DW,height:DH/2,fill:'#000',opacity:.12},wrap);
+ el('rect',{x:x+.5,y:MY+.5,width:DW-1,height:DH-1,fill:'none',stroke:'#6a706d','stroke-width':1},MT);
+ DIG.push({strip:strip,pos:0,from:0,to:0,t0:0})});
+[['lrun','#1d2a1b','РАБОТА'],['loil','#2b2416','МАСЛО'],['lco','#2c1715','УГАР. ГАЗ']].forEach((l,i)=>{const y=296+i*28;el('circle',{cx:390,cy:y,r:10,fill:'#0a0a0a',stroke:'#3c4141','stroke-width':2},$('lamps'));el('circle',{id:l[0],cx:390,cy:y,r:7,fill:l[1]},$('lamps'));el('circle',{cx:387,cy:y-3,r:2,fill:'#fff','fill-opacity':.15},$('lamps'));el('text',{'data-c':'435,'+y,'data-w':58,fill:'#8f9289','font-size':9,'letter-spacing':1,class:'lit'},$('lamps')).textContent=l[2]});
+function icon(kind,box,p){const c='#d4c38a',w=1.4,q=el('g',{},p);
+ if(kind=='fridge'){el('rect',{x:-4.5,y:-7,width:9,height:14,rx:1.5,fill:'none',stroke:c,'stroke-width':w,class:'lit'},q);el('line',{x1:-4.5,y1:-2,x2:4.5,y2:-2,stroke:c,'stroke-width':w,class:'lit'},q);el('line',{x1:2.5,y1:-5.5,x2:2.5,y2:-3.5,stroke:c,'stroke-width':w,class:'lit'},q)}
+ if(kind=='bulb'){el('circle',{cx:0,cy:-2,r:4.5,fill:'none',stroke:c,'stroke-width':w,class:'lit'},q);el('rect',{x:-2.5,y:2.5,width:5,height:4,rx:1,fill:'none',stroke:c,'stroke-width':w,class:'lit'},q)}
+ if(kind=='stove'){el('rect',{x:-6,y:-5,width:12,height:11,rx:1.5,fill:'none',stroke:c,'stroke-width':w,class:'lit'},q);el('circle',{cx:-2.5,cy:-1,r:1.6,fill:'none',stroke:c,'stroke-width':1.2,class:'lit'},q);el('circle',{cx:2.5,cy:-1,r:1.6,fill:'none',stroke:c,'stroke-width':1.2,class:'lit'},q);el('line',{x1:-4,y1:3,x2:4,y2:3,stroke:c,'stroke-width':1.2,class:'lit'},q)}
+ centreG(q,box)}
+const OUT=[['fridge','Холодильник','0,08 л/ч'],['bulb','Свет · 4 лампы','0,02 л/ч'],['stove','Плита','0,09 л/ч'],null];
+OUT.forEach((o,i)=>{const x=496+(i%2)*42,y=215+Math.floor(i/2)*52,p=el('g',{},$('outs'));
+ el('rect',{x:x,y:y,width:38,height:44,rx:4,fill:'#2a2e2e',stroke:'#46504c','stroke-width':1.5},p);el('rect',{x:x+4,y:y+4,width:30,height:30,rx:6,fill:'#0e1010'},p);
+ el('rect',{x:x+11,y:y+10,width:3,height:9,rx:1,fill:'#000'},p);el('rect',{x:x+24,y:y+10,width:3,height:9,rx:1,fill:'#000'},p);el('path',{d:'M'+(x+17)+' '+(y+28)+' a2 2 0 0 1 4 0 v-3 h-4z',fill:'#000'},p);
+ el('circle',{cx:x+19,cy:y+39,r:1.5,fill:'#141414'},p);
+ if(o){el('rect',{x:x+5,y:y+5,width:28,height:26,rx:6,fill:'#3b3f3f',stroke:'#141414','stroke-width':1.5},p);icon(o[0],[x+5,y+5,28,26],p);
+  el('path',{d:'M'+(x+19)+' '+(y+31)+' C'+(x+19)+' '+(y+44)+' '+(x+32)+' '+(y+42)+' '+(x+34)+' '+(y+50),stroke:'#2b2f2f','stroke-width':3,fill:'none'},p);
+  p.style.cursor='help';p.addEventListener('pointerenter',()=>showTip(o[1]+' · '+o[2],x+19,y-4));p.addEventListener('pointerleave',hideTip)}
+ else{p.style.cursor='help';p.addEventListener('pointerenter',()=>showTip('Свободная розетка',x+19,y-4));p.addEventListener('pointerleave',hideTip)}});
+function showTip(s,x,y){const t=$('tipt');t.textContent=s;const m=inkOf(s,11,0,'500'),w=Math.ceil(m.r-m.l)+18,h=20,X=Math.max(4,Math.min(696-w,x-w/2)),Y=y-h;$('tipr').setAttribute('x',X);$('tipr').setAttribute('y',Y);$('tipr').setAttribute('width',w);$('tipr').setAttribute('height',h);t.setAttribute('data-c',(X+w/2)+','+(Y+h/2));place(t);$('tip').setAttribute('opacity',1)}
+function hideTip(){$('tip').setAttribute('opacity',0)}
+function rot(id,a,c){$(id).setAttribute('transform','rotate('+a+' '+c[0]+' '+c[1]+')')}
+function anim(id,f0,f1,c,ms){const t0=performance.now();(function f(t){let k=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-k,3),o=k<1?Math.sin(k*9)*(1-k)*6:0;rot(id,f0+(f1-f0)*e+o,c);if(k<1)requestAnimationFrame(f)})(t0)}
+let mins=Math.round(.62*333.3*60);
+function meterTo(m,instant){m=Math.max(0,Math.min(59994,m));const s=String(Math.floor(m/6)).padStart(4,'0');
+ DIG.forEach((d,i)=>{const v=+s[i];if(instant){d.pos=v;d.t0=0;d.strip.setAttribute('transform','translate(0,'+(-v*STEP)+')');return}
+  const cur=((Math.round(d.t0?d.to:d.pos)%10)+10)%10;if(v===cur)return;let from=d.pos,to=v;if(to<from&&from-to>5)to+=10;else if(to>from&&to-from>5)from+=10;d.from=from;d.to=to;d.t0=performance.now()})}
+function meterStep(t){DIG.forEach(d=>{if(!d.t0)return;const k=Math.min(1,(t-d.t0)/320),e=k<1?1-Math.pow(1-k,3)+Math.sin(k*Math.PI)*.05:1;d.pos=d.from+(d.to-d.from)*e;d.strip.setAttribute('transform','translate(0,'+(-((d.pos%10+10)%10)*STEP).toFixed(2)+')');if(k>=1){d.pos=((Math.round(d.to)%10)+10)%10;d.t0=0;d.strip.setAttribute('transform','translate(0,'+(-d.pos*STEP)+')')}})}
+function lit(on){g.querySelectorAll('.lit').forEach(t=>{const at=t.tagName==='text'?'fill':'stroke';const base=t.dataset.base||(t.dataset.base=t.getAttribute(at));t.setAttribute(at,on?(t.dataset.on||(base=='#d4c38a'?'#f3e3a6':'#e6ddb8')):base)})}
+function draw(){$('lrun').setAttribute('fill',S.run?'#7fc35e':'#1d2a1b');
+ $('loil').setAttribute('fill',S.cond<.4?'#e0b452':'#2b2416');$('loil').classList.toggle('blink',S.cond<.4);
+ $('lco').setAttribute('fill',S.inside&&S.run?'#e0584c':'#2c1715');$('lco').classList.toggle('blink',S.inside&&S.run);
+ lit(S.run);g.classList.toggle('run',S.run)}
+function msg(t){$('msg').textContent=t;place($('msg'))}
+function toggleSw(){S.sw=!S.sw;anim('knob',S.sw?-40:40,S.sw?40:-40,knobC,220);
+ if(!S.sw&&S.run){S.run=false;msg('Заглушен: стрелки падают, подсветка гаснет.')}else msg(S.sw?'«РАБОТА». Зажми ручку шнура и резко дёрни вниз.':'Двигатель выключен.');draw()}
+let N={a:-120,w:0},F={a:-60+120*.62,w:0},LV={x:0,from:0,to:0,t0:0},tick=0;
+const A={x:138,y:334},L0=18,LMAX=100,END=.85,FAST=.35,NP=6;let L=L0,drag=null,last=performance.now();
+const R=[];for(let i=0;i<=NP;i++){const y=A.y+L0*i/NP;R.push({x:A.x,y:y,px:A.x,py:y})}
+const Hd=R[NP];
+function pt(e){const p=g.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(g.getScreenCTM().inverse())}
+$('hg').addEventListener('pointerdown',e=>{const q=pt(e);drag={ox:Hd.x-q.x,oy:Hd.y-q.y,hist:[[performance.now(),L]],fired:false,max:0,tx:Hd.x,ty:Hd.y};$('hg').setPointerCapture(e.pointerId);$('hg').style.cursor='grabbing'});
+$('hg').addEventListener('pointermove',e=>{if(!drag)return;const q=pt(e);let x=q.x+drag.ox,y=q.y+drag.oy,dx=x-A.x,dy=y-A.y,d=Math.hypot(dx,dy);if(d>LMAX){x=A.x+dx/d*LMAX;y=A.y+dy/d*LMAX}if(y<A.y+8)y=A.y+8;
+ drag.tx=x;drag.ty=y;L=Math.max(L0,Math.min(LMAX,Math.hypot(x-A.x,y-A.y)));const now=performance.now(),frac=(L-L0)/(LMAX-L0);drag.max=Math.max(drag.max,frac);drag.hist.push([now,L]);while(drag.hist.length>2&&now-drag.hist[0][0]>90)drag.hist.shift();
+ if(!drag.fired&&frac>=END){drag.fired=true;const a=drag.hist[0];jerk((L-a[1])/Math.max(1,now-a[0]))}});
+function release(){if(!drag)return;const q=drag;drag=null;$('hg').style.cursor='grab';if(!q.fired&&q.max>.25&&!S.run)msg('Недотянул: дёрни шнур до конца.')}
+$('hg').addEventListener('pointerup',release);$('hg').addEventListener('pointercancel',release);
+function rope(dt){if(!drag&&L>L0)L=Math.max(L0,L-7*dt);const seg=L/NP;
+ for(let i=1;i<=NP;i++){const p=R[i];if(i==NP&&drag){p.px=p.x;p.py=p.y;p.x+=(drag.tx-p.x)*.7;p.y+=(drag.ty-p.y)*.7;continue}
+  const vx=(p.x-p.px)*.9,vy=(p.y-p.py)*.9;p.px=p.x;p.py=p.y;p.x+=vx;p.y+=vy+(i==NP?.8:.12)*dt*dt;if(S.run&&i==NP){p.x+=(Math.random()-.5)*.4;p.y+=(Math.random()-.5)*.25}}
+ const H=R[NP];for(let i=1;i<NP;i++){const k=i/NP,sx=A.x+(H.x-A.x)*k,sy=A.y+(H.y-A.y)*k;R[i].x+=(sx-R[i].x)*.35;R[i].y+=(sy-R[i].y)*.35}
+ for(let k=0;k<10;k++){R[0].x=A.x;R[0].y=A.y;for(let i=0;i<NP;i++){const a=R[i],b=R[i+1],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;if(d<=seg)continue;const df=(d-seg)/d;
+   const wa=i==0?0:(i+1==NP?(drag?1:.7):.5),wb=i==0?1:(i+1==NP?(drag?0:.3):.5),tw=wa+wb||1;a.x+=dx*df*wa/tw;a.y+=dy*df*wa/tw;b.x-=dx*df*wb/tw;b.y-=dy*df*wb/tw}}
+ for(let i=1;i<=NP;i++)if(R[i].y<A.y+2)R[i].y=A.y+2}
+function step(t){const dt=Math.min(32,t-last)/16;last=t;rope(dt);meterStep(t);
+ const a=R[NP-1],b=R[NP],ang=Math.atan2(b.x-a.x,b.y-a.y)*180/Math.PI;$('hg').setAttribute('transform','translate('+b.x.toFixed(1)+','+(b.y+4).toFixed(1)+') rotate('+(-ang).toFixed(1)+')');
+ let d='M'+R[0].x.toFixed(1)+' '+R[0].y.toFixed(1);for(let i=1;i<NP;i++){const m=R[i],n=R[i+1];d+=' Q'+m.x.toFixed(1)+' '+m.y.toFixed(1)+' '+((m.x+n.x)/2).toFixed(1)+' '+((m.y+n.y)/2).toFixed(1)}d+=' L'+b.x.toFixed(1)+' '+b.y.toFixed(1);$('cord').setAttribute('d',d);
+ const tg=S.run?-48:-120;N.w+=((tg-N.a)*.05-N.w*.18)*dt;if(S.run)N.w+=(Math.random()-.5)*1.6*dt;N.a+=N.w*dt;if(N.a<-123){N.a=-123;N.w=Math.abs(N.w)*.4}rot('lneedle',N.a,LC);
+ const ft=-60+120*S.fuel;F.w+=((ft-F.a)*.04-F.w*.2)*dt;if(S.run)F.w+=(Math.random()-.5)*.45*dt;F.a+=F.w*dt;rot('fneedle',F.a,FC);
+ if(LV.t0){const k=Math.min(1,(t-LV.t0)/220),e=1-Math.pow(1-k,3),o=k<1?Math.sin(k*Math.PI*2)*(1-k)*3:0;LV.x=LV.from+(LV.to-LV.from)*e+(k<1?o*Math.sign(LV.to-LV.from):0);$('lever').setAttribute('transform','translate('+LV.x.toFixed(1)+',0)');const on=1-Math.abs(LV.x)/43;$('hvOn').setAttribute('opacity',Math.max(0,on).toFixed(2));$('hvOff').setAttribute('opacity',Math.max(0,1-on).toFixed(2));if(k>=1)LV.t0=0}
+ if(S.run&&t>tick){tick=t+150;mins=Math.max(0,mins-1);S.fuel=mins/(333.3*60);meterTo(mins)}
+ requestAnimationFrame(step)}
+requestAnimationFrame(step);
+function jerk(sp){if(S.run){msg('Уже работает.');return}
+ if(sp<FAST){msg('Слишком медленно: шнур должен дойти до конца рывком.');return}
+ if(!S.sw){msg('Чух... без «РАБОТА» не заведётся.');return}
+ if(S.fuel<.02){msg('Чух-чух... бак пуст.');return}
+ const fail=Math.max(0,Math.min(.8,(.6-S.cond)/.6));if(Math.random()<fail){N.w+=4;F.w+=1;msg('Чих... заглох. Изношен - пробуй ещё ('+Math.round(fail*100)+'% неудачи).');return}
+ S.run=true;msg('Завёлся: подсветка загорелась, счётчик пошёл.');draw()}
+function refuel(){S.fuel=Math.min(1,S.fuel+.35);mins=Math.round(S.fuel*333.3*60);meterTo(mins);msg('Канистра в бак: стрелка ползёт к F, барабаны крутятся.');draw()}
+function setFuel(f){S.fuel=f;mins=Math.round(f*333.3*60);meterTo(mins);draw();msg('Стрелка у E, счётчик почти на нуле.')}
+function worn(){S.cond=.3;draw();msg('Лампа «МАСЛО» мигает: заводится через раз.')}
+function indoors(){S.inside=!S.inside;draw();msg(S.inside?'Внутри: на работе мигает «УГАР. ГАЗ».':'Снаружи.')}
+function setHouse(on){S.house=on;LV.from=LV.x;LV.to=on?0:-43;LV.t0=performance.now()}
+function toggleHouse(){setHouse(!S.house);msg(S.house?'Генератор снова питает дом.':'Сеть дома отключена: дом без тока.')}
+function reset(){S={sw:false,run:false,fuel:.62,cond:.82,inside:false,house:true};rot('knob',-40,knobC);setHouse(true);mins=Math.round(.62*333.3*60);meterTo(mins);draw();msg('Поверни переключатель на «РАБОТА», зажми ручку шнура и резко дёрни вниз.')}
+rot('knob',-40,knobC);meterTo(mins,true);draw();
+/* the font first, then every measurement: the stylesheet must have arrived before document.fonts knows the family */
+function relayout(){cache={};placeAll();g.classList.add('ready')}
+function fontsThen(){Promise.all(['500','600','700'].map(w=>document.fonts.load(w+" 20px 'Fira Sans Extra Condensed'","НАГРУЗКА09"))).catch(()=>{}).then(()=>document.fonts.ready).then(relayout)}
+const link=$('ff');if(link.sheet)fontsThen();else{link.addEventListener('load',fontsThen);link.addEventListener('error',relayout)}
+document.fonts.addEventListener('loadingdone',relayout);
+setTimeout(()=>{if(!g.classList.contains('ready'))relayout()},2500);
+</script>
+</body></html>

@@ -1,0 +1,37 @@
+[h1]Knox Inventory 1.0 BETA - update 5: Keep the Lights On[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+Flip the switch, yank the cord - and the generator rattles to life. The generator no longer shows a plain info box: it has a window of its own, a portable generator you work with your hands.
+
+[h2]The generator[/h2]
+[list]
+[*]A tank with a fuel gauge, an OFF / RUN switch, a starter cord, a load needle, an hour meter, RUN, OIL and CO GAS lamps, outlets and a HOUSE lever.
+[*]It starts only with a jerk: pull the cord all the way and fast. Too slow or not far enough - the engine won't catch.
+[*]The outlets hold the plugs of what the generator powers right now: a fridge, the lights, a stove. Hover a plug for its name and use.
+[*]TIME LEFT counts how many hours the fuel lasts at this load; the light drum on the right is tenths of an hour.
+[*]Running, the body shakes and the scales light up. Indoors, the CO GAS lamp blinks.
+[*]Condition matters: at 30% every other pull fails, from 60% up it always starts on the first one. Below 40% the OIL lamp blinks. One rule for every start, the right click menu's too.
+[/list]
+
+[h2]How to work it[/h2]
+[list]
+[*]Left click a generator: the character walks up and the window opens.
+[*]While the window is open the character crouches at the generator, and everything in it works at once - no action bar for every click.
+[*]Refuelling looks like the game's: the character pours from the can, the needle creeps to F. Click the can again to stop. The can has to be on you.
+[*]Only someone who knows electrics (skill 3) or has read the generator magazine can connect it to a house. Anyone can disconnect it.
+[*]Close the window or walk away - the character stands up.
+[*]Don't like it? Switch the Generator module off in Knox's settings and the game's window is back.
+[/list]
+
+[h2]The right click menu[/h2]
+[list]
+[*]Everything about the generator is in the main group, not under Other. Turn On and Turn Off are gone: you start it in the window now.
+[*]Take Generator comes first when it can be taken (only when disconnected).
+[*]New icons: info, connect and disconnect, add fuel, fix, take, Gardening and Unwanted.
+[/list]
+
+[h2]News[/h2]
+[list]
+[*]The news post shows the generator live - the real window, not a picture.
+[*]A post's head stands on a band of its own with a line under it; a scrolled post fades softly into its panel at the edges instead of being cut off.
+[/list]

@@ -59,6 +59,7 @@ end
 --              (off: the game's bar - or another mod's, Clean UI and the like)
 --   devices    the TV and radio windows
 --   stove      the stove / oven / microwave window
+--   generator  the generator's window (KnoxGeneratorWindow; the start's chance is Knox's either way)
 --   fluids     the window for pouring fluids
 --   tooltips   item tooltips in Knox's look
 --   menus      right-click menus and the game's question boxes in Knox's look
@@ -72,7 +73,7 @@ end
 -- (health: put off until 2.0 by the author, 2026-10-19 - not in the list, off for
 -- players; on only where the settings file has dev.health=1, the developer's bench)
 T.MODULE_GROUPS = {
-    {id = "game", list = {"inventory", "hotbar", "devices", "stove", "fluids", "tooltips", "menus", "dashboard"}},
+    {id = "game", list = {"inventory", "hotbar", "devices", "stove", "generator", "fluids", "tooltips", "menus", "dashboard"}},
     {id = "out", list = {"menu", "newgame"}},
 }
 T.MODULES = {}
@@ -609,6 +610,9 @@ local function inkBox(font, s)
     end
     return 0, 0, T.measure(font, s), T.fontH(font)
 end
+-- (letter by letter captions - the generator's, spaced as its mockup - measure
+-- each letter's pixels themselves: left, top, right, bottom from where it is drawn)
+T.inkBox = inkBox
 
 function T.inkCentre(ui, s, x, y, w, h, r, g, b, a, font)
     font = font or T.fontCaps

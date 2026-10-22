@@ -378,6 +378,51 @@ function B.hotwire(player)
     end)
 end
 
+--- The generator window (2026-10-22): a generator two squares east - connected, the tank
+--- at 62 %, condition 82 % (the mockup's) - and a full can of gasoline in the pockets;
+--- the nearest generator worn, new, or with a nearly dry tank.
+function B.nearGenerator(player)
+    local w = KnoxGeneratorWindow and KnoxGeneratorWindow.instance
+    if w and w.gen then return w.gen end
+    local sq = player:getCurrentSquare()
+    if not sq then return nil end
+    for dx = -3, 3 do
+        for dy = -3, 3 do
+            local s = getCell():getGridSquare(sq:getX() + dx, sq:getY() + dy, sq:getZ())
+            local objs = s and s:getObjects()
+            for i = 0, (objs and objs:size() or 0) - 1 do
+                local o = objs:get(i)
+                if instanceof(o, "IsoGenerator") then return o end
+            end
+        end
+    end
+    return nil
+end
+function B.genPlaced(player)
+    local sq = player:getCurrentSquare()
+    local at = sq and getCell():getGridSquare(sq:getX() + 2, sq:getY(), sq:getZ())
+    if not at then return end
+    pcall(function()
+        local gen = IsoGenerator.new(instanceItem("Base.Generator"), getCell(), at)
+        gen:setConnected(true)
+        gen:setFuel(gen:getMaxFuel() * 0.62)
+        gen:setCondition(82)
+        local can = player:getInventory():AddItem("Base.PetrolCan")
+        local fc = can and can:getFluidContainer()
+        if fc then fc:addFluid(Fluid.Petrol, fc:getCapacity()) end
+        tag(can)
+    end)
+    dirtyAll()
+end
+function B.genCondition(player, c)
+    local gen = B.nearGenerator(player)
+    if gen then gen:setCondition(c) end
+end
+function B.genDry(player)
+    local gen = B.nearGenerator(player)
+    if gen then gen:setFuel(gen:getMaxFuel() * 0.07) end
+end
+
 --- The health tab: one wound a button (the author, 2026-10-19: all at once left no
 --- time to see what each part of the tab does), through the game's own debug
 --- switches (ISHealthPanel.onCheat), and with it what treats it, into the pockets
@@ -659,6 +704,16 @@ local function checkEye(player)
     return true, getText(has and "IGUI_KnoxTB_Res_EyeYes" or "IGUI_KnoxTB_Res_EyeNo")
 end
 
+--- The generator by the character, and whether the Knox window is open on it.
+local function checkGen(player)
+    local gen = B.nearGenerator(player)
+    if not gen then return false, getText("IGUI_KnoxTB_Res_GenNone") end
+    local w = KnoxGeneratorWindow and KnoxGeneratorWindow.instance
+    local open = w ~= nil and w.gen == gen
+    local state = (gen:isActivated() and "running" or "stopped") .. (gen:isConnected() and ", connected" or ", not connected")
+    return open, getText("IGUI_KnoxTB_Res_Gen", tostring(open), string.format("%.1f", gen:getFuel()), tostring(gen:getCondition()), state)
+end
+
 -- 1.0 BETA ---------------------------------------------------------------------------
 
 --- On the floor by the character: what the beta stacks and splits - feathers,
@@ -696,6 +751,16 @@ end
 -- "works" by the author on 21.10 - or broken and confirmed fixed the same day - left
 -- out, their marks: Zomboid/Lua/knox_testbench_beta1.txt)
 B.POINTS = {
+    -- 1.0: the generator window (mockup 17, written 2026-10-22)
+    {id = "gen_open", actions = {{"Gen", function(p) B.genPlaced(p) end}}, check = checkGen},
+    {id = "gen_use", check = checkGen},
+    {id = "gen_pull", check = checkGen},
+    {id = "gen_worn", actions = {{"GenWorn", function(p) B.genCondition(p, 30) end}, {"GenNew", function(p) B.genCondition(p, 100) end}}, check = checkGen},
+    {id = "gen_fuel", actions = {{"GenDry", function(p) B.genDry(p) end}}, check = checkGen},
+    {id = "gen_house", check = checkGen},
+    {id = "gen_indoor", check = checkGen},
+    {id = "gen_outlets", check = checkGen},
+    {id = "gen_menu", check = checkGen},
     -- 1.0: the big check-up (speed, caches, clean-up; nothing should look different)
     {id = "u_java", check = checkJava},
     {id = "u_move", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}, check = checkMoving},
@@ -805,9 +870,15 @@ function B:createChildren()
     self.headerH = T.sectionH + 4
     self.listW = math.floor(c * 4.6)
     self.rowH = math.floor(c * 0.55)
-    -- (tall enough for every point and the two lines under the list)
-    local listH = self.headerH + pad + #B.POINTS * (self.rowH + 2) + pad + (T.fontH(T.fontText) + 2) * 3 + T.fontTileH * 2
-    local w, h = math.floor(c * 15), math.max(math.floor(c * 10.5), listH + pad)
+    -- (no taller than 12 cells - the list scrolls with the wheel: with every point shown the
+    -- window outgrew the screen and covered the game, the author 2026-10-22)
+    local footH = (T.fontH(T.fontText) + 2) * 3 + T.fontTileH * 2
+    local listH = self.headerH + pad + #B.POINTS * (self.rowH + 2) + pad + footH
+    local w, h = math.floor(c * 15), math.max(math.floor(c * 10.5), math.min(listH + pad, math.floor(c * 12)))
+    self.listTop = self.headerH + pad
+    self.listBottom = h - pad - footH
+    self.visRows = math.max(1, math.floor((self.listBottom - self.listTop + 2) / (self.rowH + 2)))
+    self.scroll = 0
     self:setWidth(w)
     self:setHeight(h)
     local boxFont = T.gameFont(T.fontText)
@@ -856,7 +927,18 @@ function B:headerButtons()
 end
 
 function B:rowRect(i)
-    return {T.pad, self.headerH + T.pad + (i - 1) * (self.rowH + 2), self.listW, self.rowH}
+    return {T.pad, self.listTop + (i - 1 - self.scroll) * (self.rowH + 2), self.listW, self.rowH}
+end
+
+--- Is point i in the list's window (scrolled to)?
+function B:rowShown(i)
+    return i > self.scroll and i <= self.scroll + self.visRows
+end
+
+function B:scrollTo(i)
+    local most = math.max(0, #B.POINTS - self.visRows)
+    if i <= self.scroll then self.scroll = i - 1 elseif i > self.scroll + self.visRows then self.scroll = i - self.visRows end
+    self.scroll = math.max(0, math.min(most, self.scroll))
 end
 
 function B:prerender()
@@ -884,25 +966,35 @@ function B:prerender()
     end
 
     -- the list: a mark (green works, red broken, grey not yet), the number, the name
+    if self.sel ~= self.shownSel then self.shownSel = self.sel self:scrollTo(self.sel) end
     for i, p in ipairs(B.POINTS) do
-        local r = self:rowRect(i)
-        local s = B.state[p.id] or {}
-        local on = i == self.sel
-        T.rect(self, r[1], r[2], r[3], r[4], on and T.color.header or T.color.cell)
-        if over and T.inRect(mx, my, r) and not on then self:drawRect(r[1], r[2], r[3], r[4], 0.05, 1, 1, 1) end
-        T.border(self, r[1], r[2], r[3], r[4], on and T.color.accent or T.color.border)
-        local mc = (s.verdict == "ok" and T.color.ok) or (s.verdict == "bad" and T.color.bad) or T.color.tileEdge
-        local d = math.floor(r[4] * 0.36)
-        T.rect(self, r[1] + 6, r[2] + math.floor((r[4] - d) / 2), d, d, mc)
-        local name = i .. ". " .. getText("IGUI_KnoxTB_" .. p.id)
-        T.text(self, T.fit(name, T.fontText, r[3] - d - 18), r[1] + d + 12, r[2] + math.floor((r[4] - ft) / 2),
-            on and T.color.bright or T.color.text, T.fontText)
+        if self:rowShown(i) then
+            local r = self:rowRect(i)
+            local s = B.state[p.id] or {}
+            local on = i == self.sel
+            T.rect(self, r[1], r[2], r[3], r[4], on and T.color.header or T.color.cell)
+            if over and T.inRect(mx, my, r) and not on then self:drawRect(r[1], r[2], r[3], r[4], 0.05, 1, 1, 1) end
+            T.border(self, r[1], r[2], r[3], r[4], on and T.color.accent or T.color.border)
+            local mc = (s.verdict == "ok" and T.color.ok) or (s.verdict == "bad" and T.color.bad) or T.color.tileEdge
+            local d = math.floor(r[4] * 0.36)
+            T.rect(self, r[1] + 6, r[2] + math.floor((r[4] - d) / 2), d, d, mc)
+            local name = i .. ". " .. getText("IGUI_KnoxTB_" .. p.id)
+            T.text(self, T.fit(name, T.fontText, r[3] - d - 18), r[1] + d + 12, r[2] + math.floor((r[4] - ft) / 2),
+                on and T.color.bright or T.color.text, T.fontText)
+        end
+    end
+    -- the scroll bar: where the shown rows are in the whole list
+    if #B.POINTS > self.visRows then
+        local tx, th = pad + self.listW + 3, self.listBottom - self.listTop
+        T.rect(self, tx, self.listTop, 3, th, T.color.cell)
+        local ty = self.listTop + math.floor(th * self.scroll / #B.POINTS)
+        T.rect(self, tx, ty, 3, math.max(8, math.floor(th * self.visRows / #B.POINTS)), T.color.tileEdge)
     end
     local done = 0
     for _, p in ipairs(B.POINTS) do
         if (B.state[p.id] or {}).verdict then done = done + 1 end
     end
-    local ly = self:rowRect(#B.POINTS + 1)[2] + pad
+    local ly = self.listBottom + pad
     T.text(self, getText("IGUI_KnoxTB_Done", done, #B.POINTS), pad, ly, T.color.dim, T.fontText)
     local rl = T.wrap(getText("IGUI_KnoxTB_Report"), T.fontTile, self.listW)
     for _, l in ipairs(rl) do
@@ -1000,7 +1092,7 @@ function B:onMouseDown(x, y)
         end
     end
     for i = 1, #B.POINTS do
-        if T.inRect(x, y, self:rowRect(i)) then
+        if self:rowShown(i) and T.inRect(x, y, self:rowRect(i)) then
             self.sel = i
             self:showNote()
             getSoundManager():playUISound("UIActivateButton")
@@ -1049,7 +1141,12 @@ end
 KnoxWindowDrag.install(B)
 
 function B:onRightMouseUp(x, y) return true end
-function B:onMouseWheel(del) return true end
+function B:onMouseWheel(del)
+    if self:getMouseX() < T.pad + self.listW + 8 then
+        self.scroll = math.max(0, math.min(math.max(0, #B.POINTS - self.visRows), self.scroll + (del > 0 and 1 or -1)))
+    end
+    return true
+end
 
 function B:close()
     B.save()

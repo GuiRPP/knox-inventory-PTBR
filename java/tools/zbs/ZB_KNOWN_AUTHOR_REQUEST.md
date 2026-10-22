@@ -9,6 +9,9 @@
 - Закрытый: `C:\Users\pielo\Zomboid\tools\keys\knox_zbs.key.pending`. Никуда не выкладывать и не загружать.
 - Открытый: `JavaModZBS:8b10f205cfc8b6bc6d55f44410fde965696d43ad7a0de33e6e976ae3e7c83745`
 
+## Просьба отправлена (22.10.2026)
+PR https://github.com/zed-0xff/ZombieBuddy/pull/109 - файл `authors/SYNTHETIK.json` (SteamID64 76561198124465594 = тот, кто загружает мод; ключ выше), с форка SVNTHETIK/ZombieBuddy, ветка `add-author-synthetik`. Открытый ключ сверен с закрытым 22.10. Ждём, когда примут (Merged); после этого ZombieBuddy сам подтянет `authors.json` у игроков.
+
 ## Как включить подпись (когда внесут)
 1. Переименовать `knox_zbs.key.pending` в `knox_zbs.key`.
 2. Запустить `build.ps1`: рядом с jar появится `KnoxInventoryJava.jar.zbs`.

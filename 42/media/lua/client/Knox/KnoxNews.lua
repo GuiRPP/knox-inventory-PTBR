@@ -182,6 +182,10 @@ local function layoutBody(post, width)
                 local body, hot = string.match(s, "^@dash%s*(%a*)%s*(%a*)")
                 dashes = dashes + 1
                 table.insert(blocks, {kind = "dash", body = body, hot = hot == "hot", key = (post.title or "") .. "#" .. dashes})
+            elseif string.match(s, "^@gen") then
+                -- (@gen [worn]: the generator's window itself, live - KnoxGeneratorWindow.newsDemo)
+                dashes = dashes + 1
+                table.insert(blocks, {kind = "gen", worn = string.match(s, "^@gen%s+worn") ~= nil, key = (post.title or "") .. "#" .. dashes})
             elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then table.insert(blocks, {kind = "image", tex = tex}) end
@@ -360,6 +364,14 @@ function KnoxNews:prerender()
             y = y + h + pad
         elseif b.kind == "dash" and KnoxDashboard and KnoxDashboard.newsDemo then
             local d = KnoxDashboard.newsDemo(self, b.key, b.body, b.hot)
+            local _, h = d:demoSize(m.textW)
+            self.dashView = self.dashView or {0, 0, 0, 0}
+            local v = self.dashView
+            v[1], v[2], v[3], v[4] = m.readX, top, W - m.readX, viewH
+            d:hostAt(self, rx, y, v)
+            y = y + h + pad
+        elseif b.kind == "gen" and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
+            local d = KnoxGeneratorWindow.newsDemo(self, b.key, b.worn)
             local _, h = d:demoSize(m.textW)
             self.dashView = self.dashView or {0, 0, 0, 0}
             local v = self.dashView
