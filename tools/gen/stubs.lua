@@ -13,7 +13,7 @@ PICS["media/ui/knoxdash/bar.png"] = true
 PICS["media/ui/knoxdash/soft.png"] = true
 missingPics = {}
 function getTexture(path)
-    if PICS[path] then return {path = path} end
+    if PICS[path] then return {path = path, isReady = function() return true end} end
     missingPics[path] = true
     return nil
 end
@@ -127,6 +127,7 @@ KnoxTheme = {
         bad = hex("#be463c"), ok = hex("#6ca050"), good = hex("#9fb36a"), warn = hex("#c9a24a"), ink = hex("#141414"), screen = hex("#0b0c0c")},
 }
 local T = KnoxTheme
+function T.readyTex(path) return getTexture(path) end   -- (the real one: once read)
 function T.ensure() end
 function T.makeFont(style, px)
     local size = math.max(10, math.min(44, math.floor(px + 0.5)))

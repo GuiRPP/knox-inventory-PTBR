@@ -1,0 +1,11 @@
+[h1]Knox Inventory 1.0 BETA - update 9: The Road of Knox Inventory[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[b]A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, click "Allow".[/b]
+
+[list]
+[*]A pinned post in the News: the mod's roadmap - what is out, what comes next. Click a card to open that update's own post, and go back to the roadmap from it.
+[*]Support the mod on Boosty: a button in the pinned post and a coin in the inventory.
+[*]Fixed: red-white squares flashing in the main menu and the news while pictures loaded.
+[*]Smooth switching between posts; the menu runs faster with the pinned post open.
+[/list]

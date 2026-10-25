@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 61
+T.JAVA_NEEDED = 63
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -731,6 +731,54 @@ function T.plate(ui, r, s, opts)
     end
 end
 
+--- Text spaced out letter by letter (the mockup's letter-spacing: `ls` px more after each
+--- letter) in the band r = {x, y, w, h}: up and down by a capital's pixels, sideways by
+--- its own pixels (the spacing after the last letter not counted) - opts.align "centre"
+--- (default) or "left". opts.font, opts.a. Laid out once per font, text and spacing.
+--- (the pinned post's head and the roadmap's title, 2026-10-25)
+local spacedCache, spacedN = {}, 0
+local function spacedLayout(font, s, ls)
+    local key = (type(font) == "table" and font.key or tostring(font)) .. "|" .. ls .. "|" .. s
+    local L = spacedCache[key]
+    if L then return L end
+    L = {chars = {}, xs = {}}
+    -- (a letter goes where the text before it ends: the font measures to the last letter's
+    -- ink, so a space alone measured 0 and was lost, and letters measured one by one sat
+    -- unevenly - "ЧТОВЫСKNOX", "СПА СИБО", the author 2026-10-25; "H" after the text
+    -- measures it to its advance)
+    local hW = T.measure(font, "H")
+    for i = 1, string.len(s) do
+        L.chars[i] = string.sub(s, i, i)
+        L.xs[i] = (i > 1 and (T.measure(font, string.sub(s, 1, i - 1) .. "H") - hW) or 0) + ls * (i - 1)
+    end
+    local n = #L.chars
+    L.left, L.right = 0, 0
+    if n > 0 then
+        local l1 = inkBox(font, L.chars[1])
+        local _, _, rn = inkBox(font, L.chars[n])
+        L.left, L.right = L.xs[1] + l1, L.xs[n] + rn
+    end
+    spacedN = spacedN + 1
+    if spacedN > 400 then spacedCache, spacedN = {}, 1 end
+    spacedCache[key] = L
+    return L
+end
+
+function T.spaced(ui, s, r, c, opts)
+    local font = opts and opts.font or T.fontCaps
+    local ls = opts and opts.ls or 0
+    local a = opts and opts.a or 1
+    local L = spacedLayout(font, s or "", ls)
+    local _, top, _, bottom = inkBox(font, "H")
+    local ty = r[2] + math.floor((r[4] - (bottom - top)) / 2 + 0.5) - top
+    local tx = r[1] - L.left
+    if not (opts and opts.align == "left") then tx = r[1] + math.floor((r[3] - (L.right - L.left)) / 2 + 0.5) - L.left end
+    for i = 1, #L.chars do
+        T.drawText(ui, L.chars[i], tx + L.xs[i], ty, c.r, c.g, c.b, a, font)
+    end
+    return L.right - L.left
+end
+
 --- Width of a plate for `s`: its text and a pad and a half each side.
 function T.plateW(s, font)
     return T.measure(font or T.fontCaps, s or "") + math.floor(T.pad * 1.5) * 2
@@ -931,6 +979,55 @@ function T.tileFrame(ui, x, y, w, h, c, a)
     ui:drawRect(x, y + h - 2, w, 2, a, c.r, c.g, c.b)
     ui:drawRect(x, y + 2, 2, h - 4, a, c.r, c.g, c.b)
     ui:drawRect(x + w - 2, y + 2, 2, h - 4, a, c.r, c.g, c.b)
+end
+
+--- A texture on any four corners (px of `ui`: top left, top right, bottom right, bottom left
+--- of the picture) - turned, slanted, mirrored or in perspective (the pinned post's coin and
+--- its slanted shimmer, 2026-10-25). Tinted by c, `a` its alpha.
+function T.quad(ui, tex, x1, y1, x2, y2, x3, y3, x4, y4, c, a)
+    if not tex or a <= 0.003 or not ui.javaObject then return end
+    local ax, ay = ui:getAbsoluteX() + ui:getXScroll(), ui:getAbsoluteY() + ui:getYScroll()
+    ui.javaObject:DrawTexture(tex, ax + x1, ay + y1, ax + x2, ay + y2, ax + x3, ay + y3, ax + x4, ay + y4, c.r, c.g, c.b, a)
+end
+
+--- A picture only once the game has read it, else nil. (getTexture reads in the background,
+--- and a picture drawn before it is read shows the game's red-white error picture in its
+--- place - the pinned post's pictures flashed red-white squares, the author 2026-10-25.)
+--- Asked once, then looked up; T.preloadTex asks early.
+local readyTex, waitTex = {}, {}
+function T.readyTex(path)
+    local t = readyTex[path]
+    if t ~= nil then return t or nil end
+    local w = waitTex[path]
+    if w == nil then
+        w = getTexture(path) or false
+        waitTex[path] = w
+    end
+    if w and not w:isReady() then return nil end
+    readyTex[path], waitTex[path] = w, nil
+    return w or nil
+end
+
+--- Start reading these pictures now (a list of paths).
+function T.preloadTex(paths)
+    for _, p in ipairs(paths) do T.readyTex(p) end
+end
+
+--- One clip at a time on `ui`: T.clip moves it to x, y, w, h, T.unclip takes it off. (The
+--- game's clips do not intersect: one set inside another takes its place and, taken off,
+--- leaves its box cut out of the first - so a clip is moved, never nested. The pinned post's
+--- many boxes - its head, the view, the roadmap's cards - 2026-10-25.)
+function T.clip(ui, x, y, w, h)
+    if ui.knoxClip then ui:clearStencilRect() end
+    ui:setStencilRect(x, y, math.max(0, w), math.max(0, h))
+    ui.knoxClip = true
+end
+
+function T.unclip(ui)
+    if ui.knoxClip then
+        ui:clearStencilRect()
+        ui.knoxClip = nil
+    end
 end
 
 function T.inRect(x, y, r)

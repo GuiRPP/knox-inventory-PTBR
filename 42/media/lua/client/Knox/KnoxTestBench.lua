@@ -846,6 +846,29 @@ local function checkSettings()
         tostring(L.pages[w.page].h), tostring(L.viewH), tostring(math.floor(w:maxScroll())))
 end
 
+-- the pinned post (Boosty and the roadmap, the author 2026-10-25): new again - its card
+-- unread, its roadmap's opening in full; the check reads it from the news file
+local function pinnedPost()
+    local posts = KnoxNews and KnoxNews.load() or {}
+    return posts[1] and KnoxNews.isPinned(posts[1]) and posts[1] or nil
+end
+
+local function pinnedNew()
+    local p = pinnedPost()
+    if p then KnoxNews.markUnseen(p) end
+    T.settings["news.roadSeen"] = nil
+    T.saveSettings()
+end
+
+local function checkPinned()
+    local p = pinnedPost()
+    local rows = p and #KnoxNews.road(p) or 0
+    local _, nowI = 0, 0
+    if p then _, nowI = KnoxNews.roadNow(p) end
+    return p ~= nil and rows == 14 and KnoxPinned ~= nil and KnoxRoadmap ~= nil,
+        getText("IGUI_KnoxTB_Res_Pinned", tostring(p ~= nil), tostring(rows), tostring(nowI or 0), tostring(p and KnoxNews.isSeen(p)))
+end
+
 local function openSettings()
     if not KnoxSettings.instance then KnoxSettings.open() end
 end
@@ -891,6 +914,16 @@ local SIZES25 = {"Base.CuttingBoardWooden", "Base.Note", "Base.WalkieTalkie2", "
                  "Base.Rake", "Base.BarbedWire", "Base.WheatSheaf", "Base.Straw2", "Base.Brochure"}
 
 B.POINTS = {
+    -- the pinned post: Boosty, the roadmap, the coin in the top bar (the author, 2026-10-25, by the mockup)
+    {id = "pin_card", check = checkPinned},
+    {id = "pin_auto", actions = {{"PinnedNew", pinnedNew}}, check = checkPinned},
+    {id = "pin_road", actions = {{"PinnedNew", pinnedNew}}, check = checkPinned},
+    {id = "pin_hover"},
+    {id = "pin_open"},
+    {id = "pin_boosty"},
+    {id = "pin_right"},
+    {id = "pin_coin"},
+    {id = "perf_pinned", actions = {{"Mark", function() mark("pinned") end}}, check = checkPerf},
     -- the item editor from the main menu: the Knox tab's new part (the author, 2026-10-25, variant A)
     {id = "ed_mainmenu"},
     -- the item editor and its presets (the author, 2026-10-25; the mockup approved by the critic, round 4)

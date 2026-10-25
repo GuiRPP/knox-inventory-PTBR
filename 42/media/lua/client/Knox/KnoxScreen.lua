@@ -17,6 +17,7 @@ require "Knox/KnoxDevPanel"
 require "Knox/KnoxInspectWindow"
 require "Knox/KnoxSlotPicker"
 require "Knox/KnoxNews"
+require "Knox/KnoxPinned"
 require "Knox/KnoxControls"
 require "Knox/KnoxHealthPanel"
 
@@ -897,8 +898,80 @@ function KnoxScreen:prerender()
         local a = 0.55 + 0.45 * math.sin(getTimestampMs() / 1000 * math.pi * 1.6)
         self:drawRect(px + sw - math.floor(d / 2) - 1, py - math.floor(d / 2) + 1, d, d, a, c.r, c.g, c.b)
     end
-    -- the key hints: left of it
-    self:drawHints(r[1] - T.pad * 2, botY + math.floor(self.botH / 2))
+    -- the coin: Boosty, 12 px left of KNOX (the author's mockup boosty_v1, 2026-10-25) - dim and
+    -- still at rest, sand with Knox's tooltip under the mouse; a click opens Boosty in the browser
+    local s = T.cell / 48
+    local cs = math.floor(22 * s + 0.5)
+    local coin = self.coinRect or {0, 0, 0, 0}
+    self.coinRect = coin
+    coin[1], coin[2], coin[3], coin[4] = left - math.floor(12 * s + 0.5) - cs, botY + math.floor((self.botH - cs) / 2), cs, cs
+    self.coinHot = self:isMouseOver() and T.inRect(self:getMouseX(), self:getMouseY(), coin)
+    self:drawCoin(coin, self.coinHot)
+    -- the key hints: 24 px left of the coin
+    self:drawHints(coin[1] - math.floor(24 * s + 0.5), botY + math.floor(self.botH / 2))
+end
+
+-- The bottom bar's coin (two coins, lines only; the front one filled with the bar's colour)
+local COIN_REST = {r = 0x6f / 255, g = 0x74 / 255, b = 0x6d / 255}
+local COIN_FILL = {r = 0x1a / 255, g = 0x1d / 255, b = 0x1d / 255}
+local COIN_FILL_HOT = {r = 0x25 / 255, g = 0x25 / 255, b = 0x1f / 255}
+local TIP_EDGE = {r = 0x4a / 255, g = 0x4f / 255, b = 0x4f / 255}   -- (the item tooltip header's frame)
+-- (only once read: KnoxRoadmap's pinned pictures, T.readyTex)
+local function coinTexture(name)
+    return KnoxRoadmap and KnoxRoadmap.tex(name) or nil
+end
+
+function KnoxScreen:drawCoin(r, hot)
+    local fill, lines = coinTexture("coin_fill"), coinTexture("coin_lines")
+    local fc = hot and COIN_FILL_HOT or COIN_FILL
+    local lc = hot and T.color.accent or COIN_REST
+    if fill then self:drawTextureScaled(fill, r[1], r[2], r[3], r[4], 1, fc.r, fc.g, fc.b) end
+    if lines then self:drawTextureScaled(lines, r[1], r[2], r[3], r[4], 1, lc.r, lc.g, lc.b) end
+end
+
+local tipBand, tipOpts = {0, 0, 0, 0}, {}
+
+--- The coin's tooltip, Knox's: a header in a double frame with the logo, "Support Knox" /
+--- "Boosty and the mod's roadmap", a line, "[LMB] open". Over the columns, right-aligned with
+--- the corner's name, above the bar.
+function KnoxScreen:drawCoinTip()
+    if not self.coinHot or not self.brandRect then return end
+    local s = T.cell / 48
+    local pad = math.floor(8 * s + 0.5)
+    local w = math.floor(250 * s + 0.5)
+    local titleF = T.fontTab
+    local subF = T.javaFonts and T.makeFont("body", T.cell * 0.25) or T.fontTile
+    local logo = math.floor(30 * s + 0.5)
+    local hh = pad * 2 + math.max(logo, T.fontH(titleF) + T.fontH(subF))
+    local kh = T.fontH(T.fontTile) + 4
+    local h = pad + hh + pad + 1 + pad + kh + pad
+    local b = self.brandRect
+    local x = b[1] + b[3] - w
+    local y = self:getHeight() - self.botH - math.floor(17 * s + 0.5) - h
+    T.rect(self, x, y, w, h, T.color.window)
+    T.border(self, x, y, w, h, T.color.tileEdge)
+    local hx, hy, hw = x + pad, y + pad, w - pad * 2
+    T.rect(self, hx, hy, hw, hh, T.color.header)
+    T.border(self, hx, hy, hw, hh, TIP_EDGE)
+    T.border(self, hx + 1, hy + 1, hw - 2, hh - 2, TIP_EDGE)
+    local lt = coinTexture("logo_clean_64")
+    if lt then self:drawTextureScaled(lt, hx + pad, hy + math.floor((hh - logo) / 2), logo, logo, 1, 1, 1, 1) end
+    local tx = hx + pad + logo + math.floor(10 * s + 0.5)
+    local ty = hy + math.floor((hh - T.fontH(titleF) - T.fontH(subF)) / 2)
+    tipBand[1], tipBand[2], tipBand[3], tipBand[4] = tx, ty, hx + hw - pad - tx, T.fontH(titleF)
+    tipOpts.font = titleF
+    T.label(self, getText("IGUI_Knox_CoinTitle"), tipBand, T.color.bright, tipOpts)
+    tipBand[2], tipBand[4] = ty + T.fontH(titleF), T.fontH(subF)
+    tipOpts.font = subF
+    T.label(self, getText("IGUI_Knox_CoinSub"), tipBand, T.color.dim, tipOpts)
+    local ly = hy + hh + pad
+    T.rect(self, hx, ly, hw, 1, T.color.border)
+    T.keyHint(self, hx, ly + 1 + pad, getText("IGUI_Knox_LMB"), getText("IGUI_Knox_CoinOpen"), kh)
+end
+
+function KnoxScreen:render()
+    if ISPanel.render then ISPanel.render(self) end
+    self:drawCoinTip()
 end
 
 --- Key hints right-aligned at `right`, centred on `midY`: [R] повернуть ...
@@ -1241,6 +1314,11 @@ function KnoxScreen:onMouseDown(x, y)
     end
     if T.inRect(x, y, self:searchRect()) and self.searchBox then
         self.searchBox:focus()
+        return true
+    end
+    -- the coin: Boosty in the browser (the author, 2026-10-25)
+    if self.coinRect and T.inRect(x, y, self.coinRect) then
+        if KnoxPinned then KnoxPinned.openBoosty() end
         return true
     end
     local b = self.brandRect

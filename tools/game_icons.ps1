@@ -38,6 +38,7 @@ $want = [ordered]@{
     key1 = "Item_Key1"; key2 = "Item_Key2"; key3 = "Item_Key3"; key4 = "Item_Key4"; cassette2 = "Item_Cassette2"; cassette3 = "Item_Cassette3"
     body_male = "male_base"; body_female = "female_base"
     c_corpse = "Container_DeadPerson_MaleZombie"; c_body = "Container_DeadPerson_Male"; c_campfire = "Container_Campfire"
+    hat_police = "Item_HatPoliceBlue"; m16 = "Item_AssaultRifle"
     bread = "Item_Bread"; sheet = "Item_Sheet"; watch = "Item_DigitalWatch_Black"; alarmclock = "Item_AlarmClock"
     rag = "Item_Rag"; sheetrope = "Item_SheetRope"
     toiletpaper = "Item_ToiletPaper"; magazine = "Item_Magazine"; clip9 = "Item_BerettaClip"; oatmeal = "Item_Oatmeal"; ammobox9 = "Item_HandgunAmmoBox"; whiskey = "Item_Whiskey"; book_skill = "Item_Book8"

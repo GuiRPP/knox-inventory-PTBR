@@ -20,6 +20,7 @@ require "Knox/KnoxTheme"
 require "Knox/KnoxNews"
 require "Knox/KnoxNewsBack"
 require "Knox/KnoxCrosshairDemo"
+require "Knox/KnoxPinned"
 
 local T = KnoxTheme
 local DOT = string.char(183)
@@ -58,6 +59,8 @@ end
 
 -- Ask for the menu's atlases as early as possible, while the game still loads.
 Events.OnGameBoot.Add(function()
+    -- (and the news' pictures: read before they are shown)
+    pcall(KnoxPinned.preload)
     pcall(function()
         if not T.on("menu") then return end
         T.refresh()
@@ -202,9 +205,10 @@ local function tagText(tag)
     return getTextOrNull("IGUI_Knox_NewsTag_" .. string.lower(tag or "")) or tag or ""
 end
 
+-- (only once read: T.readyTex - not the game's red-white squares, the author 2026-10-25)
 local function newsTexture(file, stock)
-    local tex = file and getTexture("media/knox/news/" .. file) or nil
-    return tex or getTexture("media/ui/knoxmenu/" .. stock)
+    local tex = file and T.readyTex("media/knox/news/" .. file) or nil
+    return tex or T.readyTex("media/ui/knoxmenu/" .. stock)
 end
 
 --- What a card and the opened post need besides the body: the first
@@ -218,7 +222,11 @@ local function prepare(post)
         local art = string.match(s, "^@art%s+(.+)$")
         -- @frame #rrggbb: the card's frame in a colour of its own (0.9.8: green, for the skins)
         local frame = string.match(s, "^@frame%s+#(%x%x%x%x%x%x)")
-        if frame then
+        -- @lead text: the card's second line when it is not the first paragraph (the pinned post)
+        local leadLine = string.match(s, "^@lead%s+(.+)$")
+        if leadLine then
+            post.leadLine = trim(leadLine)
+        elseif frame then
             post.frameColor = {r = tonumber(frame:sub(1, 2), 16) / 255, g = tonumber(frame:sub(3, 4), 16) / 255,
                                b = tonumber(frame:sub(5, 6), 16) / 255}
         elseif banner then
@@ -240,7 +248,12 @@ local function prepare(post)
             post.lead = s
         end
     end
-    post.lead = post.lead or ""
+    post.lead = post.leadLine or post.lead or ""
+    -- the pinned post (the roadmap and Boosty, 2026-10-25): gold, the camp on its card
+    if KnoxNews.isPinned(post) then
+        post.pinned = true
+        post.frameColor = post.frameColor or KnoxNews.PINNED_COLOR
+    end
     -- a technical update: its kind's frame and pictures, unless it brings its own
     -- (tools\make_news_tech.ps1: one banner, a picture per language)
     if string.lower(post.tag or "") == "tech" then
@@ -336,12 +349,25 @@ local function tagPlate(ui, x, y, text, color)
     return w
 end
 
+--- The pinned card's plate: a pin turned 45 degrees, then PINNED (the mockup's .tag with its svg).
+local function pinPlate(ui, x, y, text, color)
+    local f = T.fontTile
+    text = T.upper(text)
+    local h = T.fontH(f) + 4
+    local ps = math.floor(9 * T.cell / 48 + 0.5)
+    local w = 5 + ps + 4 + T.measure(f, text) + 5
+    T.rect(ui, x, y, w, h, color)
+    KnoxPinned.pin(ui, x + 5, y + math.floor((h - ps) / 2), ps, T.color.ink)
+    T.text(ui, text, x + 5 + ps + 4, y + 2, T.color.ink, f)
+    return w
+end
+
 --- A news card: the banner, the post's kind, its title and first line.
 local function drawCard(ui, post, x, y, w, h, hot)
     prepare(post)
     local pad = T.pad
     T.rect(ui, x, y, w, h, T.color.window)
-    local tex = newsTexture(post.bannerFile, "news_banner.png")
+    local tex = post.pinned and KnoxPinned.banner() or newsTexture(post.bannerFile, "news_banner.png")
     if tex then
         -- fills the card keeping its shape; what does not fit is cut on the left, under the text
         local tw, th = tex:getWidth(), tex:getHeight()
@@ -361,9 +387,13 @@ local function drawCard(ui, post, x, y, w, h, hot)
     T.rect(ui, fx, fy + fh - t, fw, t, fc)
     T.rect(ui, fx, fy + t, t, fh - t * 2, fc)
     T.rect(ui, fx + fw - t, fy + t, t, fh - t * 2, fc)
+    -- the pinned card: a soft slanted light passes over it every 7 s, its frame catching it
+    if post.pinned then KnoxPinned.cardShine(ui, fx, fy, fw, fh) end
     local cx, cy = x + pad + 4, y + pad
     -- (the kind's plate in the post's own colour when it has one: @frame)
-    if post.tag ~= "" then cx = cx + tagPlate(ui, cx, cy, tagText(post.tag), post.frameColor or tagColor(post.tag)) + 6 end
+    if post.pinned then
+        cx = cx + pinPlate(ui, cx, cy, tagText(post.tag), post.frameColor) + 6
+    elseif post.tag ~= "" then cx = cx + tagPlate(ui, cx, cy, tagText(post.tag), post.frameColor or tagColor(post.tag)) + 6 end
     if not KnoxNews.isSeen(post) then tagPlate(ui, cx, cy, getText("IGUI_Knox_NewsNew"), T.color.ok) end
     cx = x + pad + 4
     cy = cy + T.fontH(T.fontTile) + 4 + math.floor(pad / 2)
@@ -403,12 +433,30 @@ function R:new(post)
     return o
 end
 
-function R.open(post)
+--- Open `post`. `back`: the pinned post it was opened from, {post, pin, scroll} - leaving
+--- this one goes back there, its roadmap as it was left (the author, 2026-10-25). `fade`:
+--- its panels come up out of their colour (the second half of R:switch).
+function R.open(post, back, fade)
     R.close()
     T.ensure()
     local o = R:new(post)
     o:initialise()
     o:instantiate()
+    o.back = back
+    o.fadeInAt = fade and T.animOn() and getTimestampMs() or nil
+    -- the pinned post: its roadmap's state for this opening (a card opens its update's own
+    -- post here, as the news list does - the next frame, not in the middle of this one's
+    -- drawing; the author 2026-10-25); back from that post: the same state, scrolled as it was
+    if back and back.post == post then
+        o.pin, o.scroll, o.back = back.pin, back.scroll, nil
+    elseif KnoxNews.isPinned(post) then
+        local st = {}
+        st.road = KnoxRoadmap.new(post)
+        st.road.onOpen = function(row)
+            st.openPost = KnoxNews.byTitle(row.src.link)
+        end
+        o.pin = st
+    end
     o:addToUIManager()
     o:setAlwaysOnTop(true)
     R.instance = o
@@ -423,6 +471,39 @@ function R.close()
     o:removeFromUIManager()
 end
 
+--- From this post to another without a cut: its panels sink into their colour, then the
+--- other's come up out of it - the backdrop and frames stay (closed and opened at once,
+--- the menu showed through for a frame - "it cuts the eye", the author 2026-10-25). Done
+--- at the end of render (R.switchDue), never in the middle of a frame's drawing.
+local SWITCH_OUT, SWITCH_IN = 120, 180
+function R:switch(post, back)
+    if self.switchTo then return end
+    self.switchTo = {post = post, back = back}
+    self.switchAt = T.animOn() and getTimestampMs() or 0
+end
+
+--- Esc, a click past the post, its hint: a post opened from the roadmap goes back to it,
+--- any other closes.
+function R.leave()
+    local o = R.instance
+    if o and o.back then
+        o:switch(o.back.post, o.back)
+    else
+        R.close()
+    end
+end
+
+--- Over the panels (inside their frames), their colour: `k` 0..1.
+local function veilOver(ui, r, k)
+    if r then T.rect(ui, r[1] + 2, r[2] + 2, r[3] - 4, r[4] - 4, T.color.window, k) end
+end
+function R:veil(k)
+    if k <= 0.003 then return end
+    k = math.min(1, k)
+    veilOver(self, self.panel, k)
+    veilOver(self, self.artRect, k)
+end
+
 function R:prerender()
     local W, H = self:getWidth(), self:getHeight()
     local pad, cell = T.pad, T.cell
@@ -433,10 +514,17 @@ function R:prerender()
     -- Esc closes (the key is watched here: the menu under this takes no part)
     local esc = isKeyDown(Keyboard.KEY_ESCAPE) == true
     if esc and not self.escDown then
-        R.close()
-        return
+        R.leave()
+        -- (closed: nothing more to draw; on its way back to the roadmap: drawn on)
+        if R.instance ~= self then return end
     end
     self.escDown = esc
+    -- a roadmap card clicked: its update's post in place of the pinned one
+    if self.pin and self.pin.openPost then
+        local p = self.pin.openPost
+        self.pin.openPost = nil
+        self:switch(p, {post = post, pin = self.pin, scroll = self.scroll})
+    end
 
     self:drawRect(0, 0, W, H, 0.88, 0.02, 0.022, 0.022)
     -- a drawn backdrop ("@back power", KnoxNewsBack): lit while a generator of the post runs
@@ -474,8 +562,11 @@ function R:prerender()
     local ax, ay = side + textPanelW + gap, top
     T.rect(self, ax, ay, artW, panelH, T.color.cell)
     if post.back and KnoxNewsBack then KnoxNewsBack.grid(self, ax, ay, artW, panelH, backC, backLit, 1) end
-    local art = not post.artGen and not post.artVp and newsTexture(post.artFile, "news_art.png") or nil
-    if post.artGen and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
+    local art = not self.pin and not post.artGen and not post.artVp and newsTexture(post.artFile, "news_art.png") or nil
+    if self.pin then
+        -- the pinned post: Knox's coin turning in the light, "thank you" under it
+        KnoxPinned.drawRight(self, ax, ay, artW, panelH)
+    elseif post.artGen and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
         -- the generator itself in the middle of the frame, standing (live: started, it
         -- lights the post's backdrop up - the author, 2026-10-22)
         local d = KnoxGeneratorWindow.newsDemo(self, "art", false, false)
@@ -504,138 +595,149 @@ function R:prerender()
 
     -- the text on the left
     local px, pw = side, textPanelW
-    T.rect(self, px, top, pw, panelH, T.color.window, 0.97)
-    self.backGrid = nil
-    if post.back and KnoxNewsBack then
-        self:setStencilRect(px, top, pw, panelH)
-        KnoxNewsBack.draw(self, post.back, px, top, pw, panelH, backC, backLit)
-        self.backGrid = {backC, backLit, post.back}
-        self:clearStencilRect()
-    end
-    T.tileFrame(self, px, top, pw, panelH, T.color.tileFrame)
-    self.panel = {px, top, pw, panelH}
-    self.artRect = {ax, ay, artW, panelH}
-    local centre = px + math.floor(pw / 2)
-    local textW = math.min(pw - pad * 8, cell * 20)
-    local titleFont = T.javaFonts and T.makeFont("title", math.min(44, cell * 0.72)) or UIFont.Large
-    if self.blocksW ~= textW then
-        self.blocks = layout(post, textW)
-        self.blocksW = textW
-        self.titleLines = T.wrap(T.upper(post.title), titleFont, pw - pad * 6)
-    end
-    -- the head (title, tag, date) on a band of its own over the whole panel, a line of the
-    -- post's colour under it: a thin grey line alone did not part it from the post (the
-    -- author, 2026-10-22)
     local pc = post.frameColor or T.color.accent
-    local headH = pad * 2 + #self.titleLines * T.fontH(titleFont) + math.floor(pad / 2) + T.fontH(T.fontTab) + pad + math.floor(pad / 2)
-    T.rect(self, px + 2, top + 2, pw - 4, headH - 2, T.color.header)
-    T.rect(self, px + 2, top + headH, pw - 4, 4, pc)   -- (2 px read thin: the author, 2026-10-22)
-    local y = top + pad * 2
-    for _, l in ipairs(self.titleLines) do
-        T.textCentre(self, l, centre, y, T.color.bright, titleFont)
-        y = y + T.fontH(titleFont)
-    end
-    local meta = tagText(post.tag)
-    if post.version ~= "" then meta = meta .. " " .. post.version end
-    if post.date ~= "" then meta = meta .. "  " .. DOT .. "  " .. post.date end
-    y = y + math.floor(pad / 2)
-    -- (a post with a colour of its own - @frame - has it here too: the line under the
-    -- head, its headings, its pictures' frames, the scroll bar)
-    T.textCentre(self, meta, centre, y, pc, T.fontTab)
-    y = top + headH + 4 + pad
-
-    -- the body scrolls under the title
-    local viewTop, viewH = y, top + panelH - pad - y
-    self.view = {px, viewTop, pw, viewH}
-    self:setStencilRect(px, viewTop, pw, viewH)
-    local lh = T.fontH(T.fontText) + 5
-    local colX = centre - math.floor(textW / 2)
-    y = viewTop - self.scroll + pad
-    local first = true
-    for _, b in ipairs(self.blocks) do
-        if b.kind == "text" then
-            for _, l in ipairs(b.lines) do
-                if y > viewTop - lh and y < viewTop + viewH then
-                    T.textCentre(self, l, centre, y, first and T.color.bright or T.color.text, T.fontText)
-                end
-                y = y + lh
-            end
-            y = y + math.floor(lh * 0.8)
-            first = false
-        elseif b.kind == "heading" then
-            y = y + math.floor(lh * 0.8)
-            if b.framed then y = y + math.floor(pad / 2) end
-            if y > viewTop - lh * 3 and y < viewTop + viewH then
-                if b.framed then
-                    local fw = T.measure(T.fontHeader, b.text) + pad * 4
-                    T.rect(self, centre - math.floor(fw / 2), y - math.floor(pad / 2), fw,
-                        T.fontH(T.fontHeader) + pad, pc)
-                end
-                T.textCentre(self, b.text, centre, y, b.framed and T.color.ink or (post.frameColor or T.color.bright), T.fontHeader)
-            end
-            y = y + T.fontH(T.fontHeader) + math.floor(lh * 0.7)
-            if b.framed then y = y + math.floor(pad / 2) end
-            first = false
-        elseif b.kind == "item" then
-            local d = math.max(6, math.floor(T.fontH(T.fontText) / 3))
-            if y > viewTop - lh and y < viewTop + viewH then
-                T.rect(self, colX + 2, y + math.floor((T.fontH(T.fontText) - d) / 2) + 1, d, d, b.color)
-            end
-            for _, l in ipairs(b.lines) do
-                if y > viewTop - lh and y < viewTop + viewH then
-                    T.text(self, l, colX + b.indent, y, T.color.text, T.fontText)
-                end
-                y = y + lh
-            end
-            y = y + 3
-        elseif b.kind == "image" then
-            local tw, th = b.tex:getWidth(), b.tex:getHeight()
-            local w = math.min(textW, tw)
-            local h = math.floor(th * w / math.max(1, tw))
-            local ix = centre - math.floor(w / 2)
-            y = y + math.floor(lh * 0.4)
-            self:drawTextureScaled(b.tex, ix, y, w, h, 1, 1, 1, 1)
-            T.tileFrame(self, ix - 2, y - 2, w + 4, h + 4, pc)
-            y = y + h + pad + math.floor(lh * 0.4)
-        elseif b.kind == "dash" and KnoxDashboard and KnoxDashboard.newsDemo then
-            -- the live dashboard: the panel itself on a pretend car, in the view only
-            local d = KnoxDashboard.newsDemo(self, b.key, b.body, b.hot)
-            local w, h = d:demoSize(textW)
-            local ix = centre - math.floor(w / 2)
-            y = y + math.floor(lh * 0.4)
-            d:hostAt(self, ix, y, self.view)
-            y = y + h + pad + math.floor(lh * 0.4)
-        elseif b.kind == "gen" and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
-            -- the live generator: its window itself on a pretend generator, in the view only
-            local d = KnoxGeneratorWindow.newsDemo(self, b.key, b.worn)
-            local w, h = d:demoSize(textW)
-            local ix = centre - math.floor(w / 2)
-            y = y + math.floor(lh * 0.4)
-            d:hostAt(self, ix, y, self.view)
-            y = y + h + pad + math.floor(lh * 0.4)
-        elseif b.kind == "open" then
-            -- a button of the post (it opens a window of the mod itself)
-            local r = b.rect
-            local bh = math.floor(cell * 0.7)
-            r[1], r[2], r[3], r[4] = centre - math.floor((T.buttonW(b.text) + pad * 2) / 2), y + math.floor(lh * 0.4), T.buttonW(b.text) + pad * 2, bh
-            b.shown = r[2] + bh > viewTop and r[2] < viewTop + viewH
-            if b.shown then
-                openOpts.hover = T.inRect(self:getMouseX(), self:getMouseY(), r)
-                T.button(self, r, b.text, openOpts)
-            end
-            y = r[2] + bh + pad + math.floor(lh * 0.4)
-        elseif b.kind == "vp" and KnoxCrosshair and KnoxCrosshair.newsDemo then
-            -- the live crosshair panel: the panel itself on a pretend cupboard, in the view only
-            local d = KnoxCrosshair.newsDemo(self, b.key, b.place)
-            local w, h = d:demoSize(textW)
-            local ix = centre - math.floor(w / 2)
-            y = y + math.floor(lh * 0.4)
-            d:hostAt(self, ix, y, self.view)
-            y = y + h + pad + math.floor(lh * 0.4)
+    local viewTop, viewH, contentH
+    if self.pin then
+        -- the pinned post: its head, the night road, the support block, the roadmap (KnoxPinned)
+        self.artRect = self.artRect or {0, 0, 0, 0}
+        self.artRect[1], self.artRect[2], self.artRect[3], self.artRect[4] = ax, ay, artW, panelH
+        contentH = KnoxPinned.drawLeft(self, post, self.pin, px, top, pw, panelH, self.scroll)
+        viewTop, viewH = self.view[2], self.view[4]
+        T.tileFrame(self, px, top, pw, panelH, T.color.tileFrame)
+    else
+        T.rect(self, px, top, pw, panelH, T.color.window, 0.97)
+        self.backGrid = nil
+        if post.back and KnoxNewsBack then
+            self:setStencilRect(px, top, pw, panelH)
+            KnoxNewsBack.draw(self, post.back, px, top, pw, panelH, backC, backLit)
+            self.backGrid = {backC, backLit, post.back}
+            self:clearStencilRect()
         end
+        T.tileFrame(self, px, top, pw, panelH, T.color.tileFrame)
+        self.panel = {px, top, pw, panelH}
+        self.artRect = {ax, ay, artW, panelH}
+        local centre = px + math.floor(pw / 2)
+        local textW = math.min(pw - pad * 8, cell * 20)
+        local titleFont = T.javaFonts and T.makeFont("title", math.min(44, cell * 0.72)) or UIFont.Large
+        if self.blocksW ~= textW then
+            self.blocks = layout(post, textW)
+            self.blocksW = textW
+            self.titleLines = T.wrap(T.upper(post.title), titleFont, pw - pad * 6)
+        end
+        -- the head (title, tag, date) on a band of its own over the whole panel, a line of the
+        -- post's colour under it: a thin grey line alone did not part it from the post (the
+        -- author, 2026-10-22)
+        pc = post.frameColor or T.color.accent
+        local headH = pad * 2 + #self.titleLines * T.fontH(titleFont) + math.floor(pad / 2) + T.fontH(T.fontTab) + pad + math.floor(pad / 2)
+        T.rect(self, px + 2, top + 2, pw - 4, headH - 2, T.color.header)
+        T.rect(self, px + 2, top + headH, pw - 4, 4, pc)   -- (2 px read thin: the author, 2026-10-22)
+        local y = top + pad * 2
+        for _, l in ipairs(self.titleLines) do
+            T.textCentre(self, l, centre, y, T.color.bright, titleFont)
+            y = y + T.fontH(titleFont)
+        end
+        local meta = tagText(post.tag)
+        if post.version ~= "" then meta = meta .. " " .. post.version end
+        if post.date ~= "" then meta = meta .. "  " .. DOT .. "  " .. post.date end
+        y = y + math.floor(pad / 2)
+        -- (a post with a colour of its own - @frame - has it here too: the line under the
+        -- head, its headings, its pictures' frames, the scroll bar)
+        T.textCentre(self, meta, centre, y, pc, T.fontTab)
+        y = top + headH + 4 + pad
+
+        -- the body scrolls under the title
+        viewTop, viewH = y, top + panelH - pad - y
+        self.view = {px, viewTop, pw, viewH}
+        self:setStencilRect(px, viewTop, pw, viewH)
+        local lh = T.fontH(T.fontText) + 5
+        local colX = centre - math.floor(textW / 2)
+        y = viewTop - self.scroll + pad
+        local first = true
+        for _, b in ipairs(self.blocks) do
+            if b.kind == "text" then
+                for _, l in ipairs(b.lines) do
+                    if y > viewTop - lh and y < viewTop + viewH then
+                        T.textCentre(self, l, centre, y, first and T.color.bright or T.color.text, T.fontText)
+                    end
+                    y = y + lh
+                end
+                y = y + math.floor(lh * 0.8)
+                first = false
+            elseif b.kind == "heading" then
+                y = y + math.floor(lh * 0.8)
+                if b.framed then y = y + math.floor(pad / 2) end
+                if y > viewTop - lh * 3 and y < viewTop + viewH then
+                    if b.framed then
+                        local fw = T.measure(T.fontHeader, b.text) + pad * 4
+                        T.rect(self, centre - math.floor(fw / 2), y - math.floor(pad / 2), fw,
+                            T.fontH(T.fontHeader) + pad, pc)
+                    end
+                    T.textCentre(self, b.text, centre, y, b.framed and T.color.ink or (post.frameColor or T.color.bright), T.fontHeader)
+                end
+                y = y + T.fontH(T.fontHeader) + math.floor(lh * 0.7)
+                if b.framed then y = y + math.floor(pad / 2) end
+                first = false
+            elseif b.kind == "item" then
+                local d = math.max(6, math.floor(T.fontH(T.fontText) / 3))
+                if y > viewTop - lh and y < viewTop + viewH then
+                    T.rect(self, colX + 2, y + math.floor((T.fontH(T.fontText) - d) / 2) + 1, d, d, b.color)
+                end
+                for _, l in ipairs(b.lines) do
+                    if y > viewTop - lh and y < viewTop + viewH then
+                        T.text(self, l, colX + b.indent, y, T.color.text, T.fontText)
+                    end
+                    y = y + lh
+                end
+                y = y + 3
+            elseif b.kind == "image" then
+                local tw, th = b.tex:getWidth(), b.tex:getHeight()
+                local w = math.min(textW, tw)
+                local h = math.floor(th * w / math.max(1, tw))
+                local ix = centre - math.floor(w / 2)
+                y = y + math.floor(lh * 0.4)
+                if b.tex:isReady() then self:drawTextureScaled(b.tex, ix, y, w, h, 1, 1, 1, 1) end
+                T.tileFrame(self, ix - 2, y - 2, w + 4, h + 4, pc)
+                y = y + h + pad + math.floor(lh * 0.4)
+            elseif b.kind == "dash" and KnoxDashboard and KnoxDashboard.newsDemo then
+                -- the live dashboard: the panel itself on a pretend car, in the view only
+                local d = KnoxDashboard.newsDemo(self, b.key, b.body, b.hot)
+                local w, h = d:demoSize(textW)
+                local ix = centre - math.floor(w / 2)
+                y = y + math.floor(lh * 0.4)
+                d:hostAt(self, ix, y, self.view)
+                y = y + h + pad + math.floor(lh * 0.4)
+            elseif b.kind == "gen" and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
+                -- the live generator: its window itself on a pretend generator, in the view only
+                local d = KnoxGeneratorWindow.newsDemo(self, b.key, b.worn)
+                local w, h = d:demoSize(textW)
+                local ix = centre - math.floor(w / 2)
+                y = y + math.floor(lh * 0.4)
+                d:hostAt(self, ix, y, self.view)
+                y = y + h + pad + math.floor(lh * 0.4)
+            elseif b.kind == "open" then
+                -- a button of the post (it opens a window of the mod itself)
+                local r = b.rect
+                local bh = math.floor(cell * 0.7)
+                r[1], r[2], r[3], r[4] = centre - math.floor((T.buttonW(b.text) + pad * 2) / 2), y + math.floor(lh * 0.4), T.buttonW(b.text) + pad * 2, bh
+                b.shown = r[2] + bh > viewTop and r[2] < viewTop + viewH
+                if b.shown then
+                    openOpts.hover = T.inRect(self:getMouseX(), self:getMouseY(), r)
+                    T.button(self, r, b.text, openOpts)
+                end
+                y = r[2] + bh + pad + math.floor(lh * 0.4)
+            elseif b.kind == "vp" and KnoxCrosshair and KnoxCrosshair.newsDemo then
+                -- the live crosshair panel: the panel itself on a pretend cupboard, in the view only
+                local d = KnoxCrosshair.newsDemo(self, b.key, b.place)
+                local w, h = d:demoSize(textW)
+                local ix = centre - math.floor(w / 2)
+                y = y + math.floor(lh * 0.4)
+                d:hostAt(self, ix, y, self.view)
+                y = y + h + pad + math.floor(lh * 0.4)
+            end
+        end
+        self:clearStencilRect()
+        contentH = y + self.scroll - viewTop + pad
     end
-    self:clearStencilRect()
-    local contentH = y + self.scroll - viewTop + pad
     self.scrollMax = math.max(0, contentH - viewH)
     if self.scroll > self.scrollMax then self.scroll = self.scrollMax end
     self.bar = nil
@@ -666,7 +768,7 @@ function R:prerender()
     end
 
     -- how to leave
-    local label = getText("IGUI_Knox_NewsClose")
+    local label = getText(self.back and "IGUI_Knox_NewsBackRoad" or "IGUI_Knox_NewsClose")
     local hintW = T.measure(T.fontTile, "Esc") + 10 + 8 + T.measure(T.fontTile, label)
     local hx, hy = math.floor((W - hintW) / 2), bottom + math.floor((H - bottom - T.fontH(T.fontTile)) / 2)
     self.hint = {hx - pad, hy - pad, hintW + pad * 2, T.fontH(T.fontTile) + pad * 2}
@@ -685,6 +787,19 @@ function R:render()
     if b then
         T.rect(self, b[1], b[2], 2, b[3], T.color.border)
         T.rect(self, b[4], b[5], b[6], b[7], b[8])
+    end
+    -- from one post to another (R:switch): this one sinks, then the other is opened coming up
+    if not (self.fadeInAt or self.switchTo) then return end
+    local now = getTimestampMs()
+    if self.fadeInAt then
+        local k = (now - self.fadeInAt) / SWITCH_IN
+        if k >= 1 then self.fadeInAt = nil else self:veil(1 - k * k * (3 - 2 * k)) end
+    end
+    local to = self.switchTo
+    if to then
+        local k = self.switchAt > 0 and (now - self.switchAt) / SWITCH_OUT or 1
+        self:veil(k * k * (3 - 2 * math.min(1, k)))
+        if k >= 1 then R.open(to.post, to.back, true) end
     end
 end
 
@@ -732,6 +847,17 @@ function R:drawFades()
 end
 
 function R:onMouseDown(x, y)
+    if self.switchTo then return true end
+    local pin = self.pin
+    if pin then
+        -- the support block's button: Boosty in the browser
+        if pin.btn and pin.inView and T.inRect(x, y, pin.btn) then
+            KnoxPinned.openBoosty()
+            return true
+        end
+        -- the roadmap: the arrows, a drag, a card (in the view only)
+        if self.view and T.inRect(x, y, self.view) and KnoxRoadmap.onMouseDown(pin.road, x, y) then return true end
+    end
     for _, bl in ipairs(self.blocks or {}) do
         if bl.kind == "open" and bl.shown and T.inRect(x, y, bl.rect) then
             if bl.what == "settings" and KnoxSettings and not KnoxSettings.instance then KnoxSettings.open() end
@@ -748,7 +874,7 @@ function R:onMouseDown(x, y)
     end
     if (self.hint and T.inRect(x, y, self.hint))
             or not ((self.panel and T.inRect(x, y, self.panel)) or (self.artRect and T.inRect(x, y, self.artRect))) then
-        R.close()
+        R.leave()
     end
     return true
 end
@@ -758,11 +884,19 @@ function R:onMouseMove(dx, dy) return true end
 function R:onRightMouseDown(x, y) return true end
 
 function R:onRightMouseUp(x, y)
-    R.close()
+    if self.switchTo then return true end
+    R.leave()
     return true
 end
 
 function R:onMouseWheel(del)
+    if self.switchTo then return true end
+    local pin = self.pin
+    if pin then
+        -- over the roadmap: across it
+        local x, y = self:getMouseX(), self:getMouseY()
+        if self.view and T.inRect(x, y, self.view) and KnoxRoadmap.onMouseWheel(pin.road, x, y, del) then return true end
+    end
     self.scroll = math.max(0, math.min(self.scrollMax or 0, self.scroll + del * T.cell))
     return true
 end
@@ -914,8 +1048,16 @@ local function openNewOnce()
     if not o or not o:getIsVisible() or R.instance then return end
     if fontsPending(T.fontHeader, T.fontTile) then return end
     autoTried = true
-    local newest = posts()[1]
-    if newest and not KnoxNews.isSeen(newest) then R.open(newest) end
+    -- the newest update first, as always; with it read, the pinned post when its roadmap has
+    -- a new line (the author, 2026-10-25: "opens full screen like every new post")
+    local list = posts()
+    local pinned = KnoxNews.isPinned(list[1]) and list[1] or nil
+    local newest = pinned and list[2] or list[1]
+    if newest and not KnoxNews.isSeen(newest) then
+        R.open(newest)
+    elseif pinned and not KnoxNews.isSeen(pinned) then
+        R.open(pinned)
+    end
 end
 
 Events.OnPreUIDraw.Add(showOrHide)

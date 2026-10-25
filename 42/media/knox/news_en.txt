@@ -19,9 +19,35 @@
 ;   @art vp                             - the crosshair panel itself on the right instead of a picture (live)
 ;   @back aim                           - a drawn backdrop of the post: a grid and a crosshair that brighten while a panel of the post is busy
 ;   @open settings                      - an "Open Knox's settings" button in the post's text
+;   # | date | pinned | title           - the pinned post (the roadmap and Boosty): always the first card. "New" on it only when an @road line is added.
+;   @lead text                           - the card's second line (when it is not the first paragraph)
+;   @boosty                              - the support block with the Boosty button
+;   @road date | version | title | text | preview | post
+;                                        - a roadmap line: preview - road_<name>_en.png of media/knox/news/road, post - the title of a post of this file
+;                                          that a click on its card opens. Date "-" - a stage to come. The last line with a date is "Now".
 ;   plain text                          - a paragraph; an empty line starts a new one
 ;   ; ...                               - a comment, not shown in game
 ; A post counts as read by its version, date and title: change them and it shows as new again.
+
+# | 25.10.2026 | pinned | The Road of Knox Inventory
+@lead What's out, what's next - and how to support the mod
+Knox Inventory is made in the evenings, for free and with open source code. If you like the mod and want health, skills and the rest of the interface to come to Knox sooner - you can support it on Boosty!
+
+@boosty
+@road 10.10 | 0.6 | Stage 1: Public test | A Tarkov-style inventory: grids, gear, surroundings. | u060 | Update 0.6.0
+@road 10.10 | 0.7 | TV and radio | Their own windows for the TV and the radio. | u070 | Update 0.7.0: TV and radio
+@road 11.10 | 0.8 | The camp by the fire | A main menu with your heroes by the fire, the survivor's passport. | u080 | Update 0.8.0: The camp by the fire
+@road 13.10 | 0.9 | Scavenger | Item sizes, bags, pockets, searching. | u090 | Update 0.9.0: Scavenger
+@road 15.10 | 0.9.8 | Order | Sorting by category, stacks, skins. | u098 | Update 0.9.8: Order
+@road 17.10 | 0.9.8.7 | By Ear | Knox sounds, saves, magazines. | u0987 | Update 0.9.8.7: By Ear
+@road 20.10 | 1.0 BETA | Rigs and multiplayer | Bags with compartments, the right-click menu. | r10 | Knox Inventory 1.0 BETA
+@road 21.10 | Beta 3 | Behind the wheel | The dashboard, the head unit, music. | b3 | Behind the wheel
+@road 22.10 | Beta 5 | Keep the Lights On | The generator window, the worn generator. | g1 | Keep the Lights On
+@road 25.10 | Beta 6 | In Your Sights | The Viewpoint aim panel, the fridge. | x1 | In Your Sights
+@road 25.10 | Beta 8 | Make It Yours | An item editor right in the game, presets. | e1 | Make It Yours
+@road - | Stage 2 | Health | Injuries right on the body, treatment in one click.
+@road - | Stage 3 | Skills and map | Skills and progress, a Knox-style world map.
+@road - | Stage 4 | The whole interface | Crafting, building, vehicles - window by window.
 
 # | 25.10.2026 | update | Make It Yours
 @banner e1_banner_en.png

@@ -15,7 +15,7 @@ import se.krka.kahlua.vm.LuaClosure;
  *   java -cp projectzomboid.jar LuaRun.java stubs.lua SomeModFile.lua test.lua name=value
  * Run it from the game's folder (Kahlua reads stdlib.lua from the working directory).
  * Only the language and its standard library are there - the game's API is whatever the first
- * files define (stubs). Added: readfile(path) -> text, writefile(path, text), print to the
+ * files define (stubs). Added: readfile(path) -> text, writefile(path, text), nanotime(), print to the
  * console; an argument "name=value" becomes a global string.
  */
 public class LuaRun {
@@ -30,6 +30,11 @@ public class LuaRun {
             } catch (Exception e) {
                 frame.push(null);
             }
+            return 1;
+        });
+        // (offline profiles: microseconds of a run - the game's Lua has no clock of its own)
+        env.rawset("nanotime", (JavaFunction) (LuaCallFrame frame, int n) -> {
+            frame.push((double) System.nanoTime());
             return 1;
         });
         env.rawset("writefile", (JavaFunction) (LuaCallFrame frame, int n) -> {

@@ -66,8 +66,70 @@ function N.load()
             table.insert(cur.body, line)
         end
     end
+    -- the pinned post (type "pinned": the roadmap and Boosty, the author 2026-10-25) is the
+    -- first card always, and it is new again only when its roadmap gets a line: read by
+    -- the last released line, not by its title and date
+    for i, p in ipairs(posts) do
+        if string.lower(p.tag) == "pinned" then
+            local last = N.roadNow(p)
+            p.id = "pinned|" .. (last and (last.date .. "|" .. last.version) or p.date)
+            if i > 1 then
+                table.remove(posts, i)
+                table.insert(posts, 1, p)
+            end
+            break
+        end
+    end
     N.posts = posts
     return posts
+end
+
+function N.isPinned(p)
+    return p ~= nil and string.lower(p.tag or "") == "pinned"
+end
+
+--- The pinned post's colour: coin gold, warmer than the sand (the mockup's --gold).
+N.PINNED_COLOR = {r = 0xe0 / 255, g = 0xb6 / 255, b = 0x5e / 255}
+
+--- The pinned post's roadmap, from its lines
+---   @road date | version | title | text | picture | the post it opens
+--- (date "-": a stage to come; picture: road_<name>_<lang>.png of media/knox/news/road;
+--- the post: the title of an update in the same file). Read once per post.
+function N.road(p)
+    if p.road then return p.road end
+    local rows = {}
+    for _, line in ipairs(p.body or {}) do
+        local s = string.match(line, "^%s*@road%s+(.*)$")
+        if s then
+            local f = {}
+            for v in string.gmatch(s .. "|", "([^|]*)|") do table.insert(f, trim(v)) end
+            local row = {date = f[1] or "", version = f[2] or "", title = f[3] or "", text = f[4] or "",
+                         preview = f[5] or "", link = f[6] or ""}
+            row.future = row.date == "-" or row.date == ""
+            if row.future then row.date = "" end
+            table.insert(rows, row)
+        end
+    end
+    p.road = rows
+    return rows
+end
+
+--- The roadmap's "now": its last released line (nil: none).
+function N.roadNow(p)
+    local rows = N.road(p)
+    for i = #rows, 1, -1 do
+        if not rows[i].future then return rows[i], i end
+    end
+    return nil
+end
+
+--- The post of this file with this title (a roadmap card opens it).
+function N.byTitle(title)
+    if not N.posts then N.load() end
+    for _, p in ipairs(N.posts) do
+        if p.title == title then return p end
+    end
+    return nil
 end
 
 local seen = nil
@@ -102,6 +164,13 @@ function N.markSeen(post)
     saveSeen()
 end
 
+--- A post new again (the bench: the pinned post opening by itself, 2026-10-25).
+function N.markUnseen(post)
+    if not N.isSeen(post) then return end
+    seen[post.id] = nil
+    saveSeen()
+end
+
 --- Are there posts not read yet? (the dot on the top bar's stage plate)
 function N.hasUnread()
     if not N.posts then N.load() end
@@ -125,6 +194,7 @@ N.TECH_COLOR = {r = 0x86 / 255, g = 0xa8 / 255, b = 0xbf / 255}
 
 local function tagColor(tag)
     if string.lower(tag or "") == "tech" then return N.TECH_COLOR end
+    if string.lower(tag or "") == "pinned" then return N.PINNED_COLOR end
     return T.color[TAG_COLOR[string.lower(tag or "")] or "good"]
 end
 
@@ -147,6 +217,7 @@ function N.colorOf(p)
             end
         end
         if not p.frameColor and string.lower(p.tag or "") == "tech" then p.frameColor = N.TECH_COLOR end
+        if not p.frameColor and N.isPinned(p) then p.frameColor = N.PINNED_COLOR end
     end
     return p.frameColor or T.color.accent
 end
@@ -225,7 +296,8 @@ end
 
 function KnoxNews:reload()
     self.posts = N.load()
-    self.selected = self.posts[1]
+    -- (the pinned post opens over the screen, as in the menu: the newest other one is shown here)
+    self.selected = N.isPinned(self.posts[1]) and self.posts[2] or self.posts[1]
     self.blocks = nil
     if self.selected then N.markSeen(self.selected) end
 end
@@ -245,6 +317,12 @@ function KnoxNews:metrics()
 end
 
 function KnoxNews:select(post)
+    -- the pinned post: its roadmap and Boosty over the whole screen, as the main menu shows
+    -- it (the author, 2026-10-25) - this page's reader has none of that
+    if N.isPinned(post) and KnoxMenuNewsReader then
+        KnoxMenuNewsReader.open(post)
+        return
+    end
     if post == self.selected then return end
     self.selected = post
     self.blocks = nil
@@ -368,7 +446,7 @@ function KnoxNews:prerender()
             local w = math.min(m.textW, tw)
             local h = math.floor(th * w / math.max(1, tw))
             T.rect(self, rx - 2, y - 2, w + 4, h + 4, T.color.cell)
-            self:drawTextureScaled(b.tex, rx, y, w, h, 1, 1, 1, 1)
+            if b.tex:isReady() then self:drawTextureScaled(b.tex, rx, y, w, h, 1, 1, 1, 1) end   -- (not before it is read: red-white squares, 2026-10-25)
             T.border(self, rx - 2, y - 2, w + 4, h + 4, T.color.border)
             y = y + h + pad
         elseif b.kind == "dash" and KnoxDashboard and KnoxDashboard.newsDemo then
