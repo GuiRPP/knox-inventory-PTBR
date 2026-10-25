@@ -29,7 +29,7 @@ local vp = nil
 
 --- What there is of Viewpoint: {present, version, oldpoint, oldpointVersion,
 --- has = {part = true}, missing = "..."}. The Java parts (KnoxViewpoint.knoxViewpointParts):
---- cursor, look, view, rows, menu, topdown, oldpoint. Looked up once (the jars
+--- cursor, look, view, rows, menu, panel, topdown, oldpoint. Looked up once (the jars
 --- are loaded before any Lua runs).
 function C.viewpoint()
     if vp then return vp end
@@ -96,7 +96,7 @@ function C.report()
     local v = C.viewpoint()
     if not v.present then return end
     local on = {}
-    for _, n in ipairs({"cursor", "look", "view", "rows", "menu", "topdown", "oldpoint"}) do
+    for _, n in ipairs({"cursor", "look", "view", "rows", "menu", "panel", "topdown", "oldpoint"}) do
         if v.has[n] then table.insert(on, n) end
     end
     local off = v.missing

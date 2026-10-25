@@ -742,6 +742,122 @@ function B.betaPile(player)
     dirtyAll()
 end
 
+-- Performance (the author's task, 2026-10-24) ------------------------------------------
+-- The counter (shared/Knox/KnoxPerf.lua) is switched by dev.perf in knox_settings.txt
+-- and starts with the next load of the Lua; what it measures goes to
+-- Zomboid/Lua/knox_perf.txt, the steps of the scenario as marks in that file.
+
+function B.perfSet(on)
+    T.settings["dev.perf"] = on and "1" or "0"
+    T.saveSettings()
+    halo(getSpecificPlayer(0), on and "IGUI_KnoxTB_PerfOnHalo" or "IGUI_KnoxTB_PerfOffHalo")
+end
+
+local function checkPerf()
+    local v = knoxJavaVersion and tonumber(knoxJavaVersion()) or 0
+    local on = KnoxPerf ~= nil and KnoxPerf.on == true
+    return on and v >= 58, getText("IGUI_KnoxTB_Res_Perf", tostring(v), tostring(on), tostring(T.settings["dev.perf"] or "0"),
+        tostring(KnoxPerf and KnoxPerf.wrapped or 0) .. " / " .. tostring(KnoxPerf and KnoxPerf.knoxHandlers or 0))
+end
+
+--- A mark in knox_perf.txt for a point's step: "<point> #<n>".
+local marks = {}
+local function mark(id)
+    marks[id] = (marks[id] or 0) + 1
+    if KnoxPerf then KnoxPerf.mark(id .. " #" .. marks[id]) end
+    halo(getSpecificPlayer(0), "IGUI_KnoxTB_PerfMark", marks[id])
+end
+
+--- The screen opened and closed 50 times, once a second, by itself (the bench goes
+--- with the screen - it is the screen's child).
+local cycle = nil
+local function cycleTick()
+    local c = cycle
+    if not c then
+        Events.OnTick.Remove(cycleTick)
+        return
+    end
+    local t = getTimestampMs()
+    if t < c.at then return end
+    c.at = t + 500
+    if KnoxScreen.instance then
+        KnoxScreen.instance:close()
+        c.done = c.done + 1
+        if c.done >= c.n then
+            cycle = nil
+            Events.OnTick.Remove(cycleTick)
+            if KnoxPerf then KnoxPerf.mark("open/close x" .. c.n .. ": end") end
+            halo(getSpecificPlayer(0), "IGUI_KnoxTB_PerfCycleDone", c.n)
+        end
+    elseif getSpecificPlayer(0) and not getSpecificPlayer(0):isDead() then
+        Knox.open(0)
+    end
+end
+
+function B.openClose(n)
+    if cycle then return end
+    if KnoxPerf then KnoxPerf.mark("open/close x" .. n .. ": start") end
+    cycle = {n = n, done = 0, at = getTimestampMs() + 500}
+    if B.instance then B.instance:close() end
+    if KnoxScreen.instance then KnoxScreen.instance:close() end
+    Events.OnTick.Remove(cycleTick)
+    Events.OnTick.Add(cycleTick)
+end
+
+--- A bag with a few things in it on the floor at the feet, for the crosshair
+--- panel (a short press of take looks into it, a held one takes it).
+function B.vpBag(player)
+    local sq = player and player:getCurrentSquare()
+    if not sq then return end
+    local bag = sq:AddWorldInventoryItem(exists(BAG) and BAG or "Base.Bag_Schoolbag", 0.5, 0.5, 0)
+    if not bag then return end
+    table.insert(B.dumped, tag(bag))
+    local inv = bag.getInventory and bag:getInventory()
+    if inv then
+        for _, ft in ipairs({"Base.Apple", "Base.WaterBottle", "Base.Pencil", "Base.Pencil", "Base.Socks"}) do
+            if exists(ft) then inv:AddItem(ft) end
+        end
+    end
+    dirtyAll()
+end
+
+--- The crosshair panel: Java part, Viewpoint's part, owned now, the switch, failed.
+local function checkVpPanel()
+    local v = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
+    local has = KnoxCompat.vpHas("panel") == true
+    local own = KnoxCrosshair ~= nil and KnoxCrosshair.owned == true
+    local failed = KnoxCrosshair ~= nil and KnoxCrosshair.failed == true
+    local on = T.switch("vp.panel") == true
+    local ok = v ~= nil and v >= 61 and has and own == on and not failed
+    return ok, getText("IGUI_KnoxTB_Res_VpPanel", tostring(v or "-"), tostring(has), tostring(on), tostring(own), tostring(failed))
+end
+
+--- The settings window (remade with pages and a scroll, 2026-10-25): open, its
+--- height against the screen's, the page shown, how tall it is and how much scrolls.
+local function checkSettings()
+    local w = KnoxSettings and KnoxSettings.instance
+    if not w or not w.L then return false, getText("IGUI_KnoxTB_Res_SettingsNone") end
+    local L, sh = w.L, getCore():getScreenHeight()
+    local ok = w:getHeight() <= sh - T.cell * 2 and #KnoxSettings.PAGES == 7
+    for _, p in ipairs(KnoxSettings.PAGES) do
+        if not L.pages[p] or #L.pages[p].items == 0 then ok = false end
+    end
+    return ok, getText("IGUI_KnoxTB_Res_Settings", tostring(math.floor(w:getHeight())), tostring(sh), w.page,
+        tostring(L.pages[w.page].h), tostring(L.viewH), tostring(math.floor(w:maxScroll())))
+end
+
+local function openSettings()
+    if not KnoxSettings.instance then KnoxSettings.open() end
+end
+
+function B.die(player)
+    if not player or player:isDead() then return end
+    if KnoxPerf then KnoxPerf.mark("death by the bench") end
+    if KnoxScreen.instance then KnoxScreen.instance:close() end
+    pcall(function() player:Kill(nil) end)
+    if not player:isDead() then pcall(function() player:setHealth(0) end) end
+end
+
 -- The points -----------------------------------------------------------------------
 
 -- (2026-10-20: the beta's first run in the game. The points marked "works" for
@@ -751,7 +867,36 @@ end
 -- "works" by the author on 21.10 - or broken and confirmed fixed the same day - left
 -- out, their marks: Zomboid/Lua/knox_testbench_beta1.txt)
 B.POINTS = {
-    -- 1.0: the generator window (mockup 17, written 2026-10-22)
+    -- the settings window with its pages in a column and a scroll (the author, 2026-10-25)
+    {id = "set_open", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_small", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_scroll", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_slider", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_cats", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_binds", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_apply", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_vp", actions = {{"Settings", openSettings}}, check = checkSettings},
+    {id = "set_menu"},
+    {id = "set_cn"},
+    -- Knox's crosshair panel in place of Viewpoint's (the author, 2026-10-25)
+    {id = "vp_on", check = checkVpPanel},
+    {id = "vp_keys", check = checkVpPanel},
+    {id = "vp_search"},
+    {id = "vp_bag", actions = {{"VpBag", function(p) B.vpBag(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    {id = "vp_take", actions = {{"VpBag", function(p) B.vpBag(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    {id = "vp_scroll", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    {id = "vp_actions"},
+    {id = "vp_tab"},
+    {id = "vp_off", check = checkVpPanel},
+    -- performance: the base line before any fix (the author's task, 2026-10-24)
+    {id = "perf_on", actions = {{"PerfOn", function() B.perfSet(true) end}, {"PerfOff", function() B.perfSet(false) end}}, check = checkPerf},
+    {id = "perf_play", actions = {{"Mark", function() mark("play") end}}, check = checkPerf},
+    {id = "perf_reload", check = checkPerf},
+    {id = "perf_death", actions = {{"Die", function(p) B.die(p) end}}, check = checkPerf},
+    {id = "perf_car", actions = {{"Car", function(p) B.car(p) end}, {"Mark", function() mark("car") end}}, check = checkPerf},
+    {id = "perf_loot", actions = {{"Dump", function(p) B.dump(p) end}, {"Mark", function() mark("loot") end},
+        {"ClearDump", function() B.clearDump() end}}, check = checkPerf},
+    {id = "perf_windows", actions = {{"OpenClose", function() B.openClose(50) end}, {"Mark", function() mark("windows") end}}, check = checkPerf},    -- 1.0: the generator window (mockup 17, written 2026-10-22)
     {id = "gen_open", actions = {{"Gen", function(p) B.genPlaced(p) end}}, check = checkGen},
     {id = "gen_use", check = checkGen},
     {id = "gen_pull", check = checkGen},

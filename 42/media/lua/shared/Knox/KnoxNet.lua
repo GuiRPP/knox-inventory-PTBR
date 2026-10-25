@@ -25,6 +25,8 @@
 --     server), sent to each player as they come in.
 -- Alone (no server) none of this runs: the things' modData as before.
 
+require "Knox/KnoxPerf"   -- (first: Knox's performance counter times the handlers this file adds, when dev.perf=1)
+
 KnoxNet = KnoxNet or {}
 local N = KnoxNet
 

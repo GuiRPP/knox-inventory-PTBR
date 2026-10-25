@@ -434,7 +434,11 @@ local function hookViewpoint()
             -- Viewpoint gives the first container of what is looked at (a fridge, never
             -- its freezer; a car's first part within reach): the one whose row is chosen
             -- in its panel (the wheel) is opened instead
-            local chosen = KnoxCompat.vpHas("menu") and knoxViewpointChosen and knoxViewpointChosen() or nil
+            -- (Knox's crosshair panel shown: the row chosen in it - 2026-10-25)
+            local chosen = KnoxCrosshair and KnoxCrosshair.owned and KnoxCrosshair.chosen() or nil
+            if not chosen then
+                chosen = KnoxCompat.vpHas("menu") and knoxViewpointChosen and knoxViewpointChosen() or nil
+            end
             if chosen and container and chosen ~= container then container = chosen end
             if not KnoxScreen.instance then Knox.viewpointLookAfter = true end
             ViewpointLoot.knoxOpened = KnoxScreen.instance == nil
@@ -494,6 +498,21 @@ local function hookViewpoint()
             return
         end
         grab(player, list)
+    end
+    -- Knox's crosshair panel takes the same way (KnoxCrosshair; the author,
+    -- 2026-10-25): `items` a Lua list - one thing, or all of a list in the panel
+    Knox.viewpointGrab = function(player, items)
+        local n = player:getPlayerNum()
+        local list = {}
+        for _, item in ipairs(items) do
+            if heavy(item) then
+                if #items == 1 then return take(player, item) end
+            elseif #items == 1 or not item:isUnwanted(player) then
+                knoxFromGround(item, n)
+                table.insert(list, item)
+            end
+        end
+        if #list > 0 then grab(player, list) end
     end
 end
 

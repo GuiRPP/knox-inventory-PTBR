@@ -17,12 +17,14 @@
 
 require "ISUI/ISPanel"
 require "Knox/KnoxTheme"
+require "Knox/KnoxCrosshairDemo"
 
 KnoxNews = ISPanel:derive("KnoxNews")
 local N = KnoxNews
 local T = KnoxTheme
 
-local MOD_ID = T.MOD_ID   -- (the release or the beta: whose files these are)
+local MOD_ID = T.MOD_ID
+local openOpts = {primary = true}   -- (a post's button: drawn every frame, its options filled in)   -- (the release or the beta: whose files these are)
 local SEEN_FILE = "knox_news_seen.txt"
 local DOT = string.char(183)   -- the game reads Lua files as single bytes: the middle dot by its code
 
@@ -186,6 +188,13 @@ local function layoutBody(post, width)
                 -- (@gen [worn]: the generator's window itself, live - KnoxGeneratorWindow.newsDemo)
                 dashes = dashes + 1
                 table.insert(blocks, {kind = "gen", worn = string.match(s, "^@gen%s+worn") ~= nil, key = (post.title or "") .. "#" .. dashes})
+            elseif string.match(s, "^@vp") then
+                -- (@vp [fridge]: Knox's crosshair panel itself, live - KnoxCrosshairDemo)
+                dashes = dashes + 1
+                table.insert(blocks, {kind = "vp", place = string.match(s, "^@vp%s*(%a*)"), key = (post.title or "") .. "#" .. dashes})
+            elseif string.match(s, "^@open%s+settings") then
+                -- (a button that opens Knox's settings window itself)
+                table.insert(blocks, {kind = "open", what = "settings", text = getText("IGUI_Knox_NewsOpenSettings"), rect = {0, 0, 0, 0}})
             elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then table.insert(blocks, {kind = "image", tex = tex}) end
@@ -378,6 +387,24 @@ function KnoxNews:prerender()
             v[1], v[2], v[3], v[4] = m.readX, top, W - m.readX, viewH
             d:hostAt(self, rx, y, v)
             y = y + h + pad
+        elseif b.kind == "open" then
+            local r = b.rect
+            local bw, bh = T.buttonW(b.text) + pad * 2, math.floor(T.cell * 0.7)
+            r[1], r[2], r[3], r[4] = rx, y, bw, bh
+            b.shown = y + bh > top and y < top + viewH
+            if b.shown then
+                openOpts.hover = T.inRect(self:getMouseX(), self:getMouseY(), r)
+                T.button(self, r, b.text, openOpts)
+            end
+            y = y + bh + pad
+        elseif b.kind == "vp" and KnoxCrosshair and KnoxCrosshair.newsDemo then
+            local d = KnoxCrosshair.newsDemo(self, b.key, b.place)
+            local _, h = d:demoSize(m.textW)
+            self.dashView = self.dashView or {0, 0, 0, 0}
+            local v = self.dashView
+            v[1], v[2], v[3], v[4] = m.readX, top, W - m.readX, viewH
+            d:hostAt(self, rx, y, v)
+            y = y + h + pad
         end
     end
     self:clearStencilRect()
@@ -408,6 +435,13 @@ function KnoxNews:prerender()
 end
 
 function KnoxNews:onMouseDown(x, y)
+    for _, bl in ipairs(self.blocks or {}) do
+        if bl.kind == "open" and bl.shown and T.inRect(x, y, bl.rect) then
+            if bl.what == "settings" and KnoxSettings and not KnoxSettings.instance then KnoxSettings.open() end
+            getSoundManager():playUISound("UIActivateButton")
+            return true
+        end
+    end
     local b = self.bar
     if b and T.inRect(x, y, b.track) then
         local onKnob = y >= b.knobY and y < b.knobY + b.knobH

@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 57
+T.JAVA_NEEDED = 61
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -216,6 +216,9 @@ T.SWITCHES = {
     -- musicHear   the others' own music heard here (and fetched when not here)
     {key = "musicShare", default = true, new = true, page = "game"},
     {key = "musicHear", default = true, new = true, page = "game"},
+    -- vp.panel  Knox's own crosshair panel in place of Viewpoint's (KnoxCrosshair;
+    --           the author, 2026-10-25) - listed only with Viewpoint here
+    {key = "vp.panel", default = true, new = true, page = "game", only = "viewpoint"},
 }
 
 -- Choices of the inventory in the settings: one of a few values, shown as a row
@@ -1010,16 +1013,17 @@ end
 
 --- A key in a small frame ("[R]") followed by its label, for hint rows;
 --- returns the x after it.
-function T.keyHint(ui, x, y, key, label, h)
+-- (`a`: how much it shows - the crosshair panel's hints fade as they change, KnoxCrosshair)
+function T.keyHint(ui, x, y, key, label, h, a)
     local font = T.fontTile
     local kw = T.measure(font, key) + 10
     local kh = h or (T.fontH(font) + 4)
     hintPlate[1], hintPlate[2], hintPlate[3], hintPlate[4] = x, y, kw, kh
-    hintPlateOpts.fill, hintPlateOpts.edge, hintPlateOpts.font = T.color.header, T.color.tileEdge, font
+    hintPlateOpts.fill, hintPlateOpts.edge, hintPlateOpts.font, hintPlateOpts.a = T.color.header, T.color.tileEdge, font, a
     T.plate(ui, hintPlate, key, hintPlateOpts)
     x = x + kw + 6
     hintBand[1], hintBand[2], hintBand[3], hintBand[4] = x, y, 0, kh
-    hintBandOpts.font = T.fontText
+    hintBandOpts.font, hintBandOpts.a = T.fontText, a
     return x + T.label(ui, label, hintBand, T.color.dim, hintBandOpts)
 end
 

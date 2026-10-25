@@ -19,9 +19,11 @@ require "OptionScreens/MainScreen"
 require "Knox/KnoxTheme"
 require "Knox/KnoxNews"
 require "Knox/KnoxNewsBack"
+require "Knox/KnoxCrosshairDemo"
 
 local T = KnoxTheme
 local DOT = string.char(183)
+local openOpts = {primary = true}   -- (a post's button: drawn every frame, its options filled in)
 
 -- Menu items ------------------------------------------------------------------
 
@@ -228,6 +230,9 @@ local function prepare(post)
             -- "@art gen": the post's generator itself in the frame, drawn by its window -
             -- sharp on any screen (a picture of it was soft, the author 2026-10-22)
             post.artGen = true
+        elseif art and trim(art) == "vp" then
+            -- "@art vp": the crosshair panel itself in the frame, live (KnoxCrosshairDemo, 2026-10-25)
+            post.artVp = true
         elseif art then
             post.artFile = trim(art)
         elseif not post.lead and s ~= "" and not MARK[string.sub(s, 1, 1)] and string.sub(s, 1, 1) ~= "#"
@@ -295,6 +300,16 @@ local function layout(post, width)
                 local last = blocks[#blocks]
                 if last and last.kind == "heading" then last.framed = true end
                 table.insert(blocks, {kind = "gen", worn = string.match(s, "^@gen%s+worn") ~= nil, key = dashes})
+            elseif string.match(s, "^@vp") then
+                -- the crosshair panel itself, live: "@vp" (a cupboard) / "@vp fridge"
+                -- (KnoxCrosshairDemo); a section opened by it, as by a picture
+                dashes = dashes + 1
+                local last = blocks[#blocks]
+                if last and last.kind == "heading" then last.framed = true end
+                table.insert(blocks, {kind = "vp", place = string.match(s, "^@vp%s*(%a*)"), key = dashes})
+            elseif string.match(s, "^@open%s+settings") then
+                -- a button that opens Knox's settings window itself, over the post (2026-10-25)
+                table.insert(blocks, {kind = "open", what = "settings", text = getText("IGUI_Knox_NewsOpenSettings"), rect = {0, 0, 0, 0}})
             elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then
@@ -431,8 +446,12 @@ function R:prerender()
         for _, d in pairs(self.knoxGenDemos or {}) do
             if d.demo and d.demo.g.on and d:getIsVisible() then on = true end
         end
+        -- ("@back aim": lit while a crosshair panel of the post finds or takes things)
+        for _, d in pairs(self.knoxVpDemos or {}) do
+            if d:getIsVisible() and d:busy() then on = true end
+        end
         self.backSt = self.backSt or {}
-        backLit = KnoxNewsBack.litFor(self.backSt, on, getTimestampMs())
+        backLit = KnoxNewsBack.litFor(self.backSt, on, getTimestampMs(), post.back)
         KnoxNewsBack.grid(self, 0, 0, W, H, backC, backLit, 0.45)
     end
 
@@ -455,11 +474,19 @@ function R:prerender()
     local ax, ay = side + textPanelW + gap, top
     T.rect(self, ax, ay, artW, panelH, T.color.cell)
     if post.back and KnoxNewsBack then KnoxNewsBack.grid(self, ax, ay, artW, panelH, backC, backLit, 1) end
-    local art = not post.artGen and newsTexture(post.artFile, "news_art.png") or nil
+    local art = not post.artGen and not post.artVp and newsTexture(post.artFile, "news_art.png") or nil
     if post.artGen and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
         -- the generator itself in the middle of the frame, standing (live: started, it
         -- lights the post's backdrop up - the author, 2026-10-22)
         local d = KnoxGeneratorWindow.newsDemo(self, "art", false, false)
+        local dw, dh = d:demoSize(artW - pad * 4)
+        self.artView = self.artView or {0, 0, 0, 0}
+        local v = self.artView
+        v[1], v[2], v[3], v[4] = ax, ay, artW, panelH
+        d:hostAt(self, ax + math.floor((artW - dw) / 2), ay + math.floor((panelH - dh) / 2), v)
+    elseif post.artVp and KnoxCrosshair and KnoxCrosshair.newsDemo then
+        -- the crosshair panel in the middle of the frame (live: the fridge and its freezer)
+        local d = KnoxCrosshair.newsDemo(self, "art", "fridge")
         local dw, dh = d:demoSize(artW - pad * 4)
         self.artView = self.artView or {0, 0, 0, 0}
         local v = self.artView
@@ -586,6 +613,25 @@ function R:prerender()
             y = y + math.floor(lh * 0.4)
             d:hostAt(self, ix, y, self.view)
             y = y + h + pad + math.floor(lh * 0.4)
+        elseif b.kind == "open" then
+            -- a button of the post (it opens a window of the mod itself)
+            local r = b.rect
+            local bh = math.floor(cell * 0.7)
+            r[1], r[2], r[3], r[4] = centre - math.floor((T.buttonW(b.text) + pad * 2) / 2), y + math.floor(lh * 0.4), T.buttonW(b.text) + pad * 2, bh
+            b.shown = r[2] + bh > viewTop and r[2] < viewTop + viewH
+            if b.shown then
+                openOpts.hover = T.inRect(self:getMouseX(), self:getMouseY(), r)
+                T.button(self, r, b.text, openOpts)
+            end
+            y = r[2] + bh + pad + math.floor(lh * 0.4)
+        elseif b.kind == "vp" and KnoxCrosshair and KnoxCrosshair.newsDemo then
+            -- the live crosshair panel: the panel itself on a pretend cupboard, in the view only
+            local d = KnoxCrosshair.newsDemo(self, b.key, b.place)
+            local w, h = d:demoSize(textW)
+            local ix = centre - math.floor(w / 2)
+            y = y + math.floor(lh * 0.4)
+            d:hostAt(self, ix, y, self.view)
+            y = y + h + pad + math.floor(lh * 0.4)
         end
     end
     self:clearStencilRect()
@@ -686,6 +732,13 @@ function R:drawFades()
 end
 
 function R:onMouseDown(x, y)
+    for _, bl in ipairs(self.blocks or {}) do
+        if bl.kind == "open" and bl.shown and T.inRect(x, y, bl.rect) then
+            if bl.what == "settings" and KnoxSettings and not KnoxSettings.instance then KnoxSettings.open() end
+            getSoundManager():playUISound("UIActivateButton")
+            return true
+        end
+    end
     local b = self.bar
     if b and T.inRect(x, y, b.track) then
         -- on the knob: held where it was taken; on the track: the knob's middle comes to the mouse

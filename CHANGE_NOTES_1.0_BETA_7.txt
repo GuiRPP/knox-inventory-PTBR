@@ -1,0 +1,36 @@
+[h1]Knox Inventory 1.0 BETA - update 6: In Your Sights[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[b]A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, click "Allow".[/b]
+
+Aim at a fridge - and a panel unfolds right beside the crosshair: sausage, two steaks, a cucumber. For those who play with Viewpoint, the panel at its crosshair is now in Knox's style. And Knox's settings window is made over.
+
+[h2]The crosshair panel (needs Viewpoint)[/h2]
+[list]
+[*]Works only together with the Viewpoint mod (and OldPoint on top of it). Without it nothing changes.
+[*]A header as Knox's menu in the world has: the container's picture and its name. Things of one kind - one row with a number.
+[*]The chosen row grows whole: its tile, picture and name get bigger. A long name slides along.
+[*]You see the taking: the row fills from left to right, the tile gets a sand frame, a taken row folds smoothly away.
+[*]Knox's search right in the panel: while you look at a container, your character searches it, and what is found unfolds into the list. Look away - the search waits.
+[*]Bags in a container: a short press of "Take" looks inside, another folds it. Hold it - and you take the whole bag.
+[*]Several containers in one thing (a fridge and its freezer) - in sections of their own.
+[*]Doors, windows and Viewpoint's other actions are here too; the dangerous ones (smash, break) come last and in red.
+[*]The keys are the ones you set in Viewpoint's options; the wheel chooses a row.
+[*]The panel changes its width and height smoothly; the count of things rolls like a drum, the hints at the foot change softly.
+[*]Don't like it? Turn off "Own Viewpoint crosshair panel" on the "Loot and bags" page of Knox's settings, and Viewpoint's own panel comes back.
+[*]If anything goes wrong in the panel, Knox writes one line into console.txt and gives Viewpoint's panel back by itself.
+[/list]
+
+[h2]The settings window[/h2]
+[list]
+[*]It no longer runs off the screen on small monitors.
+[*]The settings are laid out on pages: Modules, Look, Loot and bags, Order, Sound, Controls, Main menu.
+[*]New pages Sound and Main menu; inside the pages - sections with captions.
+[*]It scrolls with the wheel, the slider and a click on the track; the list's edges fade softly.
+[/list]
+
+[h2]News[/h2]
+[list]
+[*]The news post shows the crosshair panel live - a cupboard with a backpack, a fridge with a freezer: choose with the wheel, click to take, click the crosshair to look away.
+[*]A button in the post opens Knox's settings.
+[/list]

@@ -30,6 +30,8 @@
 -- Nothing of a file's name goes out: its SHA-256, its size and its kind.
 -- Alone (no server) none of this runs.
 
+require "Knox/KnoxPerf"   -- (first: Knox's performance counter times the handlers this file adds, when dev.perf=1)
+
 KnoxMusicNet = KnoxMusicNet or {}
 local MN = KnoxMusicNet
 

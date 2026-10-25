@@ -10,8 +10,10 @@ import se.krka.kahlua.integration.annotations.LuaMethod;
 import zombie.Lua.LuaManager;
 import zombie.core.Translator;
 import zombie.core.textures.Texture;
+import zombie.characters.IsoPlayer;
 import zombie.inventory.InventoryItem;
 import zombie.inventory.ItemContainer;
+import zombie.iso.IsoGridSquare;
 
 /**
  * Viewpoint (first person, Workshop 3809306528) keeps the mouse for looking
@@ -98,6 +100,7 @@ public class KnoxViewpoint {
      *   view    View.enabled - is Viewpoint's view on (the Surroundings' "auto")
      *   rows    LootRows' rows and Row's fields - "not searched yet" in its loot panel
      *   menu    LootMenu.rows, LootRows.selected, Row.items - the container of the row chosen
+     *   panel   LootMenu's target, keys and state, InteractActions - Knox's own crosshair panel
      *   oldpoint, topdown  OldPoint's Bridge: its overhead camera, its rotation key
      */
     @LuaMethod(name = "knoxViewpointParts", global = true)
@@ -110,6 +113,7 @@ public class KnoxViewpoint {
         // (and a window left open by quitting to the menu is not held over into the next game)
         held = false;
         windowOpen = false;
+        panelOwned = false;   // (Knox's panel asks again once its Lua runs)
         ClassLoader cl = ClassLoader.getSystemClassLoader();
         if (!has(cl, "viewpoint.FP")) return "";
         field();
@@ -126,6 +130,7 @@ public class KnoxViewpoint {
         }
         part(rows, "rows", found, missing);
         part(rows && menu(), "menu", found, missing);
+        part(panelParts(), "panel", found, missing);
         if (has(cl, "oldpoint.viewpoint.Bridge")) {
             part(topDownMethod() != null, "topdown", found, missing);
             boolean key;
@@ -328,6 +333,8 @@ public class KnoxViewpoint {
      * for as long as the search setting was on).
      */
     public static long refreshed(long signature) {
+        // (Knox's own panel shown: Viewpoint's rows are not seen - no need to rebuild them)
+        if (panelOwned) return signature;
         return (searchOn && hadHidden) ? signature * 31L + System.currentTimeMillis() / 400L : signature;
     }
 
@@ -335,7 +342,8 @@ public class KnoxViewpoint {
     public static List<InventoryItem> seenOnly(List<InventoryItem> list) {
         hiddenLast = 0;
         hadHidden = false;
-        if (!searchOn || list == null || list.isEmpty()) return list;
+        // (Knox's own panel shown: it asks the search itself - not each thing over again here)
+        if (panelOwned || !searchOn || list == null || list.isEmpty()) return list;
         Object fn = LuaManager.getFunctionObject("KnoxViewpointUnseen");
         if (fn == null) return list;
         ArrayList<InventoryItem> out = null;
@@ -434,6 +442,354 @@ public class KnoxViewpoint {
         @Patch.OnExit
         public static void exit(@Patch.Return(readOnly = false) long result) {
             result = KnoxViewpoint.refreshed(result);
+        }
+    }
+
+    // Knox's own crosshair panel in place of Viewpoint's (the author, 2026-10-25:
+    // the mockup .claude/mockups/vp_panel_v1.html brought into the game).
+    // Viewpoint still picks what is looked at, rolls its loot, gathers its
+    // actions and reads its keys - the player's own, from its settings; Knox
+    // draws the panel and keeps its rows and the choice (KnoxCrosshair.lua):
+    //   LootPanel.render  not drawn: Knox's panel is drawn instead
+    //   LootRows.move     the wheel (and a pad's up / down) moves Knox's choice
+    //   LootMenu.asks     the take key is the panel's, whatever Viewpoint's own rows hold
+    //   LootMenu.take     take and take all go to Knox; the open-window key stays Viewpoint's
+    // Lua asks each frame what is looked at and what was pressed (knoxVpPanel*).
+    // A part of this not found (another Viewpoint) leaves Viewpoint's own panel.
+
+    /** Knox draws the panel (Lua: knoxVpPanelOwn). Public: read by the patches inside Viewpoint. */
+    public static volatile boolean panelOwned;
+    private static int wheelAcc, pressed, takeKey = -1;
+
+    private static boolean panelLooked;
+    private static Field lmShown, lmLoot, lmPending, lmTarget, lmHeld;   // LootMenu's
+    private static Field tKind, tSquare, tObject, tLocked, tContainers;   // LootTargets$Target's
+    private static Field shoulderF;                                       // View.shoulder: <0 the camera over the left
+    private static Method iaCount, iaLabel, iaEnabled, iaProgress, iaTitle, iaRun;   // InteractActions'
+    private static Method kiSlot, kiMenu, title, groundTitle;
+    private static Object bindTake, bindAll;                              // Keys.LOOT_TAKE, Keys.LOOT_TAKE_ALL
+
+    private static Field declared(Class<?> c, String name) throws ReflectiveOperationException {
+        Field f = c.getDeclaredField(name);
+        f.setAccessible(true);
+        return f;
+    }
+
+    private static Method method(Class<?> c, String name, Class<?>... args) throws ReflectiveOperationException {
+        Method m = c.getDeclaredMethod(name, args);
+        m.setAccessible(true);
+        return m;
+    }
+
+    private static boolean panel() {
+        if (!panelLooked) {
+            panelLooked = true;
+            try {
+                ClassLoader cl = ClassLoader.getSystemClassLoader();
+                Class<?> lm = Class.forName("viewpoint.interact.LootMenu", false, cl);
+                Class<?> tg = Class.forName("viewpoint.interact.LootTargets$Target", false, cl);
+                Class<?> ia = Class.forName("viewpoint.interact.InteractActions", false, cl);
+                Class<?> ki = Class.forName("viewpoint.platform.KeyInput", false, cl);
+                Class<?> keys = Class.forName("viewpoint.platform.Keys", false, cl);
+                Class<?> rows = Class.forName("viewpoint.interact.LootRows", false, cl);
+                lmShown = declared(lm, "shown");
+                lmLoot = declared(lm, "loot");
+                lmPending = declared(lm, "pending");
+                lmHeld = declared(lm, "held");
+                tKind = declared(tg, "kind");
+                tSquare = declared(tg, "square");
+                tObject = declared(tg, "object");
+                tLocked = declared(tg, "locked");
+                tContainers = declared(tg, "containers");
+                shoulderF = declared(Class.forName("viewpoint.core.View", false, cl), "shoulder");
+                iaCount = method(ia, "count");
+                iaLabel = method(ia, "label", int.class);
+                iaEnabled = method(ia, "enabled", int.class);
+                iaProgress = method(ia, "progress", int.class);
+                iaTitle = method(ia, "title");
+                iaRun = method(ia, "run", IsoPlayer.class, int.class);
+                kiSlot = method(ki, "slot", int.class);
+                kiMenu = method(ki, "menu", int.class);
+                title = method(rows, "title", ItemContainer.class);
+                groundTitle = method(rows, "groundTitle");
+                bindTake = declared(keys, "LOOT_TAKE").get(null);
+                bindAll = declared(keys, "LOOT_TAKE_ALL").get(null);
+                // (the target last: it is what says the parts are all here)
+                lmTarget = declared(lm, "target");
+            } catch (Throwable t) {
+                lmTarget = null;
+            }
+        }
+        return lmTarget != null;
+    }
+
+    /** Does this Viewpoint have what Knox's panel needs? (KnoxCompat: the part "panel") */
+    static boolean panelParts() {
+        panelLooked = false;
+        return panel();
+    }
+
+    /** Knox draws the panel (true) or Viewpoint does. Returns whether Knox does. */
+    @LuaMethod(name = "knoxVpPanelOwn", global = true)
+    public static boolean knoxVpPanelOwn(boolean on) {
+        boolean own = on && panel();
+        if (own != panelOwned) {
+            panelOwned = own;
+            wheelAcc = 0;
+            pressed = 0;
+        }
+        return own;
+    }
+
+    private static Object target() throws IllegalAccessException {
+        return lmTarget.get(null);
+    }
+
+    /** Is Viewpoint's panel up right now (something within reach looked at)? */
+    @LuaMethod(name = "knoxVpPanelShown", global = true)
+    public static boolean knoxVpPanelShown() {
+        if (!panel()) return false;
+        try {
+            return lmShown.getBoolean(null);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** What is looked at: 0 the ground, 3 a car, 5 / 6 a body or a character, others furniture. */
+    @LuaMethod(name = "knoxVpPanelKind", global = true)
+    public static int knoxVpPanelKind() {
+        try {
+            return panel() ? tKind.getInt(target()) : -1;
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelLocked", global = true)
+    public static boolean knoxVpPanelLocked() {
+        try {
+            return panel() && tLocked.getBoolean(target());
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Has it things to show (a container, the ground) - or only actions? */
+    @LuaMethod(name = "knoxVpPanelLoot", global = true)
+    public static boolean knoxVpPanelLoot() {
+        try {
+            return panel() && lmLoot.getBoolean(null);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelSquare", global = true)
+    public static IsoGridSquare knoxVpPanelSquare() {
+        try {
+            return panel() ? (IsoGridSquare) tSquare.get(target()) : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelObject", global = true)
+    public static Object knoxVpPanelObject() {
+        try {
+            return panel() ? tObject.get(target()) : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** The containers of what is looked at (Viewpoint's own list: read, never changed). */
+    @LuaMethod(name = "knoxVpPanelContainers", global = true)
+    public static List<?> knoxVpPanelContainers() {
+        try {
+            return panel() ? (List<?>) tContainers.get(target()) : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** A container's name as Viewpoint gives it (a car's part, a named bag...); nil: the ground's. */
+    @LuaMethod(name = "knoxVpPanelTitle", global = true)
+    public static String knoxVpPanelTitle(ItemContainer c) {
+        try {
+            if (!panel()) return null;
+            return (String) (c == null ? groundTitle.invoke(null) : title.invoke(null, c));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelActions", global = true)
+    public static int knoxVpPanelActions() {
+        try {
+            return panel() ? (Integer) iaCount.invoke(null) : 0;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelActionLabel", global = true)
+    public static String knoxVpPanelActionLabel(int i) {
+        try {
+            return panel() ? (String) iaLabel.invoke(null, i) : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelActionOn", global = true)
+    public static boolean knoxVpPanelActionOn(int i) {
+        try {
+            return panel() && Boolean.TRUE.equals(iaEnabled.invoke(null, i));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** How far the action is done (0..1): its bar fills the row as a take's does. */
+    @LuaMethod(name = "knoxVpPanelActionProgress", global = true)
+    public static float knoxVpPanelActionProgress(int i) {
+        try {
+            return panel() ? (Float) iaProgress.invoke(null, i) : 0f;
+        } catch (Throwable t) {
+            return 0f;
+        }
+    }
+
+    /** The actions' heading Viewpoint gives (a door's name...), or nil. */
+    @LuaMethod(name = "knoxVpPanelActionsTitle", global = true)
+    public static String knoxVpPanelActionsTitle() {
+        try {
+            return panel() ? (String) iaTitle.invoke(null) : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @LuaMethod(name = "knoxVpPanelRun", global = true)
+    public static void knoxVpPanelRun(int i) {
+        try {
+            if (panel() && IsoPlayer.players[0] != null) iaRun.invoke(null, IsoPlayer.players[0], i);
+        } catch (Throwable t) {
+            // (another Viewpoint: nothing happens)
+        }
+    }
+
+    /** The wheel's notches since asked (down: +). */
+    @LuaMethod(name = "knoxVpPanelWheel", global = true)
+    public static int knoxVpPanelWheel() {
+        int n = wheelAcc;
+        wheelAcc = 0;
+        return n;
+    }
+
+    /** A key pressed since asked: 1 take, 2 take all, 0 none. */
+    @LuaMethod(name = "knoxVpPanelPressed", global = true)
+    public static int knoxVpPanelPressed() {
+        int n = pressed;
+        pressed = 0;
+        return n;
+    }
+
+    /** Is the take key (pressed last) still held? A pad's press: false (no hold). */
+    @LuaMethod(name = "knoxVpPanelHeld", global = true)
+    public static boolean knoxVpPanelHeld() {
+        try {
+            if (!panel() || takeKey < 0) return false;
+            int slot = (Integer) kiSlot.invoke(null, takeKey);
+            boolean[] held = (boolean[]) lmHeld.get(null);
+            return slot >= 0 && slot < held.length && held[slot];
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** The camera over the left shoulder: the panel goes left of the crosshair, as Viewpoint's. */
+    @LuaMethod(name = "knoxVpPanelLeft", global = true)
+    public static boolean knoxVpPanelLeft() {
+        try {
+            return panel() && shoulderF.getInt(null) < 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** LootRows.move: while Knox draws the panel the wheel moves Knox's choice (true: skip). */
+    public static boolean wheel(int n) {
+        if (!panelOwned) return false;
+        wheelAcc += n;
+        return true;
+    }
+
+    /**
+     * LootMenu.asks: Viewpoint takes its take key only when its own chosen row
+     * holds something - with Knox's panel its rows are not the ones shown.
+     */
+    public static int asks(int key, int result) {
+        if (!panelOwned) return result;
+        try {
+            if (!lmShown.getBoolean(null)) return result;
+            Object bind = kiMenu.invoke(null, key);
+            if (bind == null) return result;
+            if (bind == bindTake) {
+                takeKey = key;
+                return 1;
+            }
+            if (bind == bindAll) return lmLoot.getBoolean(null) ? 2 : result;
+        } catch (Throwable t) {
+            // (as Viewpoint said)
+        }
+        return result;
+    }
+
+    /** LootMenu.take: take / take all go to Knox (true: skip); the window key stays Viewpoint's. */
+    public static boolean take() {
+        if (!panelOwned) return false;
+        try {
+            int p = lmPending.getInt(null);
+            if (p != 1 && p != 2) return false;
+            pressed = p;
+            lmPending.setInt(null, 0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Patch(className = "viewpoint.interact.LootPanel", methodName = "render")
+    public static class PanelDraw {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() {
+            return KnoxViewpoint.panelOwned;
+        }
+    }
+
+    @Patch(className = "viewpoint.interact.LootRows", methodName = "move")
+    public static class PanelWheel {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter(@Patch.Argument(0) int n) {
+            return KnoxViewpoint.wheel(n);
+        }
+    }
+
+    @Patch(className = "viewpoint.interact.LootMenu", methodName = "asks")
+    public static class PanelKeys {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) int key, @Patch.Return(readOnly = false) int result) {
+            result = KnoxViewpoint.asks(key, result);
+        }
+    }
+
+    @Patch(className = "viewpoint.interact.LootMenu", methodName = "take")
+    public static class PanelTake {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() {
+            return KnoxViewpoint.take();
         }
     }
 }

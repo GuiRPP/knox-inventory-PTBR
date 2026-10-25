@@ -505,6 +505,24 @@ local function worldGroupOf(menu, o, depth, root)
     return "other"
 end
 
+--- Knox's icon (a texture or nil) and world group ("danger"...) of an option
+--- of the world's menu by its name: Viewpoint's crosshair actions are those
+--- options (KnoxCrosshair; the author, 2026-10-25).
+function K.worldLook(name)
+    local kt = knownTables()
+    local g = kt.worldText[name]
+    if not g then
+        for _, p in ipairs(kt.worldPrefix) do
+            if string.sub(name, 1, #p[1]) == p[1] then
+                g = p[2]
+                break
+            end
+        end
+    end
+    local icon = kt.iconText[name]
+    return icon and texOf(icon) or nil, g
+end
+
 --- The world's menu this one belongs to (it, or the menu it hangs from) and how deep it is.
 local function worldOf(menu)
     local m, n = menu, 0

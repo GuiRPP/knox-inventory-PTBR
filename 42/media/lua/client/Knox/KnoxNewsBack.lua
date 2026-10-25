@@ -6,6 +6,10 @@
 -- post, or in the frame on the right), the bulb flares with a flicker of its filament,
 -- the grid comes out, warm light spreads under the bulb; it trembles with the engine and
 -- fades when the engine stops (KnoxMenuNews: litFor, draw).
+-- "@back aim" (the crosshair panel's post, 2026-10-25): the same grid and a big faint
+-- sight at the lower right; while the post's panel is at work - things being found or
+-- taken - the grid comes out, the sight brightens and its inner ring draws in, as if
+-- it were aimed (no flicker: it is no lamp).
 -- Nothing is made while drawing: the bulb's lines are worked out once per size.
 
 require "Knox/KnoxTheme"
@@ -65,6 +69,41 @@ do
     end
 end
 
+-- The sight in units (its middle at 0, 0; radius 1): the outer ring and its marks stay,
+-- the inner ring and the cross's inner strokes draw in as it is aimed.
+local SIGHT, SIGHT_IN = {}, {}
+do
+    local ring = {}
+    for i = 0, 72 do
+        local a = math.rad(5 * i)
+        table.insert(ring, math.cos(a))
+        table.insert(ring, math.sin(a))
+    end
+    table.insert(SIGHT, ring)
+    -- the cross: long strokes from the ring inwards, ticks along them
+    table.insert(SIGHT, {-1.12, 0, -0.42, 0})
+    table.insert(SIGHT, {0.42, 0, 1.12, 0})
+    table.insert(SIGHT, {0, -1.12, 0, -0.42})
+    table.insert(SIGHT, {0, 0.42, 0, 1.12})
+    for _, d in ipairs({0.6, 0.8}) do
+        table.insert(SIGHT, {-d, -0.05, -d, 0.05})
+        table.insert(SIGHT, {d, -0.05, d, 0.05})
+        table.insert(SIGHT, {-0.05, d, 0.05, d})
+        table.insert(SIGHT, {-0.05, -d, 0.05, -d})
+    end
+    local inner = {}
+    for i = 0, 72 do
+        local a = math.rad(5 * i)
+        table.insert(inner, 0.32 * math.cos(a))
+        table.insert(inner, 0.32 * math.sin(a))
+    end
+    table.insert(SIGHT_IN, inner)
+    table.insert(SIGHT_IN, {-0.24, 0, -0.08, 0})
+    table.insert(SIGHT_IN, {0.08, 0, 0.24, 0})
+    table.insert(SIGHT_IN, {0, -0.24, 0, -0.08})
+    table.insert(SIGHT_IN, {0, 0.08, 0, 0.24})
+end
+
 local function lines(ui, list, cx, cy, k, th, c, a)
     for _, l in ipairs(list) do
         for i = 1, #l - 3, 2 do
@@ -75,7 +114,7 @@ end
 
 --- How lit, 0..1, eased over time: `st` a table kept by the caller, `on` - is a
 --- generator of the post running now.
-function B.litFor(st, on, now)
+function B.litFor(st, on, now, kind)
     local dt = math.max(0, math.min(100, now - (st.at or now)))
     st.at = now
     local v = st.v or 0
@@ -86,6 +125,10 @@ function B.litFor(st, on, now)
         v = math.max(0, v - dt / DOWN_MS)
     end
     st.v = v
+    if kind == "aim" then
+        st.f = v
+        return v
+    end
     -- the filament as it lights: a few quick dips; running: a slight tremble
     local f = v
     if on then
@@ -122,7 +165,24 @@ end
 
 --- The backdrop of a text panel x, y, w, h: the grid, the light and the bulb at its lower
 --- right (partly off the panel: the caller clips to it).
+--- The sight of "@back aim" at its place in the panel x, y, w, h, as faded in as `am`.
+local function sight(ui, x, y, w, h, c, lit, am)
+    local k = h * 0.3
+    local cx, cy = x + w - k * 0.75, y + h - k * 0.7
+    local th = math.max(2, T.cell * 0.05)
+    lines(ui, SIGHT, cx, cy, k, th, c, (0.07 + 0.13 * lit) * am)
+    -- (the inner ring draws in a little as it is aimed, and brightens most)
+    lines(ui, SIGHT_IN, cx, cy, k * (1 - 0.12 * lit), th, c, (0.06 + 0.3 * lit) * am)
+    local d = math.max(3, math.floor(th * 1.5))
+    ui:drawRect(cx - d / 2, cy - d / 2, d, d, (0.1 + 0.6 * lit) * am, T.color.accent.r, T.color.accent.g, T.color.accent.b)
+end
+
 function B.draw(ui, kind, x, y, w, h, c, lit)
+    if kind == "aim" then
+        B.grid(ui, x, y, w, h, c, lit, 1)
+        sight(ui, x, y, w, h, c, lit, 1)
+        return
+    end
     if kind ~= "power" then return end
     B.grid(ui, x, y, w, h, c, lit, 1)
     local k = h * 0.3
@@ -148,7 +208,7 @@ end
 --- stay whole and only the post fades (a flat fill there hid them in a dark band - the
 --- author, 2026-10-22).
 function B.drawStrip(ui, kind, x, y0, w, h0, c, lit, y, h, am)
-    if kind ~= "power" or am <= 0.003 then return end
+    if (kind ~= "power" and kind ~= "aim") or am <= 0.003 then return end
     local step = math.max(12, math.floor(T.cell / 2))
     local minor, major = (0.04 + 0.035 * lit) * am, (0.08 + 0.07 * lit) * am
     local i = 0
@@ -160,6 +220,13 @@ function B.drawStrip(ui, kind, x, y0, w, h0, c, lit, y, h, am)
     for gy = y0 + step, y0 + h0 - 1, step do
         i = i + 1
         if gy >= y and gy < y + h then ui:drawRect(x, gy, w, 1, i % 4 == 0 and major or minor, c.r, c.g, c.b) end
+    end
+    if kind == "aim" then
+        -- (the sight only where the strip crosses it; the caller clips to the strip)
+        local k = h0 * 0.3
+        local cy = y0 + h0 - k * 0.7
+        if y + h > cy - 1.2 * k and y < cy + 1.2 * k then sight(ui, x, y0, w, h0, c, lit, am) end
+        return
     end
     local k = h0 * 0.3
     local cx, cy = x + w - k * 0.62, y0 + h0 - k * 0.42

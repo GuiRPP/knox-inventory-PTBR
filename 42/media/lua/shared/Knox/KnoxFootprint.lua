@@ -19,6 +19,7 @@
 -- measured by the Java part when first seen and remembered in
 -- Zomboid/Lua/knox_sizes.txt, so an item keeps its size from then on.
 
+require "Knox/KnoxPerf"   -- (first: Knox's performance counter times the handlers this file adds, when dev.perf=1)
 require "Knox/KnoxFootprintData"
 require "Knox/KnoxBagShapes"
 

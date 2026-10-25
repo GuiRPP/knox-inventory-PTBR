@@ -20,6 +20,7 @@
 -- closes the window. With others the window sends the command to the server, which
 -- checks it, does it and answers ("result"); the generator's own sync tells everyone.
 
+require "Knox/KnoxPerf"   -- (first: Knox's performance counter times the handlers this file adds, when dev.perf=1)
 require "TimedActions/ISBaseTimedAction"
 require "TimedActions/ISActivateGenerator"
 

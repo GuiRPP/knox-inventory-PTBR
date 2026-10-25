@@ -7,6 +7,8 @@
 
 local SRC = readfile(MN_PATH)
 assert(SRC, "no " .. tostring(MN_PATH))
+-- (the module requires Knox/KnoxPerf first since 2026-10-24: nothing to load here)
+require = require or function() end
 local G = _G
 assert(G, "no _G")
 
