@@ -234,7 +234,9 @@ local WORLD_TITLE = {act = "IGUI_Knox_MenuActions", use = "IGUI_Knox_MenuUse", m
                      build = "IGUI_Knox_MenuBuild", other = "IGUI_Knox_MenuOther"}
 local WORLD_TEXT = {
     act = {"ContextMenu_Walk_to", "ContextMenu_SitGround", "ContextMenu_SleepOnGround", "ContextMenu_Sleep",
-           "ContextMenu_Rest", "ContextMenu_Climb_over"},
+           "ContextMenu_Rest", "ContextMenu_Climb_over",
+           -- (the author, 2026-10-25: a window's "Climb through" sat under "Other")
+           "ContextMenu_Climb_through"},
     use = {"Fluid_Show_Info", "Fluid_Transfer_Fluids", "ContextMenu_Drink", "ContextMenu_Fill", "ContextMenu_FillOne",
            "ContextMenu_FillAll", "ContextMenu_RefillContainer", "ContextMenu_Wash", "ContextMenu_Turn_On", "ContextMenu_Turn_Off",
            "ContextMenu_StoveSetting",
@@ -283,6 +285,13 @@ local ICON_TEXT = {
     ContextMenu_Eat = "eat", ContextMenu_OpenAndEat = "eat", ContextMenu_Drink = "drink", ContextMenu_OpenAndDrink = "drink",
     ContextMenu_Wear = "wear", ContextMenu_Smoke = "smoke", ContextMenu_Read = "read", ContextMenu_ReRead = "read", ContextMenu_CheckMap = "map",
     ContextMenu_Apply_Bandage = "bandage", ContextMenu_Bandage = "bandage",
+    -- (the author, 2026-10-25: the game's health window's treatments had none - the
+    -- pictures of Knox's own health tab, KnoxHealthCare)
+    ContextMenu_Disinfect = "disinfect", ContextMenu_Remove_Bandage = "unbandage",
+    ContextMenu_Stitch = "sew", ContextMenu_Remove_Stitch = "unstitch",
+    ContextMenu_Remove_Glass = "tweezers", ContextMenu_Remove_Bullet = "tweezers",
+    ContextMenu_Splint = "splint", ContextMenu_Remove_Splint = "unsplint", ContextMenu_Clean_Burn = "burn",
+    ContextMenu_PlantainCataplasm = "poultice", ContextMenu_ComfreyCataplasm = "poultice", ContextMenu_GarlicCataplasm = "poultice",
     ContextMenu_InsertBulletsInMagazine = "magazine", ContextMenu_InsertBullets = "magazine",
     ContextMenu_UnloadRounds = "magazine", ContextMenu_EjectMagazine = "magazine", ContextMenu_InsertMagazine = "magazine",
     IGUI_DeviceOptions = "device", ContextMenu_Attach = "attach",
@@ -305,6 +314,9 @@ local ICON_TEXT = {
     ContextMenu_WashAllContainer = "wash_containers", ContextMenu_WashAllWeapon = "wash_weapons",
     ContextMenu_SleepOnGround = "sleep", ContextMenu_Sleep = "sleep", ContextMenu_SitGround = "sit",
     ContextMenu_Walk_to = "walk", ContextMenu_PickupBrokenGlass = "glass",
+    -- (the author, 2026-10-25: a window's "Remove broken glass" and "Climb through" had none)
+    ContextMenu_RemoveBrokenGlass = "glass", ContextMenu_Climb_through = "climb",
+    ContextMenu_Climb_over = "climb",   -- (a fence: the same way over)
     ContextMenu_Fill = "fill", ContextMenu_FillOne = "fill", ContextMenu_FillAll = "fill", ContextMenu_RefillContainer = "fill",
     ContextMenu_Rest = "rest", ContextMenu_Open_window = "window", ContextMenu_Close_window = "window",
     ContextMenu_Open_curtains = "curtains", ContextMenu_Close_curtains = "curtains", ContextMenu_Remove_curtains = "curtains_off",

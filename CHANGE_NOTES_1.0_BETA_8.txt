@@ -1,0 +1,21 @@
+[h1]Knox Inventory 1.0 BETA - update 7: small fixes[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+No new Java part this time: ZombieBuddy won't ask again.
+
+[h2]Fixed[/h2]
+[list]
+[*]The "In Your Sights" news post no longer drops the main menu's FPS: its backdrop under the scroll's soft edges was drawn thousands of times a frame.
+[/list]
+
+[h2]Menus[/h2]
+[list]
+[*]Icons for every treatment in the game's health window: disinfect, take the bandage off, stitch, take the stitches out, remove glass or a bullet, splint, clean a burn, poultices.
+[*]A window's "Remove broken glass" and "Climb through", and a fence's "Climb over", have icons now.
+[*]"Climb through" sits under Actions instead of Other.
+[/list]
+
+[h2]Sizes[/h2]
+[list]
+[*]Cutting board 2x2, note 1x1, every walkie-talkie 1x2, doodle 1x1, fleshing tool 1x3, rake 1x4, barbed wire 2x2, wheat 1x2, straw 1x1, brochure 1x1.
+[/list]

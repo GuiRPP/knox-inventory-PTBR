@@ -112,6 +112,21 @@ local function lines(ui, list, cx, cy, k, th, c, a)
     end
 end
 
+-- The same, only the strokes that reach into the rows ya..yb (a fade strip 3 px high:
+-- drawn whole in each, the sight cost 4266 draws a frame and the menu fell to 50 FPS -
+-- the author, 2026-10-25). Compared in the sight's units: a stroke left out costs two compares.
+local function linesIn(ui, list, cx, cy, k, th, c, a, ya, yb)
+    local ua, ub = (ya - th - cy) / k, (yb + th - cy) / k
+    for _, l in ipairs(list) do
+        for i = 1, #l - 3, 2 do
+            local y1, y2 = l[i + 1], l[i + 3]
+            if (y1 >= ua or y2 >= ua) and (y1 <= ub or y2 <= ub) then
+                bar(ui, cx + l[i] * k, cy + y1 * k, cx + l[i + 2] * k, cy + y2 * k, th, c, a)
+            end
+        end
+    end
+end
+
 --- How lit, 0..1, eased over time: `st` a table kept by the caller, `on` - is a
 --- generator of the post running now.
 function B.litFor(st, on, now, kind)
@@ -166,13 +181,20 @@ end
 --- The backdrop of a text panel x, y, w, h: the grid, the light and the bulb at its lower
 --- right (partly off the panel: the caller clips to it).
 --- The sight of "@back aim" at its place in the panel x, y, w, h, as faded in as `am`.
-local function sight(ui, x, y, w, h, c, lit, am)
+--- (ya, yb: only what reaches into those rows - a fade strip's; nil: all of it)
+local function sight(ui, x, y, w, h, c, lit, am, ya, yb)
     local k = h * 0.3
     local cx, cy = x + w - k * 0.75, y + h - k * 0.7
     local th = math.max(2, T.cell * 0.05)
-    lines(ui, SIGHT, cx, cy, k, th, c, (0.07 + 0.13 * lit) * am)
-    -- (the inner ring draws in a little as it is aimed, and brightens most)
-    lines(ui, SIGHT_IN, cx, cy, k * (1 - 0.12 * lit), th, c, (0.06 + 0.3 * lit) * am)
+    local ki = k * (1 - 0.12 * lit)
+    if ya then
+        linesIn(ui, SIGHT, cx, cy, k, th, c, (0.07 + 0.13 * lit) * am, ya, yb)
+        linesIn(ui, SIGHT_IN, cx, cy, ki, th, c, (0.06 + 0.3 * lit) * am, ya, yb)
+    else
+        lines(ui, SIGHT, cx, cy, k, th, c, (0.07 + 0.13 * lit) * am)
+        -- (the inner ring draws in a little as it is aimed, and brightens most)
+        lines(ui, SIGHT_IN, cx, cy, ki, th, c, (0.06 + 0.3 * lit) * am)
+    end
     local d = math.max(3, math.floor(th * 1.5))
     ui:drawRect(cx - d / 2, cy - d / 2, d, d, (0.1 + 0.6 * lit) * am, T.color.accent.r, T.color.accent.g, T.color.accent.b)
 end
@@ -225,7 +247,7 @@ function B.drawStrip(ui, kind, x, y0, w, h0, c, lit, y, h, am)
         -- (the sight only where the strip crosses it; the caller clips to the strip)
         local k = h0 * 0.3
         local cy = y0 + h0 - k * 0.7
-        if y + h > cy - 1.2 * k and y < cy + 1.2 * k then sight(ui, x, y0, w, h0, c, lit, am) end
+        if y + h > cy - 1.2 * k and y < cy + 1.2 * k then sight(ui, x, y0, w, h0, c, lit, am, y, y + h) end
         return
     end
     local k = h0 * 0.3

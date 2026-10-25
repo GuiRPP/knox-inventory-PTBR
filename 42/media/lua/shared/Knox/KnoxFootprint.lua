@@ -209,6 +209,13 @@ hand("Cornflour Cornflour2 Cornmeal", 2, 2)                                     
 hand("Chocolate Butter KnifeFillet OvenMitt Toothbrush Toothpaste Tissue", 1, 1)
 hand("GenericMail LetterHandwritten SheetPaper2 Flier Flier_Nolans Paperwork", 1, 1)   -- paper folds
 hand("Strainer RollingPin BreadKnife SewingKit", 1, 2)
+-- the author's list, 2026-10-25
+hand("CuttingBoardPlastic CuttingBoardWooden BarbedWire", 2, 2)
+hand("Note Doodle Brochure Straw Straw2", 1, 1)
+hand("WalkieTalkie1 WalkieTalkie2 WalkieTalkie3 WalkieTalkie4 WalkieTalkie5 WalkieTalkieMakeShift", 1, 2)   -- every walkie-talkie
+hand("WheatSheaf WheatSheafDried", 1, 2)
+hand("Fleshing_Tool", 1, 3)
+hand("Rake", 1, 4)
 F.HAND = HAND
 
 -- How many one tile holds, set by hand (over the rules' count by weight).

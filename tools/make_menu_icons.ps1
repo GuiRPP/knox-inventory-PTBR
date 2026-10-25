@@ -449,6 +449,22 @@ Icon "glass" {
     Shape $g @(32, 56, 44, 30, 56, 56)
     Line $g 46 8 46 18; Line $g 41 13 51 13
 }
+# climbing through a window: its frame, and a way out of it over the sill (the author,
+# 2026-10-25: "Climb through" had none)
+Icon "climb" {
+    param($g)
+    Box $g 6 10 28 44
+    Line $g 2 54 38 54
+    $p = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $p.AddBezier((F 18), (F 42), (F 26), (F 12), (F 46), (F 10), (F 56), (F 36))
+    $g.DrawPath((Pen), $p)
+    # (the head along the curve's end: from its last handle, 46,10 -> 56,36)
+    $a = [Math]::Atan2(26, 10)
+    foreach ($sd in -1, 1) {
+        $h = $a + [Math]::PI + $sd * 0.62
+        Line $g 56 36 (56 + 11 * [Math]::Cos($h)) (36 + 11 * [Math]::Sin($h))
+    }
+}
 
 # Fluids -------------------------------------------------------------------------------
 

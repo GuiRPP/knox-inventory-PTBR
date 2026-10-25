@@ -866,7 +866,14 @@ end
 -- (2026-10-21, the big check-up: its points on top; the beta's points marked
 -- "works" by the author on 21.10 - or broken and confirmed fixed the same day - left
 -- out, their marks: Zomboid/Lua/knox_testbench_beta1.txt)
+-- the things of the author's size list, 2026-10-25 (one of each)
+local SIZES25 = {"Base.CuttingBoardWooden", "Base.Note", "Base.WalkieTalkie2", "Base.Doodle", "Base.Fleshing_Tool",
+                 "Base.Rake", "Base.BarbedWire", "Base.WheatSheaf", "Base.Straw2", "Base.Brochure"}
+
 B.POINTS = {
+    -- the author's look, 2026-10-25: menu icons, "Climb through" in Actions, sizes by his list
+    {id = "menu_icons25", actions = {{"Disinfect", function(p) giveKit(p, {"Base.Disinfectant", "Base.AlcoholWipes"}) end}}},
+    {id = "sizes25", actions = {{"Sizes25", function(p) giveKit(p, SIZES25) end}}},
     -- the settings window with its pages in a column and a scroll (the author, 2026-10-25)
     {id = "set_open", actions = {{"Settings", openSettings}}, check = checkSettings},
     {id = "set_small", actions = {{"Settings", openSettings}}, check = checkSettings},
