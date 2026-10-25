@@ -519,12 +519,17 @@ end
 --   show_ids = yes               item tooltips show the item's ID (to write it here)
 -- Asked for by a player with 200 mods (Hemalon, 2026-10-14): some mod item always
 -- gets a size that is off, and some bags want more or less room.
+-- Since the item editor (the author, 2026-10-25: KnoxEditor) the lines come in
+-- layers, the narrower over the wider (KnoxPresets): the mod's own defaults
+-- (media/knox/item_defaults.txt), the presets in use - the general one, a tab's,
+-- a mod's - and this file last, over them all.
 
 local OVERRIDES_FILE = "knox_overrides.txt"
-F.overrides = {}         -- full type -> {w, h, cols, rows, stack}
+F.overrides = {}         -- full type -> {w, h, cols, rows, parts, mask, stack, pockets, pocketsAll, cat, sound}
+F.baseOverrides = {}     -- the mod's own defaults alone: Knox's own, as the item editor shows it
 F.showIds = false
 
-local MAX_SIDE, MAX_COLS, MAX_ROWS, MAX_STACK = 20, 20, 40, 1000
+local MAX_SIDE, MAX_COLS, MAX_ROWS, MAX_STACK, MAX_POCKETS = 20, 20, 40, 1000, 32
 -- Knox's categories (KnoxTheme.category): weapons, ammo, medicine, food, tools,
 -- materials, clothing and bags, books and keys, the rest
 F.CATEGORIES = {wpn = true, ammo = true, med = true, food = true, tool = true, mat = true, clo = true, info = true, misc = true}
@@ -537,18 +542,29 @@ local function clampInt(v, lo, hi)
     return v
 end
 
---- One line of the file: true when it set something (comments, blank and
---- broken lines set nothing).
-function F.parseOverride(line)
+--- One line read: the item's ID and what it sets, or nil (a note, a blank or a
+--- broken line). show_ids gives "show_ids" and {on = true / false}.
+function F.parseLine(line)
     line = string.gsub(line or "", "#.*$", "")
     local key, rest = string.match(line, "^%s*([^=%s]+)%s*=%s*(.-)%s*$")
-    if not key or rest == "" then return false end
+    if not key or rest == "" then return nil end
     rest = string.lower(rest)
     if string.lower(key) == "show_ids" then
-        F.showIds = rest == "yes" or rest == "1" or rest == "true" or rest == "on"
-        return true
+        return "show_ids", {on = rest == "yes" or rest == "1" or rest == "true" or rest == "on"}
     end
     local o = {}
+    -- a bag drawn cell by cell: rows of x (a cell) and . (none), "|" between them
+    -- (the item editor, 2026-10-25; not "#" - the rest of a line after it is a note)
+    local mask = string.match(rest, "mask%s*([x%.|]+)")
+    if mask then
+        local rows, ok = 0, string.find(mask, "x", 1, true) ~= nil
+        for row in string.gmatch(mask, "[^|]+") do
+            rows = rows + 1
+            if #row > MAX_COLS then ok = false end
+        end
+        if ok and rows <= MAX_ROWS then o.mask = mask end
+        rest = string.gsub(rest, "mask%s*[x%.|]+", " ")
+    end
     -- a bag's compartments (KnoxBagShapes): rows of WxH, "/" between rows - the
     -- rest of the line up to another word
     local parts = string.match(rest, "parts%s*([%dx%s/]+)")
@@ -562,6 +578,19 @@ function F.parseOverride(line)
         o.cols, o.rows = clampInt(gc, 1, MAX_COLS), clampInt(gr, 1, MAX_ROWS)
         if not (o.cols and o.rows) then o.cols, o.rows = nil, nil end
         rest = string.gsub(rest, "grid%s*%d+%s*x%s*%d+", "")
+    end
+    -- the cells of pockets a piece of clothing gives: this item's, or every item worn
+    -- where it is ("pockets.all": KnoxGrid.pocketsOf; the item editor, 2026-10-25)
+    local pa = string.match(rest, "pockets%.all%s*(%d+)")
+    if pa then
+        o.pockets = clampInt(pa, 0, MAX_POCKETS)
+        o.pocketsAll = o.pockets ~= nil or nil
+        rest = string.gsub(rest, "pockets%.all%s*%d+", "")
+    end
+    local pk = string.match(rest, "pockets%s*(%d+)")
+    if pk then
+        if not o.pockets then o.pockets = clampInt(pk, 0, MAX_POCKETS) end
+        rest = string.gsub(rest, "pockets%s*%d+", "")
     end
     local st = string.match(rest, "stack%s*(%d+)")
     if st then
@@ -579,7 +608,19 @@ function F.parseOverride(line)
     local a, b = string.match(rest, "(%d+)%s*x%s*(%d+)")
     a, b = clampInt(a, 1, MAX_SIDE), clampInt(b, 1, MAX_SIDE)
     if a and b then o.w, o.h = math.min(a, b), math.max(a, b) end   -- (short side, long side, as the rules give)
-    if not (o.w or o.cols or o.stack or o.cat or o.sound or o.parts) then return false end
+    if not (o.w or o.cols or o.stack or o.cat or o.sound or o.parts or o.mask or o.pockets) then return nil end
+    return key, o
+end
+
+--- One line of the file: true when it set something (comments, blank and
+--- broken lines set nothing).
+function F.parseOverride(line)
+    local key, o = F.parseLine(line)
+    if not key then return false end
+    if key == "show_ids" then
+        F.showIds = o.on
+        return true
+    end
     F.overrides[key] = o
     return true
 end
@@ -601,14 +642,23 @@ local TEMPLATE = {
     "#                                     magazine book cardboard cloth leather shoes tin metalsmall metal",
     "#                                     jewelry keys glass ceramic plastic plasticsoft pills ammo wood",
     "#                                     stone food fooddry",
+    "#   Base.Bag_FannyPackFront = mask xxxx|.xx.   a bag drawn cell by cell: x a cell, . none",
+    "#   Base.Trousers_Denim = pockets 6   cells of pockets it gives (pockets.all 6: all worn there)",
+    "#   Base.Pistol = stack 2             stack 1: never stacks; 2 and more: alike ones stack",
     "#",
+    "# Easier: the item editor (an item's menu > Item editor). It keeps",
+    "# presets in Zomboid/Lua/knox_presets; the lines of this file go over them.",
     "# The ID of an item: set show_ids to yes below, and item tooltips show it.",
     "# Lines starting with # are notes. A bag's grid has 15 rows at most.",
     "",
     "show_ids = no",
 }
 
+--- The player's own file's lines (over every preset: KnoxPresets.effectiveLines).
+F.handLines = {}
+
 local function loadOverrides()
+    F.handLines = {}
     if not getFileReader then return end
     local r = getFileReader(OVERRIDES_FILE, false)
     if not r then
@@ -625,11 +675,37 @@ local function loadOverrides()
     local n = 0
     local line = r:readLine()
     while line do
-        if F.parseOverride(line) and not string.find(line, "^%s*show_ids") then n = n + 1 end
+        if F.parseOverride(line) and not string.find(line, "^%s*show_ids") then
+            n = n + 1
+            table.insert(F.handLines, line)
+        end
         line = r:readLine()
     end
     r:close()
     if n > 0 then print("[Knox] " .. OVERRIDES_FILE .. ": " .. n .. " item size(s) of the player's own") end
+end
+F.loadOverrides = loadOverrides
+F.OVERRIDES_FILE = OVERRIDES_FILE
+
+--- The mod's own defaults (media/knox/item_defaults.txt, written by the item editor
+--- in dev mode): the lowest layer, what the editor counts as Knox's own.
+F.DEFAULTS_FILE = "media/knox/item_defaults.txt"
+F.defaultLines = {}
+function F.loadDefaults()
+    F.baseOverrides, F.defaultLines = {}, {}
+    if not getModFileReader then return end
+    local ok, r = pcall(getModFileReader, KnoxModId or "KnoxInventory", F.DEFAULTS_FILE, false)
+    if not ok or not r then return end
+    local line = r:readLine()
+    while line do
+        local key, o = F.parseLine(line)
+        if key and key ~= "show_ids" then
+            F.baseOverrides[key] = o
+            table.insert(F.defaultLines, line)
+        end
+        line = r:readLine()
+    end
+    r:close()
 end
 
 -- Answers ---------------------------------------------------------------------
@@ -644,6 +720,19 @@ function F.useOverrides(lines)
     for _, l in ipairs(lines or {}) do F.parseOverride(l) end
     F.showIds = showIds
     cache = {}
+    F.pocketsLoc = nil
+end
+
+--- fn(...) worked out with the lines `ov` (full type -> what it sets) in place of
+--- those in effect - the item editor's "as Knox has it" (the mod's defaults alone)
+--- and an item as a preset gives it. Nothing worked out in it is kept.
+function F.withOverrides(ov, fn, ...)
+    local was, kept, locs = F.overrides, cache, F.pocketsLoc
+    F.overrides, cache, F.pocketsLoc = ov, {}, nil
+    local ok, a, b, c = pcall(fn, ...)
+    F.overrides, cache, F.pocketsLoc = was, kept, locs
+    if not ok then print("[Knox] withOverrides: " .. tostring(a)) return nil end
+    return a, b, c
 end
 
 --- The player's own sizes over what the rules or the table gave.
@@ -748,6 +837,7 @@ function F.bagGrid(item, capacity, scale)
 end
 
 if getFileReader and not (isServer and isServer()) then
+    F.loadDefaults()
     loadOverrides()
     loadLearned()
     local lastSave = 0

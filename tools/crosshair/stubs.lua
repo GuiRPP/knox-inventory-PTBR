@@ -143,7 +143,8 @@ function isMouseButtonDown(b) return b == 0 and MOUSE.down end
 SOUNDS = 0
 function getSoundManager() return {playUISound = function() SOUNDS = SOUNDS + 1 end} end
 Events = {OnGameStart = {Add = function() end}}
-KnoxCompat = {vpHas = function() return true end, windowOpen = function() return false end}
+KnoxCompat = {vpHas = function() return true end, windowOpen = function() return false end,
+              topDown = function() return VP.topDown == true end}
 KnoxContextMenu = {worldLook = function(label)
     if string.find(label, "Smash") then return {path = "smash"}, "danger" end
     return {path = "icon"}, "door"

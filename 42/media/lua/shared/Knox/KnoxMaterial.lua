@@ -405,16 +405,19 @@ function M.infoOf(item)
     return info
 end
 
-local cache = {}
+local cache, cacheFor = {}, nil
 
---- The material of a thing in the game (cached by its type).
+--- The material of a thing in the game (cached by its type; anew when the
+--- player's lines are read anew - the item editor's presets: KnoxPresets).
 --- @return string material, string why
 function M.of(item)
     if not item then return "misc", "no item" end
     local ft = item:getFullType()
+    local overrides = KnoxFootprint and KnoxFootprint.overrides
+    if cacheFor ~= overrides then cache, cacheFor = {}, overrides end
     local c = cache[ft]
     if c then return c[1], c[2] end
-    local o = KnoxFootprint and KnoxFootprint.overrides and KnoxFootprint.overrides[ft]
+    local o = overrides and overrides[ft]
     local mat, why
     if o and o.sound and M.LIST[o.sound] then
         mat, why = o.sound, "knox_overrides.txt"

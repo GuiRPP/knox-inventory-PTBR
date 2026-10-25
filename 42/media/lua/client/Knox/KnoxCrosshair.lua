@@ -1322,7 +1322,11 @@ function P.frame(ui)
     local player = getSpecificPlayer(0)
     local own = want()
     if own ~= P.owned then P.owned = knoxVpPanelOwn(own) == true end
-    local shown = P.owned and player ~= nil and not player:isDead() and knoxVpPanelShown() and not KnoxCompat.windowOpen()
+    -- (not over OldPoint's overhead camera: it hides Viewpoint's panel there and gives
+    -- the wheel to its zoom - the target is what is under the mouse, so the plate
+    -- folded as the mouse went to it: the author, 2026-10-25)
+    local shown = P.owned and player ~= nil and not player:isDead() and knoxVpPanelShown()
+        and not KnoxCompat.windowOpen() and not KnoxCompat.topDown()
     if shown then
         local obj, sq, kind = knoxVpPanelObject(), P.src.square(), P.src.kind()
         if not P.visible or obj ~= P.tobj or sq ~= P.tsq or kind ~= P.tkind then

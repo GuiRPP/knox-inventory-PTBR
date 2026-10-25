@@ -1,0 +1,45 @@
+[h1]Knox Inventory 1.0 BETA - update 8: Make It Yours[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[b]A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, click "Allow".[/b]
+[b]Your lines in knox_overrides.txt are not lost: on the first start they move into the preset "My preset", and the file itself stays as a copy, knox_overrides_backup.txt.[/b]
+
+A backpack a bit tight, an axe a bit big, a jacket short of pockets? Now that is your call. Right-click any item and choose "Item editor" - or open it before you even start, in the main menu: the Knox tab at the top, "Item editor". Size, a bag's compartments, pockets and stacks - right in the game, no text files.
+
+[h2]The inside of a bag[/h2]
+[list]
+[*]An item's size in the grid - width and length, its tile shown right beside.
+[*]The inside of a bag, your pick: compartments (as in Tarkov), one grid, or cell by cell. Cell by cell, you draw the shape with the mouse: left click adds a cell, right click takes it away, or drag.
+[*]Beside it: how many cells you made and how many the game's capacity gives.
+[/list]
+
+[h2]Pockets and stacks[/h2]
+[list]
+[*]Clothing pockets: how many cells a jacket or trousers give - for this item or for everything worn in the same place.
+[*]Stacks: any item but a bag can be stacked several to a cell. Only identical ones go together.
+[*]Category (the tile's colour) and sound - from a list.
+[/list]
+
+[h2]Presets[/h2]
+Every edit lives in a preset. A preset is general, for a tab (say, bags only) or for a mod. In game they work in layers: the narrower one over the general one.
+[list]
+[*]New, copy, rename, turn on and off - on the Presets tab.
+[*]If another preset sets an item over yours, the editor tells you and offers "Edit there".
+[*]"Reset all" brings the items back to how Knox sets them. Changed your mind - "Undo" or Ctrl+Z.
+[*]Search by name and ID; the Changed tab - everything you have changed so far.
+[/list]
+
+[h2]Share[/h2]
+[list]
+[*]Export - to the clipboard or to a file in Zomboid/Lua/knox_presets. Share a preset, say, in the Steam discussions.
+[*]Import - from the clipboard or a file. The editor shows every line and skips the broken ones.
+[*]The Mods tab - other mods' items, mod by mod: build a preset for your favourite mod.
+[*]In multiplayer the admin edits the server's presets - once saved, they reach every player.
+[/list]
+
+[h2]Fixed[/h2]
+[list]
+[*]Viewpoint's crosshair panel in OldPoint's overhead camera no longer vanishes under the mouse: there it hides, as OldPoint hides its own panel.
+[/list]
+
+Happy packing - and may there always be room left in your backpack.

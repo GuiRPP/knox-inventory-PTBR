@@ -22,7 +22,9 @@
 --     of its sections, the layout of its pockets (KnoxNet.me).
 --   * the sizes are the server's: its "Size of bags and pockets" and its own
 --     knox_overrides.txt (Zomboid/Lua/knox_server.txt, knox_overrides.txt on the
---     server), sent to each player as they come in.
+--     server), sent to each player as they come in. Since the item editor
+--     (2026-10-25) with the server's presets under them (KnoxPresets: knox_presets
+--     on the server), which its admins change from the editor - sent to all again.
 -- Alone (no server) none of this runs: the things' modData as before.
 
 require "Knox/KnoxPerf"   -- (first: Knox's performance counter times the handlers this file adds, when dev.perf=1)
@@ -358,7 +360,18 @@ end
 function N.onServerCommand(module, command, args)
     if module ~= N.MODULE or type(args) ~= "table" then return end
     if command == "config" then N.applyConfig(args)
-    elseif command == "me" then N.applyMe(args) end
+    elseif command == "me" then N.applyMe(args)
+    elseif command == "presets" and N.onPresets then N.onPresets(args) end
+end
+
+--- Is this player one of the server's admins (or moderators)? (the game's access
+--- level; the role of later builds)
+function N.isAdmin(player)
+    if not player then return false end
+    local ok, lvl = pcall(function() return player:getAccessLevel() end)
+    if ok and type(lvl) == "string" and lvl ~= "" then return string.lower(lvl) ~= "none" end
+    local ok2, yes = pcall(function() return player:getRole():hasCapability(Capability.ChangeSandboxOptions) end)
+    return ok2 and yes == true
 end
 
 -- Server ---------------------------------------------------------------------------
@@ -556,15 +569,74 @@ function N.serverConfig()
             if v then scale = int(v, 50, 200) or 100 end
         end
     end
-    local overrides = {}
+    -- the server's presets in use, its knox_overrides.txt over them (comments and the
+    -- display switch stay home): every item's whole line
+    local store = N.serverStore()
+    local hand = {}
     for _, l in ipairs(readLines("knox_overrides.txt") or {}) do
-        -- (comments and the display switch stay home)
         if not string.find(l, "^%s*#") and not string.find(l, "^%s*$") and not string.find(l, "^%s*show_ids") then
-            table.insert(overrides, l)
-            if #overrides >= 2000 then break end
+            table.insert(hand, l)
         end
     end
+    local overrides = KnoxPresets and KnoxPresets.effectiveLines(store, hand, 2000) or hand
     return {scale = scale, overrides = overrides}
+end
+
+-- The server's presets (KnoxPresets), read once, and again when an admin sends them.
+local presetStore = nil
+function N.serverStore()
+    if not KnoxPresets then return nil end
+    if presetStore then return presetStore end
+    if KnoxFootprint and KnoxFootprint.loadDefaults and not KnoxFootprint.defaultsRead then
+        KnoxFootprint.loadDefaults()
+        KnoxFootprint.defaultsRead = true
+    end
+    local ok, store = pcall(KnoxPresets.loadLocal)
+    if not ok or not store then
+        local ok2, made = pcall(KnoxPresets.migrate)
+        store = ok2 and made or {list = {}}
+    end
+    presetStore = store
+    return store
+end
+
+--- An admin's editor asks for the server's presets: the index and each file's lines.
+function N.serverPresetsGet(player)
+    if not N.isAdmin(player) then return end
+    local store = N.serverStore() or {list = {}}
+    local files = {}
+    for _, p in ipairs(store.list) do files[p.file] = KnoxPresets.text(p) end
+    sendServerCommand(player, N.MODULE, "presets", {index = KnoxPresets.indexLines(store), files = files})
+end
+
+--- An admin saved the server's presets: written here, then every player gets the sizes anew.
+function N.serverPresetsPut(player, args)
+    if not N.isAdmin(player) or type(args.index) ~= "table" or type(args.files) ~= "table" then return end
+    local files = {}
+    for file, lines in pairs(args.files) do
+        if type(file) == "string" and string.find(file, "^[^/\\]+%.txt$") and file ~= "index.txt" and type(lines) == "table" then
+            local t = {}
+            for _, l in ipairs(lines) do if type(l) == "string" and #t < 4000 then table.insert(t, l) end end
+            files[file] = t
+        end
+    end
+    local index = {}
+    for _, l in ipairs(args.index) do if type(l) == "string" then table.insert(index, l) end end
+    -- (the files the index names but the admin didn't send: as they are here)
+    for _, l in ipairs(index) do
+        local file = string.match(l, "^%s*preset%s*=%s*(.-%.txt)")
+        if file and not files[file] then files[file] = KnoxPresets.readLines(KnoxPresets.DIR .. file) end
+    end
+    local store = KnoxPresets.storeFrom(index, files)
+    local gone = {}
+    for _, p in ipairs((N.serverStore() or {list = {}}).list) do
+        if not KnoxPresets.find(store, p.file) then gone[p.file] = true end
+    end
+    KnoxPresets.saveLocal(store, nil, gone)
+    presetStore = store
+    print("[Knox] presets of the server changed by " .. tostring(player:getUsername()))
+    sendServerCommand(N.MODULE, "config", N.serverConfig())
+    N.serverPresetsGet(player)
 end
 
 --- The server's own music settings (knox_server.txt, music.*; KnoxMusicNet), each
@@ -612,7 +684,9 @@ function N.onClientCommand(module, command, player, args)
     if module ~= N.MODULE or not player then return end
     if command == "items" then N.serverItems(player, args)
     elseif command == "me" then N.serverMe(player, args)
-    elseif command == "hello" then N.serverHello(player) end
+    elseif command == "hello" then N.serverHello(player)
+    elseif command == "presetsGet" then N.serverPresetsGet(player)
+    elseif command == "presetsPut" and type(args) == "table" then N.serverPresetsPut(player, args) end
 end
 
 -- Events ---------------------------------------------------------------------------

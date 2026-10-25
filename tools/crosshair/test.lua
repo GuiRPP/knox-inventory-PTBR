@@ -170,6 +170,17 @@ run("locked", function()
     VP.locked = false
 end)
 
+-- OldPoint's overhead camera: no panel there, as OldPoint hides Viewpoint's (2026-10-25)
+run("overhead camera", function()
+    VP.topDown = true
+    frames(2)
+    check("hidden overhead", P.visible == false)
+    frames(20)
+    VP.topDown = false
+    frames(2)
+    check("back after", P.visible == true)
+end)
+
 run("looked away", function()
     VP.shown = false
     frames(2)

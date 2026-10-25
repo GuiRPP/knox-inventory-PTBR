@@ -41,6 +41,37 @@ local function scaled(n)
     return math.max(1, math.floor(n * KnoxFootprint.gridScale() + 0.5))
 end
 
+--- Body location -> cells, from the lines that give every item worn there its
+--- pockets ("pockets.all N", the item editor): made when first asked after the
+--- lines change (KnoxFootprint.useOverrides empties it).
+local function pocketsByLoc()
+    local F = KnoxFootprint
+    if F.pocketsLoc then return F.pocketsLoc end
+    local t = {}
+    local sm = ScriptManager and ScriptManager.instance
+    for ft, o in pairs(F.overrides or {}) do
+        if o.pocketsAll and sm then
+            local sc = sm:getItem(ft)
+            local loc = sc and sc:getBodyLocation()
+            if loc then t[F.norm(loc)] = o.pockets end
+        end
+    end
+    F.pocketsLoc = t
+    return t
+end
+
+--- Cells of pockets an item worn at `loc` (KnoxFootprint.norm) gives, unscaled:
+--- its own line ("pockets N"), its location's ("pockets.all N"), Knox's own; nil: none.
+-- (the item editor, the author 2026-10-25: pockets set per item)
+function KnoxGrid.pocketsOf(item, loc)
+    local o = item and KnoxFootprint.overrides[item:getFullType()]
+    local n = o and o.pockets
+    if n == nil then n = pocketsByLoc()[loc] end
+    if n == nil then n = KnoxGrid.POCKETS[loc] end
+    if n and n > 0 then return n end
+    return nil
+end
+
 --- Where the pockets come from: {{name, cells}, ...} (hands first), and their sum.
 function KnoxGrid.pockets(player)
     local hands = scaled(KnoxGrid.HANDS)
@@ -50,8 +81,8 @@ function KnoxGrid.pockets(player)
     if worn then
         for i = 0, worn:size() - 1 do
             local w = worn:get(i)
-            local n = KnoxGrid.POCKETS[KnoxFootprint.norm(w:getLocation())]
             local item = w:getItem()
+            local n = KnoxGrid.pocketsOf(item, KnoxFootprint.norm(w:getLocation()))
             if n and item then
                 n = scaled(n)
                 table.insert(list, {item:getDisplayName(), n})
@@ -68,7 +99,8 @@ function KnoxGrid.pocketCells(player)
     local worn = player:getWornItems()
     if worn then
         for i = 0, worn:size() - 1 do
-            local n = KnoxGrid.POCKETS[KnoxFootprint.norm(worn:get(i):getLocation())]
+            local w = worn:get(i)
+            local n = KnoxGrid.pocketsOf(w:getItem(), KnoxFootprint.norm(w:getLocation()))
             if n then total = total + scaled(n) end
         end
     end
@@ -116,8 +148,8 @@ function KnoxGrid.bagScale(container, player)
 end
 
 --- A bag's compartments (KnoxBagShapes), or nil for one grid: its family's shape,
---- or the player's own line in knox_overrides.txt ("parts ..." gives one, "grid CxR"
---- takes it away).
+--- or the player's own line in knox_overrides.txt ("parts ..." gives one, "mask ..."
+--- one drawn cell by cell, "grid CxR" takes it away).
 function KnoxGrid.shapeOf(container, player)
     if not KnoxBagShapes or (player and container == player:getInventory()) then return nil end
     local item = container:getContainingItem()
@@ -125,7 +157,10 @@ function KnoxGrid.shapeOf(container, player)
     local ft = item:getFullType()
     local o = KnoxFootprint.overrides and KnoxFootprint.overrides[ft]
     local shape
-    if o and o.parts then
+    if o and o.mask then
+        -- (written with x for a cell: "#" starts a note in the file)
+        shape = KnoxBagShapes.fromSpec("mask:" .. string.gsub(o.mask, "x", "#"))
+    elseif o and o.parts then
         shape = KnoxBagShapes.fromSpec(o.parts)
     elseif o and o.cols then
         return nil
@@ -173,6 +208,13 @@ end
 --- Items of one type that share a single tile (ammo, nails, pills...; also
 --- things used up bit by bit - batteries, tape, thread). How many: stackLimit.
 function KnoxGrid.isStackable(item)
+    -- the player's own line: "stack 1" never, "stack N" any alike ones (the item editor,
+    -- the author 2026-10-25: whether a thing stacks and how many)
+    local o = KnoxFootprint.overrides[item:getFullType()]
+    if o and o.stack then
+        if o.stack <= 1 then return false end
+        return KnoxGrid.isAlike(item)
+    end
     -- cigarettes and cigars are food that never spoils: they stack (not poisoned ones)
     if KnoxFootprint.isSmoke(item) then return (item:getPoisonPower() or 0) <= 0 end
     -- the small things players asked to stack (2026-10-19; only feathers, seeds and
@@ -187,6 +229,32 @@ function KnoxGrid.isStackable(item)
     if item:getFluidContainer() then return false end
     if item:getConditionMax() > 0 and item:getCondition() < item:getConditionMax() then
         return false
+    end
+    return true
+end
+
+--- Can this thing share a tile with others of its type, whatever its kind: nothing
+--- in it, whole, clean, the same in every piece. (What a "stack N" line asks of a
+--- kind Knox never stacks - a pistol, a shirt, a can of food.) A bag never does.
+function KnoxGrid.isAlike(item)
+    if instanceof(item, "InventoryContainer") or instanceof(item, "Moveable") then return false end
+    local fc = item:getFluidContainer()
+    if fc and not fc:isEmpty() then return false end
+    if item:getConditionMax() > 0 and item:getCondition() < item:getConditionMax() then return false end
+    if instanceof(item, "Food") then return KnoxGrid.isPlainFood(item) end
+    if instanceof(item, "Clothing") then
+        local ok, clean = pcall(function()
+            return (item:getDirtyness() or 0) <= 0 and (item:getBloodlevel() or 0) <= 0 and (item:getWetness() or 0) <= 0
+                and (item:getHolesNumber() or 0) == 0
+        end)
+        return ok and clean == true
+    end
+    if instanceof(item, "HandWeapon") then
+        -- (a gun with a round in it or a part on it is not like the others)
+        local ok, plain = pcall(function()
+            return (item:getCurrentAmmoCount() or 0) == 0 and not item:isRoundChambered() and item:getAllWeaponParts():size() == 0
+        end)
+        return ok and plain == true
     end
     return true
 end

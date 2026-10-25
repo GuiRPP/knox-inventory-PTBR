@@ -850,6 +850,26 @@ local function openSettings()
     if not KnoxSettings.instance then KnoxSettings.open() end
 end
 
+-- the item editor (the author, 2026-10-25): things to edit, the window on one of them
+local EDITOR_KIT = {"Base.Bag_Schoolbag", "Base.Bag_FannyPackFront", "Base.Jacket_Padded", "Base.Pistol", "Base.Pistol",
+                    "Base.Nails", "Base.Nails", "Base.Pen"}
+
+local function openEditor(p)
+    giveKit(p, EDITOR_KIT)
+    if KnoxEditor then KnoxEditor.open("Base.Bag_Schoolbag") end
+end
+
+local function checkEditor()
+    local w = KnoxEditor and KnoxEditor.instance
+    if not w or not w.L then return false, getText("IGUI_KnoxTB_Res_EditorNone") end
+    local sh = getCore():getScreenHeight()
+    local t = w.store and w:target()
+    local n = w.store and #w.store.list or 0
+    local ok = w:getHeight() <= sh and w.ops ~= nil and #w.ops > 0
+    return ok, getText("IGUI_KnoxTB_Res_Editor", tostring(math.floor(w:getHeight())), tostring(sh), tostring(n),
+        t and t.name or "-", tostring(#w.ops), tostring(w:unsavedN()))
+end
+
 function B.die(player)
     if not player or player:isDead() then return end
     if KnoxPerf then KnoxPerf.mark("death by the bench") end
@@ -871,6 +891,25 @@ local SIZES25 = {"Base.CuttingBoardWooden", "Base.Note", "Base.WalkieTalkie2", "
                  "Base.Rake", "Base.BarbedWire", "Base.WheatSheaf", "Base.Straw2", "Base.Brochure"}
 
 B.POINTS = {
+    -- the item editor from the main menu: the Knox tab's new part (the author, 2026-10-25, variant A)
+    {id = "ed_mainmenu"},
+    -- the item editor and its presets (the author, 2026-10-25; the mockup approved by the critic, round 4)
+    {id = "ed_open", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_tabs", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_size", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_bag", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_mask", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_pockets", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_stack", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_look", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_presets", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_layers", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_export", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_import", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_reset", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_defaults", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_720", actions = {{"Editor", openEditor}}, check = checkEditor},
+    {id = "ed_mp"},
     -- the author's look, 2026-10-25: menu icons, "Climb through" in Actions, sizes by his list
     {id = "menu_icons25", actions = {{"Disinfect", function(p) giveKit(p, {"Base.Disinfectant", "Base.AlcoholWipes"}) end}}},
     {id = "sizes25", actions = {{"Sizes25", function(p) giveKit(p, SIZES25) end}}},
@@ -895,6 +934,7 @@ B.POINTS = {
     {id = "vp_actions"},
     {id = "vp_tab"},
     {id = "vp_off", check = checkVpPanel},
+    {id = "vp_overhead"},
     -- performance: the base line before any fix (the author's task, 2026-10-24)
     {id = "perf_on", actions = {{"PerfOn", function() B.perfSet(true) end}, {"PerfOff", function() B.perfSet(false) end}}, check = checkPerf},
     {id = "perf_play", actions = {{"Mark", function() mark("play") end}}, check = checkPerf},

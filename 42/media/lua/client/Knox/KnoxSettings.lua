@@ -1071,7 +1071,14 @@ function KnoxSettingsTab:place()
     self.label = T.upper(getText("IGUI_Knox_Modules_Button"))
     self.wKnox, self.wInv, self.wLabel = T.measure(font, self.knox), T.measure(font, self.inv), T.measure(font, self.label)
     self.gap = gap
-    local w = pad * 3 + self.wKnox + gap + self.wInv + pad * 2 + 1 + pad * 2 + self.wLabel + pad * 3
+    -- the item editor's part after the settings' (2026-10-25, the author: "the editor's
+    -- button in the game's main menu too, to set all up before going into the game")
+    self.edLabel = KnoxEditor and T.upper(getText("IGUI_KnoxEd_Title")) or nil
+    self.wEd = self.edLabel and T.measure(font, self.edLabel) or 0
+    self.line1 = pad * 3 + self.wKnox + gap + self.wInv + pad * 2
+    self.line2 = self.edLabel and (self.line1 + 1 + pad * 2 + self.wLabel + pad * 2) or nil
+    local w = self.line1 + 1 + pad * 2 + self.wLabel + pad * 3
+    if self.line2 then w = self.line2 + 1 + pad * 2 + self.wEd + pad * 3 end
     local h = T.fontH(font) + pad * 2
     self:setWidth(w)
     self:setHeight(h)
@@ -1083,9 +1090,17 @@ end
 function KnoxSettingsTab:prerender()
     if self.placedFor ~= tostring(T.cell) .. "/" .. tostring(T.javaFonts) .. "/" .. getCore():getScreenWidth() then self:place() end
     local w, h, pad = self:getWidth(), self:getHeight(), T.pad
-    local hover = self:isMouseOver() or (KnoxSettings.instance ~= nil)
+    local over = self:isMouseOver()
+    local edOpen = KnoxEditor ~= nil and KnoxEditor.instance ~= nil
+    local hover = over or (KnoxSettings.instance ~= nil) or edOpen
     local a = hover and 1 or 0.55
     T.rect(self, 0, 0, w, h, T.color.header, hover and 0.96 or 0.7)
+    -- the part under the mouse: a faint sand band over it (only with the editor's part there)
+    local onEd = over and self.line2 ~= nil and self:getMouseX() >= self.line2
+    if over and self.line2 then
+        if onEd then T.rect(self, self.line2 + 1, 1, w - self.line2 - 2, h - 2, T.color.accent, 0.14)
+        else T.rect(self, self.line1 + 1, 1, self.line2 - self.line1 - 1, h - 2, T.color.accent, 0.14) end
+    end
     -- a sand frame all round, as every Knox plate in the menu has
     T.tileFrame(self, 0, 0, w, h, T.color.accent, a)
     local font = T.fontCaps
@@ -1094,10 +1109,17 @@ function KnoxSettingsTab:prerender()
     T.text(self, self.knox, x, y, T.color.bright, font, a)
     x = x + self.wKnox + self.gap
     T.text(self, self.inv, x, y, T.color.accent, font, a)
-    x = x + self.wInv + pad * 2
+    x = self.line1
     T.rect(self, x, y, 1, T.fontH(font), T.color.tileEdge, a)
     x = x + 1 + pad * 2
-    T.text(self, self.label, x, y, hover and T.color.bright or T.color.text, font, a)
+    local onSet = (over and not onEd) or KnoxSettings.instance ~= nil
+    if not self.line2 then onSet = hover end
+    T.text(self, self.label, x, y, onSet and T.color.bright or T.color.text, font, a)
+    if self.line2 then
+        x = self.line2
+        T.rect(self, x, y, 1, T.fontH(font), T.color.tileEdge, a)
+        T.text(self, self.edLabel, x + 1 + pad * 2, y, (onEd or edOpen) and T.color.bright or T.color.text, font, a)
+    end
 end
 
 function KnoxSettingsTab:onMouseDown(x, y)
@@ -1107,7 +1129,9 @@ end
 
 -- (on release, as the window's own buttons: see KnoxSettings.onMouseUp)
 function KnoxSettingsTab:onMouseUp(x, y)
-    if self.pressed then KnoxSettings.open() end
+    if self.pressed then
+        if self.line2 and x >= self.line2 then KnoxEditor.open() else KnoxSettings.open() end
+    end
     self.pressed = nil
     return true
 end
