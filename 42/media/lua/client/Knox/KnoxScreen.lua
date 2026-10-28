@@ -1545,6 +1545,9 @@ function KnoxScreen.toggle(playerNum)
     KnoxScreen.instance = s
     KnoxScreen.building = nil
     KnoxScreen.openedAt = getTimestampMs()
+    -- (closed with a thing held and opened again before letting go: it is the
+    -- screen's drag again - KnoxDrag.takeBack)
+    KnoxDrag.takeBack()
     if KnoxScreen.known then
         local fresh = {}
         local still = {}

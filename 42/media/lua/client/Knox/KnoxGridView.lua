@@ -7,6 +7,7 @@ require "ISUI/ISInventoryPaneContextMenu"
 require "Knox/KnoxTheme"
 require "Knox/KnoxGrid"
 require "Knox/KnoxDrag"
+require "Knox/KnoxReasonIcons"
 require "Knox/KnoxTooltip"
 require "Knox/KnoxSelect"
 require "Knox/KnoxActions"
@@ -1102,30 +1103,43 @@ function KnoxGridView:renderGrid()
         local w, h = KnoxDrag.dims()
         local merge = KnoxDrag.mergeTarget(self)
         local bag = not merge and KnoxDrag.bagUnderMouse(self)
-        local ok
+        local ok, why
         if merge then
             x, y = merge.x, merge.y
             w, h = KnoxGrid.dims(merge, merge.r)
-            ok = KnoxDrag.canDrop(L, x, y, self:player(), merge)
+            ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
         elseif bag then
             -- onto a bag: the bag lights up, green when the item fits inside
             x, y = bag.x, bag.y
             w, h = KnoxGrid.dims(bag, bag.r)
-            ok = KnoxDrag.intoBag(bag, self:player())
+            local fits, inside, _, _, _, bagWhy = KnoxDrag.intoBag(bag, self:player())
+            ok, why = fits, bagWhy
+            -- (it may go in, but no place is left in it)
+            if not ok and not why and inside then why = "IGUI_Knox_NoRoom" end
         else
-            ok = KnoxDrag.canDrop(L, x, y, self:player(), merge)
+            ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
             -- it doesn't go as it is turned but would the other way: shown that way
             -- (the drop turns it by itself)
             if not ok and dragged.w ~= dragged.h then
                 KnoxDrag.rotate()
                 local x2, y2 = self:dropCell()
                 if KnoxDrag.canDrop(L, x2, y2, self:player(), nil) then
-                    ok = true
+                    ok, why = true, nil
                     x, y = x2, y2
                     w, h = KnoxDrag.dims()
                 end
                 KnoxDrag.rotate()
             end
+            -- (the cells are taken, and no other place in the grid is free: no room.
+            -- Not within its own grid - rearranging a full bag)
+            if not ok and not why and L.container ~= (KnoxDrag.source and KnoxDrag.source.layout and KnoxDrag.source.layout.container)
+                    and KnoxDrag.noPlaceIn(L) then
+                why = "IGUI_Knox_NoRoom"
+            end
+        end
+        -- (walked away with it in hand: red, the drop is refused - KnoxDrag.tooFarFor)
+        if ok and KnoxDrag.tooFarFor(self:player(), bag and bag.item:getInventory() or L.container) then
+            ok, why = false, "IGUI_Knox_TooFar"
         end
         local c = ok and T.color.ok or T.color.bad
         -- clip the highlight to the grid
@@ -1150,6 +1164,12 @@ function KnoxGridView:renderGrid()
         elseif x1 > x0 and y1 > y0 then
             self:drawRect(x0 * cs + 1, y0 * cs + 1, (x1 - x0) * cs - 1, (y1 - y0) * cs - 1, 0.22, c.r, c.g, c.b)
             self:drawRectBorder(x0 * cs + 1, y0 * cs + 1, (x1 - x0) * cs - 1, (y1 - y0) * cs - 1, 1, c.r, c.g, c.b)
+        end
+        -- refused, and there are words for why: the plate by the held tile says it
+        -- (KnoxDragLayer:drawReason), kept to the grid's sides
+        if not ok and why then
+            local ax = self:getAbsoluteX() + self:getXScroll()
+            KnoxDrag.setHint(why, ax, ax + L.cols * cs + 1)
         end
     end
 
@@ -1251,10 +1271,113 @@ function KnoxDragLayer:follow(e)
     return math.floor(st.px + 0.5), math.floor(st.py + 0.5)
 end
 
+-- The reason plate (option A in the style "Чертёж", the author 2026-10-28):
+-- the held tile over a place it can't go, and caught up with the cursor (the
+-- author: only then) - a plate over the held tile says why, with a picture
+-- (tools/reason_icons). Over the tile, not the red footprint: over a big bag the
+-- footprint is the bag, and the plate lay on the tile (the author, 2026-10-28).
+-- Below the tile, clear of the arrow, when the screen's top is too near; kept
+-- to the grid's sides and the screen. In 120 ms, out in 170.
+-- Mockup: .claude/mockups/drop_reason.
+local REASON_ICON = {IGUI_Knox_TooFar = "far", IGUI_Knox_NoRoom = "full", IGUI_Knox_BagGrowsNoRoom = "grow"}
+local CURSOR_H = 27            -- Knox's arrow (knox_cursor.png) below its point
+local SHADOW = {r = 0, g = 0, b = 0}
+local reasonBand, reasonOpts = {0, 0, 0, 0}, {align = "centre"}
+local reasonTexts, reasonPaths = {}, {}
+
+-- the picture's size for the plate: the largest made that is no bigger than half a cell
+local function reasonSize()
+    local want = math.max(20, math.floor(T.cell * 0.5 + 0.5))
+    local sizes = KnoxReasonIcons and KnoxReasonIcons.sizes
+    if not sizes then return nil end
+    local best = sizes[1]
+    for i = 1, #sizes do
+        if sizes[i] <= want then best = sizes[i] end
+    end
+    return best
+end
+
+local function reasonTex(name, size)
+    local byName = reasonPaths[name]
+    if not byName then
+        byName = {}
+        reasonPaths[name] = byName
+    end
+    local p = byName[size]
+    if not p then
+        local stem = "media/ui/knoxreason/" .. name .. "_" .. size
+        p = {stem .. "_base.png", stem .. "_mark.png"}
+        byName[size] = p
+    end
+    return T.readyTex(p[1]), T.readyTex(p[2])
+end
+
+--- `x, y, w, h`: the held tile on the screen (without its shake).
+function KnoxDragLayer:drawReason(settled, x, y, w, h)
+    local k = KnoxDrag.hint
+    local now = getTimestampMs()
+    local st = self.reasonState
+    if not st then
+        st = {a = 0, ms = now, why = nil, x = 0, y = 0, w = 0, h = 0, left = 0, right = 0, mouseY = 0}
+        self.reasonState = st
+    end
+    local dt = now - st.ms
+    st.ms = now
+    if k.frame == KnoxDrag.frame and k.why and settled then
+        if st.why ~= k.why then st.why, st.a = k.why, 0 end
+        st.x, st.y, st.w, st.h = x, y, w, h
+        st.left, st.right, st.mouseY = k.left, k.right, getMouseY()
+        st.a = math.min(1, st.a + dt / 120)
+    else
+        st.a = math.max(0, st.a - dt / 170)
+    end
+    if st.a <= 0 or not st.why then return end
+
+    local text = reasonTexts[st.why]
+    if not text then
+        text = getText(st.why)
+        reasonTexts[st.why] = text
+    end
+    local font, pad = T.fontText, T.pad
+    local left, _, right = T.inkBox(font, text)
+    local tw = right - left
+    local name = REASON_ICON[st.why]
+    local size = name and reasonSize()
+    local m = size and KnoxReasonIcons[name] and KnoxReasonIcons[name][size]
+    local gap = math.floor(pad / 2)
+    local bh = math.max(T.fontH(font), m and size or 0) + pad
+    local bw = pad + (m and (m.w + gap) or 0) + tw + pad
+    local sw, sh = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local bx = st.x + math.floor((st.w - bw) / 2)
+    bx = math.max(st.left + 1, math.min(bx, st.right - 1 - bw))
+    bx = math.max(0, math.min(bx, sw - bw))
+    -- (above the "+N" badge of things held along with it, when there is one)
+    local badge = #KnoxDrag.extras > 0 and T.fontTileH + 2 or 0
+    local by = st.y - badge - gap - bh
+    if by < 0 then by = math.min(sh - bh, math.max(st.y + st.h + gap, st.mouseY + CURSOR_H + 2)) end
+    local a = st.a
+    T.rect(self, bx + 4, by + 6, bw, bh, SHADOW, 0.45 * a)
+    T.rect(self, bx, by, bw, bh, T.color.window, 0.97 * a)
+    T.border(self, bx, by, bw, bh, T.color.bad, a)
+    local tx = bx + pad
+    if m then
+        local base, mark = reasonTex(name, size)
+        local iy = by + math.floor((bh - (m.bottom - m.top + 1)) / 2) - m.top
+        local c, r = T.color.text, T.color.bad
+        if base then self:drawTextureScaled(base, tx, iy, m.w, m.h, 0.92 * a, c.r, c.g, c.b) end
+        if mark then self:drawTextureScaled(mark, tx, iy, m.w, m.h, a, r.r, r.g, r.b) end
+        tx = tx + m.w + gap
+    end
+    reasonBand[1], reasonBand[2], reasonBand[3], reasonBand[4] = tx, by, tw, bh
+    reasonOpts.font, reasonOpts.a = font, a
+    T.label(self, text, reasonBand, T.color.text, reasonOpts)
+end
+
 function KnoxDragLayer:render()
     local e = KnoxDrag.entity
     if not e then
         self.inertia = nil
+        KnoxDrag.frame = KnoxDrag.frame + 1
         return
     end
     local cs = T.cell
@@ -1282,6 +1405,7 @@ function KnoxDragLayer:render()
     local kg = 0
     for _, it in ipairs(e.items or {e.item}) do kg = kg + KnoxGrid.weightOf(it) end
     local sx, sy = KnoxGridView.strain(kg)
+    local restX, restY = x, y
     x, y = x + sx, y + sy
     T.rect(ui, x, y, pw, ph, T.category[T.categoryOf(e.item)], 0.85)
     T.border(ui, x, y, pw, ph, T.color.accent, 1)
@@ -1295,6 +1419,12 @@ function KnoxDragLayer:render()
         T.rect(ui, x + pw - tw, y - T.fontTileH - 2, tw, T.fontTileH + 2, T.color.accent)
         T.drawText(ui, text, x + pw - tw + 4, y - T.fontTileH - 1, 0.08, 0.08, 0.08, 1, T.fontTile)
     end
+    -- caught up with the cursor: the reason plate may show (the author: not before)
+    local st = self.inertia
+    local settled = math.abs(fx - getMouseX()) <= 1 and math.abs(fy - getMouseY()) <= 1
+        and (not st or (T.animOn and not T.animOn()) or math.abs(st.vx) + math.abs(st.vy) < 40)
+    self:drawReason(settled, restX, restY, pw, ph)
+    KnoxDrag.frame = KnoxDrag.frame + 1
 end
 
 --- Is this tile being dragged (itself or as part of the selection)?

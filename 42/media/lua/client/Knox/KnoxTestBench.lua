@@ -903,128 +903,46 @@ end
 
 -- The points -----------------------------------------------------------------------
 
--- (2026-10-20: the beta's first run in the game. The points marked "works" for
--- 0.9.8 - rig_*, menu_new, near_same, tv_back, layers_back - and the health tab,
--- hidden until 2.0, are left out; their marks: Zomboid/Lua/knox_testbench_0987.txt)
--- (2026-10-21, the big check-up: its points on top; the beta's points marked
--- "works" by the author on 21.10 - or broken and confirmed fixed the same day - left
--- out, their marks: Zomboid/Lua/knox_testbench_beta1.txt)
--- the things of the author's size list, 2026-10-25 (one of each)
-local SIZES25 = {"Base.CuttingBoardWooden", "Base.Note", "Base.WalkieTalkie2", "Base.Doodle", "Base.Fleshing_Tool",
-                 "Base.Rake", "Base.BarbedWire", "Base.WheatSheaf", "Base.Straw2", "Base.Brochure"}
+-- (2026-10-28: all the earlier points taken off at the author's word - they cluttered
+-- the check of the new bugs; their marks: Zomboid/Lua/knox_testbench_beta9.txt.
+-- Before that: knox_testbench_0987.txt, knox_testbench_beta1.txt)
+
+-- the item editor counted an error for every bag (Foxel, Guyladriel, LBBz, 2026-10-25):
+-- the game's error count before the editor opens, and after
+local editorErrors0 = nil
+local function errorCount()
+    local ok, n = pcall(getLuaDebuggerErrorCount)
+    return ok and tonumber(n) or nil
+end
+
+local function openEditorCounted(p)
+    editorErrors0 = errorCount()
+    openEditor(p)
+end
+
+local function checkEditorErrors()
+    local n = errorCount()
+    if not editorErrors0 or not n then return false, getText("IGUI_KnoxTB_Res_NoCount") end
+    local w = KnoxEditor and KnoxEditor.instance
+    local e = KnoxEditorData and KnoxEditorData.byType("Base.Bag_Schoolbag")
+    local grp = e and e.grp or "-"
+    return n == editorErrors0 and grp == "Grp_back",
+        getText("IGUI_KnoxTB_Res_EdErrors", tostring(n - editorErrors0), grp, w and "+" or "-")
+end
 
 B.POINTS = {
-    -- the pinned post: Boosty, the roadmap, the coin in the top bar (the author, 2026-10-25, by the mockup)
-    {id = "pin_card", check = checkPinned},
-    {id = "pin_auto", actions = {{"PinnedNew", pinnedNew}}, check = checkPinned},
-    {id = "pin_road", actions = {{"PinnedNew", pinnedNew}}, check = checkPinned},
-    {id = "pin_hover"},
-    {id = "pin_open"},
-    {id = "pin_boosty"},
-    {id = "pin_right"},
-    {id = "pin_coin"},
-    {id = "perf_pinned", actions = {{"Mark", function() mark("pinned") end}}, check = checkPerf},
-    -- the item editor from the main menu: the Knox tab's new part (the author, 2026-10-25, variant A)
-    {id = "ed_mainmenu"},
-    -- the item editor and its presets (the author, 2026-10-25; the mockup approved by the critic, round 4)
-    {id = "ed_open", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_tabs", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_size", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_bag", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_mask", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_pockets", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_stack", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_look", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_presets", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_layers", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_export", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_import", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_reset", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_defaults", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_720", actions = {{"Editor", openEditor}}, check = checkEditor},
-    {id = "ed_mp"},
-    -- the author's look, 2026-10-25: menu icons, "Climb through" in Actions, sizes by his list
-    {id = "menu_icons25", actions = {{"Disinfect", function(p) giveKit(p, {"Base.Disinfectant", "Base.AlcoholWipes"}) end}}},
-    {id = "sizes25", actions = {{"Sizes25", function(p) giveKit(p, SIZES25) end}}},
-    -- the settings window with its pages in a column and a scroll (the author, 2026-10-25)
-    {id = "set_open", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_small", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_scroll", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_slider", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_cats", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_binds", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_apply", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_vp", actions = {{"Settings", openSettings}}, check = checkSettings},
-    {id = "set_menu"},
-    {id = "set_cn"},
-    -- Knox's crosshair panel in place of Viewpoint's (the author, 2026-10-25)
-    {id = "vp_on", check = checkVpPanel},
-    {id = "vp_keys", check = checkVpPanel},
-    {id = "vp_search"},
-    {id = "vp_bag", actions = {{"VpBag", function(p) B.vpBag(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "vp_take", actions = {{"VpBag", function(p) B.vpBag(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "vp_scroll", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "vp_actions"},
-    {id = "vp_tab"},
-    {id = "vp_off", check = checkVpPanel},
-    {id = "vp_overhead"},
-    -- performance: the base line before any fix (the author's task, 2026-10-24)
-    {id = "perf_on", actions = {{"PerfOn", function() B.perfSet(true) end}, {"PerfOff", function() B.perfSet(false) end}}, check = checkPerf},
-    {id = "perf_play", actions = {{"Mark", function() mark("play") end}}, check = checkPerf},
-    {id = "perf_reload", check = checkPerf},
-    {id = "perf_death", actions = {{"Die", function(p) B.die(p) end}}, check = checkPerf},
-    {id = "perf_car", actions = {{"Car", function(p) B.car(p) end}, {"Mark", function() mark("car") end}}, check = checkPerf},
-    {id = "perf_loot", actions = {{"Dump", function(p) B.dump(p) end}, {"Mark", function() mark("loot") end},
-        {"ClearDump", function() B.clearDump() end}}, check = checkPerf},
-    {id = "perf_windows", actions = {{"OpenClose", function() B.openClose(50) end}, {"Mark", function() mark("windows") end}}, check = checkPerf},    -- 1.0: the generator window (mockup 17, written 2026-10-22)
-    {id = "gen_open", actions = {{"Gen", function(p) B.genPlaced(p) end}}, check = checkGen},
-    {id = "gen_use", check = checkGen},
-    {id = "gen_pull", check = checkGen},
-    {id = "gen_worn", actions = {{"GenWorn", function(p) B.genCondition(p, 30) end}, {"GenNew", function(p) B.genCondition(p, 100) end}}, check = checkGen},
-    {id = "gen_fuel", actions = {{"GenDry", function(p) B.genDry(p) end}}, check = checkGen},
-    {id = "gen_house", check = checkGen},
-    {id = "gen_indoor", check = checkGen},
-    {id = "gen_outlets", check = checkGen},
-    {id = "gen_menu", check = checkGen},
-    -- 1.0: the big check-up (speed, caches, clean-up; nothing should look different)
-    {id = "u_java", check = checkJava},
-    {id = "u_move", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}, check = checkMoving},
-    {id = "u_loot"},
-    {id = "u_tooltip"},
-    {id = "u_menu"},
-    {id = "u_eye", actions = {{"Prepare", function(p, n) B.prepare(p, n) end}}, check = checkEye},
-    {id = "u_equip"},
-    {id = "u_found"},
-    {id = "u_tv"},
-    {id = "u_inspect"},
-    {id = "u_search_off"},
-    {id = "u_cn"},
-    {id = "u_mp"},
-    -- 1.0 BETA: not seen yet
-    {id = "b_bike"},
-    {id = "b_cursor"},
-    {id = "b_stacks", actions = {{"Pile", function(p) B.betaPile(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "b_mp_host"},
-    -- 1.0 (the car's dashboard as a car's - mockup 2, 2026-10-21 - and its radio)
-    {id = "dash_truck", actions = {{"Pickup", function(p) B.car(p, "Base.PickUpTruck") end}}, check = checkDash},
-    {id = "dash_night", actions = {{"Night", function() B.night() end}, {"Day", function() B.day() end}}, check = checkDash},
-    {id = "dash_low", actions = {{"Dry", function(p) B.dry(p) end}}, check = checkDash},
-    {id = "dash_hot", actions = {{"Hotwire", function(p) B.hotwire(p) end}}, check = checkDash},
-    {id = "dash_tape", check = checkDash},
-    {id = "dash_card", check = checkDash},
-    {id = "dash_heater", check = checkDash},
-    {id = "dash_screens", check = checkDash},
-    -- (the news post's live dashboard - KnoxDashboard.makeDemo, "@dash" lines)
-    {id = "dash_news"},
-    -- 1.0 (own music heard by the others in a game with others - KnoxMusicNet;
-    -- written 2026-10-21, two clients needed: a host and a second game)
-    {id = "net_share", actions = {{"Car", function(p) B.car(p) end}}, check = checkMusicNet},
-    {id = "net_outside", check = checkMusicNet},
-    {id = "net_passenger", check = checkMusicNet},
-    {id = "net_control", check = checkMusicNet},
-    {id = "net_fetch", check = checkMusicNet},
-    {id = "net_parked", actions = {{"Car", function(p) B.car(p) end}}, check = checkMusicNet},
-    {id = "net_off", check = checkMusicNet},
+    -- stage 1 of the Steam reports, 2026-10-28
+    {id = "s1_editor", actions = {{"Editor", openEditorCounted}}, check = checkEditorErrors},
+    {id = "s1_editor_menu"},
+    {id = "s1_disassemble"},
+    {id = "s1_item_tips"},
+    {id = "s1_far", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    {id = "s1_near", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    -- the reason plate by the held thing (option A, "Чертёж": the author 2026-10-28)
+    {id = "s1_reason", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    -- the trunk's button on the pickup's body (linlin; the plate wider - the author, 2026-10-28)
+    {id = "s1_trunk", actions = {{"Van", function(p) B.car(p, "Base.Van") end}, {"Pickup", function(p) B.car(p, "Base.PickUpTruck") end},
+        {"Car", function(p) B.car(p) end}}},
 }
 
 -- the health tab: hidden until 2.0, on the bench only with it (dev.health=1)

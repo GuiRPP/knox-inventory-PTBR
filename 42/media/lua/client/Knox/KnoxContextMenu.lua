@@ -626,6 +626,18 @@ local function reasonOf(o)
     return d
 end
 
+--- A tooltip of several lines (the game's "Disassemble": the name, the skill, the
+--- tools, what is missing in red): its first line says nothing of why - in a world
+--- menu it is shown whole on hover, not cut to that line under the name (the
+--- author's bench, 2026-10-28: "Name: Brown coffee table" stood under the option).
+local function isTable(o)
+    local d = o.toolTip and o.toolTip.description
+    if type(d) ~= "string" then return false end
+    local _, n = string.gsub(d, "<%s*LINE%s*>", "")
+    local _, m = string.gsub(d, "<%s*BR%s*>", "")
+    return n + m >= 2
+end
+
 -- Layout -----------------------------------------------------------------------------
 
 --- What the menu is about: its first item, the name to show (and how many);
@@ -792,6 +804,7 @@ end
 local function buildLayout(menu)
     ensure(menu)
     local L = {rows = {}, byIndex = {}, h = 0}
+    local worldMenu = not itemMenuOf(menu) and worldOf(menu) ~= nil
     local ih = menu.itemHgt
     local tileH = T.fontH(T.fontTile)
     local function add(r)
@@ -819,6 +832,7 @@ local function buildLayout(menu)
         local r = {kind = "opt", i = i, h = ih, danger = danger}
         r.chips = chipsOf(menu, o)
         r.reason = reasonOf(o)
+        if r.reason and worldMenu and isTable(o) then r.reason = nil end
         if not r.reason and o.onSelect and o.onSelect == kt.craft then
             local needs = needsOf(o)
             if needs and #needs > 0 then r.needs = needs end
@@ -1386,7 +1400,8 @@ local function renderMenu(self, visH, plateA, rowsA)
     if not fromTip then self:drawRect(3, 5 - ys, w, h, 0.45 * aP, 0, 0, 0) end
     T.rect(self, 0, -ys, w, h, T.color.window, 0.97 * aP)
     -- (the world's menus too, the same look: the author, 2026-10-18)
-    local framed = itemMenuOf(self) or worldOf(self) ~= nil
+    local itemMenu = itemMenuOf(self)
+    local framed = itemMenu or worldOf(self) ~= nil
     if framed then
         -- an item's menu, and its sub menus: the same sand frame as its tile (the author, 2026-10-18)
         local c = T.color.accent
@@ -1561,7 +1576,11 @@ local function renderMenu(self, visH, plateA, rowsA)
                 -- (an item's menu shows no option tooltips: what they said - why it
                 -- can't, what a recipe takes - is under the option's name; "Replace:
                 -- Hammer" and the like only repeated the option, the author 2026-10-18)
-                if k.toolTip and not isMouseOut and not framed then
+                -- The world's menus show it when nothing of it is under the name:
+                -- "Disassemble" lists the skill and the tools only there (ᴅᴇsᵇˡᵃᵈᵉᵉ,
+                -- 2026-10-24: it was in 0.9.8.7, gone in the beta)
+                if k.toolTip and not isMouseOut
+                        and (not framed or (not itemMenu and not r.reason and not r.needs)) then
                     self:showTooltip(k)
                     showTooltip = true
                 end

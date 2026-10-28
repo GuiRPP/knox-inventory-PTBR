@@ -779,7 +779,7 @@ function KnoxLootPanel:prerender()
         -- an item held over the row: it can be dropped on it, into that container
         -- (green: it may go there, red: it may not)
         if hover and KnoxDrag.isActive() then
-            local dc = KnoxDrag.canDropInto(c.container, player) and T.color.ok or T.color.bad
+            local dc = (KnoxDrag.canDropInto(c.container, player) and not KnoxDrag.tooFarFor(player, c.container)) and T.color.ok or T.color.bad
             self:drawRect(r[1], r[2], r[3], r[4], 0.18, dc.r, dc.g, dc.b)
             T.tileFrame(self, r[1], r[2], r[3], r[4], dc)
         end
@@ -991,7 +991,7 @@ function KnoxLootPanel:prerender()
     end
     -- an item held over the header: dropped there it goes into this container
     if self.selected and KnoxDrag.isActive() and over and inRect(mx, my, {hx, 0, H.w, H.h}) then
-        local dc = KnoxDrag.canDropInto(self.selected, player) and T.color.ok or T.color.bad
+        local dc = (KnoxDrag.canDropInto(self.selected, player) and not KnoxDrag.tooFarFor(player, self.selected)) and T.color.ok or T.color.bad
         self:drawRect(hx, 0, H.w, H.h, 0.18, dc.r, dc.g, dc.b)
         T.border(self, hx, 0, H.w, H.h, dc)
     end

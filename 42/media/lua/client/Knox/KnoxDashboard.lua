@@ -113,6 +113,32 @@ local SEDAN = {
     climate = {515, 90, 284, 55, knob = true},
 }
 local TRUCK = {
+    kind = "truck", W = 860, H = 152, rugged = true,
+    plates = {{8, 8, 84, 136, true}, {98, 8, 400, 136, true}, {504, 8, 52, 136, false}, {560, 8, 292, 136, true}},
+    lights = {cx = 50, cy = 44, r = 15, pull = true},
+    -- (the plate 22 wider for the trunk's button by the doors' rocker, as on the sedan:
+    -- under the ignition it was "not like a real dash" - the author, 2026-10-28)
+    doors = {14, 80, 32, 44}, trunk = {54, 80, 32, 44},
+    -- (the band inside the cluster's frame, the wells wholly under it: it lay over the
+    -- grey frame and the dials' tops went under it - the author, 2026-10-21)
+    dials = {
+        {id = "tach", cx = 150, cy = 88, R = 42, wall = 5, spec = TACH, cap = true},
+        {id = "speed", cx = 257, cy = 85, R = 50, wall = 5, spec = SPEED, unit = true, digits = true},
+        {id = "fuel", cx = 356, cy = 70, R = 34, wall = 5, spec = FUEL}},
+    band = {100, 10, 396, 16},
+    bolts = {{105, 137}, {491, 137}},
+    gears = {cx = 356, y = 114, cw = 12, h = 18},
+    glass = {{414, 32, 76, 104}},
+    tells = {{"engine", 422, 40, 24, 24}, {"battery", 458, 40, 24, 24}, {"lights", 422, 72, 24, 24}, {"cruise", 458, 72, 24, 24}},
+    cruiseNum = {422, 104, 60, 22},
+    ign = {cx = 530, cy = 76, r = 22, inner = 15},
+    radio = {564, 12},
+    climate = {564, 88, 284, 52, knob = false},
+}
+-- The same body without a trunk of its own (a pickup's open bed): the plate as narrow
+-- as before, the rocker alone - an empty well where a button would be looked torn out
+-- (the author, 2026-10-28).
+local PICKUP = {
     kind = "truck", W = 838, H = 152, rugged = true,
     plates = {{8, 8, 62, 136, true}, {76, 8, 400, 136, true}, {482, 8, 52, 136, false}, {538, 8, 292, 136, true}},
     lights = {cx = 39, cy = 44, r = 15, pull = true},
@@ -150,13 +176,18 @@ local NO_TIP = {doors = true, trunk = true, lights = true, tt_lights = true, vol
 local PRESET = {p1 = 1, p2 = 2, p3 = 3, p4 = 4, p5 = 5, p6 = 6}
 
 --- The car's class by its script's name: pickups, vans, SUVs, off-roaders get the
---- pickup's body, the rest (and cars of mods with other names) the sedan's.
+--- pickup's body, the rest (and cars of mods with other names) the sedan's. The
+--- pickup's body is wider with the trunk's button when the car has a trunk (a van,
+--- an SUV - linlin, 2026-10-25), as narrow as it was without one (an open bed).
 local TRUCKISH = {"pickup", "truck", "van", "suv", "offroad", "bus", "step"}
 local function bodyFor(v)
     local ok, name = pcall(function() return v:getScript():getName() end)
     name = ok and name and string.lower(tostring(name)) or ""
     for _, w in ipairs(TRUCKISH) do
-        if string.find(name, w, 1, true) then return TRUCK end
+        if string.find(name, w, 1, true) then
+            local ok, bed = pcall(function() return v:getPartById("TruckBed") end)
+            return (ok and bed ~= nil) and TRUCK or PICKUP
+        end
     end
     return SEDAN
 end
@@ -259,6 +290,13 @@ end
 local function snap(s, x, y, w, h)
     local x0, y0 = math.floor(x * s + 0.5), math.floor(y * s + 0.5)
     return x0, y0, math.floor((x + w) * s + 0.5) - x0, math.floor((y + h) * s + 0.5) - y0
+end
+
+--- A well of its own size (the doors' rocker, the trunk's button): rounded from its
+--- corner and its width, not from both edges - side by side the two came out 42 and
+--- 43 px at 1440p (the critic, 2026-10-28).
+local function snapWell(s, x, y, w, h)
+    return math.floor(x * s + 0.5), math.floor(y * s + 0.5), math.floor(w * s + 0.5), math.floor(h * s + 0.5)
 end
 
 local function pt(cx, cy, r, deg)
@@ -981,7 +1019,12 @@ function D:button(id, x, y, w, h, hover, a, ledC)
     T.rect(self, x, y, w, h, C.cell, a)
     sheen(self, x + 2, y + 2 + p, w - 4, h - 4 - p, 0.5 - 0.35 * p, a, self.cc.b)
     T.tileFrame(self, x, y, w, h, hover and C.accent or C.tileEdge, a)
-    if ledC then self:led(x + math.floor(w / 2 - self:u(5)), y + math.floor(self:u(4)), math.floor(self:u(10)), math.max(2, math.floor(self:u(2.6))), ledC, a) end
+    -- (the LED centred by its own whole width: half of it taken off the middle put
+    -- it 1 px left at 1440p - the critic, 2026-10-28)
+    if ledC then
+        local lw = math.floor(self:u(10))
+        self:led(x + math.floor((w - lw) / 2), y + math.floor(self:u(4)), lw, math.max(2, math.floor(self:u(2.6))), ledC, a)
+    end
     return p
 end
 
@@ -1028,7 +1071,7 @@ function D:drawSwitches(st, now, a)
     if not l.pull then self:labelAt(self.txt.lights, cx, U(l.cy + l.r + l.capDy), cc.legend, self.fCap, a) end
     -- the doors' locks: a rocker tilted to the locked half, its LED over it
     local d = b.doors
-    local x, y, w, h = snap(s, d[1], d[2], d[3], d[4])
+    local x, y, w, h = snapWell(s, d[1], d[2], d[3], d[4])
     local k = self.doorK
     T.rect(self, x, y, w, h, C.cell, a)
     local ix, iy, iw, ih = x + 3, y + 3, w - 6, h - 6
@@ -1037,23 +1080,29 @@ function D:drawSwitches(st, now, a)
     sheen(self, ix, iy, iw, half, 0.55 - 0.4 * k, a, cc.b)
     sheen(self, ix, iy + half, iw, ih - half, 0.15 + 0.4 * k, a, cc.b, true)
     T.rect(self, ix, iy + half - 1, iw, 2, BLACK, 0.55 * a)
-    local gs = math.min(iw, ih) * 0.62
-    pic(self, sized("lamp_lockc", gs), x + w / 2 - gs / 2, iy + ih * 0.27 - gs / 2, gs, gs, cc.legend, a)
-    pic(self, sized("lamp_locko", gs), x + w / 2 - gs / 2, iy + ih * 0.73 - gs / 2, gs, gs, cc.legend, a)
+    -- (each lock in the middle of its half, the 2 px seam left out, on whole pixels: the
+    -- closed one sat 1 px low at 1080p - the critic, 2026-10-28)
+    local gs = math.floor(math.min(iw, ih) * 0.62)
+    local gx = x + math.floor((w - gs) / 2)
+    pic(self, sized("lamp_lockc", gs), gx, iy + math.floor((half - 1 - gs) / 2), gs, gs, cc.legend, a)
+    pic(self, sized("lamp_locko", gs), gx, iy + half + 1 + math.floor((ih - half - 1 - gs) / 2), gs, gs, cc.legend, a)
     T.tileFrame(self, x, y, w, h, self.hot == "doors" and C.accent or C.tileEdge, a)
-    self:led(x + math.floor(w / 2 - U(5)), y - math.floor(U(5)), math.floor(U(10)), math.max(2, math.floor(U(2.6))), self.lampC.doors, a)
+    -- (centred by its own whole width, as the trunk button's: 1 px left at 1440p - the critic, 2026-10-28)
+    local lw = math.floor(U(10))
+    self:led(x + math.floor((w - lw) / 2), y - math.floor(U(5)), lw, math.max(2, math.floor(U(2.6))), self.lampC.doors, a)
     -- (no words under the rocker and the button: their signs say it, as on a car's;
     -- the words ran into each other with the smallest font at 1280 x 1024)
     -- the trunk's release: only with a lockable trunk (as the game's lamp); a blank without
     local t = b.trunk
     if t then
-        x, y, w, h = snap(s, t[1], t[2], t[3], t[4])
+        x, y, w, h = snapWell(s, t[1], t[2], t[3], t[4])
         if st.trunkHas then
             local p = self:button("trunk", x, y, w, h, self.hot == "trunk", a, self.lampC.trunk)
             -- (in the button's very middle on whole pixels: pushed down for the LED it
             -- looked off the middle - the author, 2026-10-21)
             local is = math.floor(math.min(w, h) * 0.55 / 2) * 2
-            pic(self, sized("lamp_trunk", is), x + (w - is) / 2, y + (h - is) / 2 + p, is, is, cc.legend, a)
+            -- (floored: an odd button and an even sign gave half a pixel at 1440p, a blur)
+            pic(self, sized("lamp_trunk", is), x + math.floor((w - is) / 2), y + math.floor((h - is) / 2) + p, is, is, cc.legend, a)
         else
             T.rect(self, x, y, w, h, C.cell, a)
             T.tileFrame(self, x, y, w, h, C.border, a)
@@ -2134,7 +2183,7 @@ function D.makeDemo(kind, hot)
     d.demo = demo
     d.vehicle, d.character, d.playerNum = demo.car, demo.chr, 0
     d.MM, d.R = demo.mm, demo.r
-    d.body = demo.kind == "pickup" and TRUCK or SEDAN
+    d.body = demo.kind == "pickup" and PICKUP or SEDAN
     d.gearCount = 5
     d.k = 1
     -- (the key already in, as when one sits down in a car with it: no sound)
@@ -2317,6 +2366,6 @@ if not ISVehicleDashboard.knoxHooked then
 end
 
 -- (for the self-test and the bench: the two bodies and how a car gets one)
-D.SEDAN, D.TRUCK, D.bodyFor = SEDAN, TRUCK, bodyFor
+D.SEDAN, D.TRUCK, D.PICKUP, D.bodyFor = SEDAN, TRUCK, PICKUP, bodyFor
 
 return KnoxDashboard

@@ -69,7 +69,11 @@ function D.items()
             if e.mod and (e.side == "bag" or e.side == "clo") then
                 e.grp = "Grp_mods"
             elseif e.side == "bag" then
-                local eq = safe(function() return sc:getCanBeEquipped() end)
+                -- (asked of a thing of the type: the game's item script has no
+                -- getCanBeEquipped - pcall hid it, but the game counted an error
+                -- for every bag, 300+ on opening; Foxel, Guyladriel, LBBz 2026-10-25)
+                local thing = instanceItem and safe(instanceItem, ft)
+                local eq = thing and safe(function() return thing:canBeEquipped() end)
                 eq = eq and F.norm(eq) or ""
                 e.grp = eq == "back" and "Grp_back" or (eq ~= "" and "Grp_worn" or "Grp_case")
             elseif e.side == "clo" then
