@@ -85,6 +85,12 @@ local function pageItems(page)
         table.insert(out, {"sec", "Controls_Title", "reset"})
         for _, a in ipairs(C.ACTIONS) do table.insert(out, {"bind", a.id}) end
         table.insert(out, {"help"})
+        -- Viewpoint's crosshair panel keys, where it is (the author, 2026-10-29)
+        if KnoxCompat and KnoxCompat.vpHas("panel") == true and C.vpKeys() then
+            table.insert(out, {"sec", "Controls_VP", "vpreset"})
+            for _, a in ipairs(C.VP_ACTIONS) do table.insert(out, {"bind", a.id}) end
+            table.insert(out, {"help", "vp"})
+        end
         return out
     end
     local seen = {}
@@ -191,7 +197,7 @@ function KnoxSettings:layout()
                     e.y, e.line = y, p ~= "modules"
                 end
                 e.text = T.upper(getText("IGUI_Knox_" .. key))
-                e.beta, e.reset = it[3] == "beta", it[3] == "reset"
+                e.beta, e.reset, e.vp = it[3] == "beta", it[3] == "reset" or it[3] == "vpreset", it[3] == "vpreset"
                 y = y + fc + pad
             elseif kind == "mod" then
                 e.name = T.upper(getText("IGUI_Knox_Module_" .. key))
@@ -251,7 +257,8 @@ function KnoxSettings:layout()
             elseif kind == "help" then
                 y = y + math.floor(pad / 2)
                 e.y = y
-                e.lines = T.wrap(getText("IGUI_Knox_Controls_Help") .. " " .. getText("IGUI_Knox_Controls_HelpMore"), T.fontText, wide)
+                e.lines = T.wrap(key == "vp" and getText("IGUI_Knox_Controls_VPHelp")
+                    or (getText("IGUI_Knox_Controls_Help") .. " " .. getText("IGUI_Knox_Controls_HelpMore")), T.fontText, wide)
                 y = y + #e.lines * (ft + 2)
             elseif kind == "camp" then
                 e.lines = T.wrap(getText("IGUI_Knox_Camp_Reset_Info"), T.fontText, wide)
@@ -494,7 +501,7 @@ end
 function KnoxSettings:assign(gesture)
     local cap = self.capture
     if not cap then return end
-    C.set(cap.id, gesture)
+    if C.vp(cap.id) then C.vpSet(cap.id, gesture) else C.set(cap.id, gesture) end
     T.saveSettings()
     self.capture = nil
     getSoundManager():playUISound("UIActivateButton")
@@ -551,7 +558,8 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         if e.beta then plateMark(self, L.betaMark, L.x0 + math.floor(w + 0.5) + pad, y + math.floor((fc - T.fontTileH - 4) / 2), T.color.warn) end
         if e.reset then
             local r = self:resetRect(e, oy)
-            button(self, r, L.resetText, hot and inRect(mx, my, r), false, C.isDefault(), T.fontTile)
+            local same = (e.vp and C.vpIsDefault()) or (not e.vp and C.isDefault())
+            button(self, r, L.resetText, hot and inRect(mx, my, r), false, same, T.fontTile)
         end
     elseif kind == "mod" then
         local on = self.want[e.key]
@@ -670,8 +678,10 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         local hover = not cap and hot and inRect(mx, my, r)
         T.rect(self, r[1], r[2], r[3], r[4], catching and T.color.accent or T.color.cell, catching and 0.18 or 1)
         T.border(self, r[1], r[2], r[3], r[4], (catching or hover) and T.color.accent or T.color.tileEdge)
-        local gesture = C.get(e.key)
-        if e.gWas ~= gesture then e.gWas, e.gText = gesture, T.upper(C.label(gesture)) end
+        -- (Viewpoint's keys: as Viewpoint writes and shows them)
+        local vp = C.vp(e.key)
+        local gesture = vp and C.vpGet(e.key) or C.get(e.key)
+        if e.gWas ~= gesture then e.gWas, e.gText = gesture, T.upper(vp and C.vpLabel(gesture) or C.label(gesture)) end
         local text, color = e.gText, gesture == "" and T.color.dim or T.color.bright
         if catching then
             local key = cap.kind ~= "mouse" and "IGUI_Knox_Controls_PressKey" or "IGUI_Knox_Controls_Click"
@@ -841,7 +851,7 @@ function KnoxSettings:clickItem(e, x, y, oy)
     local kind = e.kind
     local ey = oy + e.y
     if kind == "sec" and e.reset and inRect(x, y, self:resetRect(e, oy)) then
-        self.pressed = "reset"
+        self.pressed = e.vp and "vpreset" or "reset"
         return true
     elseif kind == "mod" and inRect(x, y, set(R1, L.sideW + 1, ey, L.w, e.h)) then
         self.want[e.key] = not self.want[e.key]
@@ -993,6 +1003,8 @@ function KnoxSettings:onMouseUp(x, y)
     elseif pressed == "reset" then
         C.reset()
         T.saveSettings()
+    elseif pressed == "vpreset" then
+        C.vpReset()
     elseif pressed == "camp" and KnoxMenuKeep and #KnoxMenuKeep.load() > 0 then
         if self.campSureAt and getTimestampMs() - self.campSureAt < 4000 then
             self.campSureAt = nil
@@ -1004,7 +1016,8 @@ function KnoxSettings:onMouseUp(x, y)
     elseif string.sub(pressed, 1, 5) == "bind:" then
         -- the plate is armed on release, so this click is not taken for the gesture
         local id = string.sub(pressed, 6)
-        self.capture = {id = id, kind = C.action(id).kind, mouse = C.action(id).mouse}
+        local a = C.action(id) or C.vp(id)
+        self.capture = {id = id, kind = a.kind, mouse = a.mouse}
     end
     return true
 end

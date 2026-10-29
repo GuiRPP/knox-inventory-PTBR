@@ -982,6 +982,19 @@ end
 local FOOD = {"Base.Apple", "Base.Crisps", "Base.WaterBottle", "Base.TinnedBeans", "Base.TinOpener"}
 local function giveFood(p) giveKit(p, FOOD) end
 
+-- A flashlight and five batteries, each charged differently (the battery panel's
+-- choice - the author, 2026-10-29).
+local BATTERY_CHARGES = {0.92, 0.61, 0.4, 0.2, 0.08}
+local function giveBatteries(p)
+    local inv = p:getInventory()
+    if inv:getCountTypeRecurse("Base.HandTorch") == 0 then tag(inv:AddItem("Base.HandTorch")) end
+    for _, c in ipairs(BATTERY_CHARGES) do
+        local it = tag(inv:AddItem("Base.Battery"))
+        if it then pcall(function() it:setCurrentUsesFloat(c) end) end
+    end
+    dirtyAll()
+end
+
 -- a big stack moved, the game froze (sychmil): 500 bullets in one bag, an empty one
 -- beside; the longest frame of the next 20 s
 --- @return the full bag, the empty one
@@ -1337,6 +1350,49 @@ B.POINTS = {
         {"Mark", function() mark("perf_inv") end}, {"PerfDetail", function() B.perfDetail() end},
         {"Ammo500", function(p) B.ammo(p) end}, {"Dump", function(p) B.dump(p) end},
         {"Wardrobe", function(p) B.wardrobe(p) end}}, check = checkPerfInv},
+    -- the author's own finds, 2026-10-29
+    {id = "a_pour"},
+    {id = "a_battery", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
+    {id = "a_torch", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
+    {id = "a_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
+    {id = "a_trash"},
+    {id = "a_hands", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
+    -- the author's wishes from the bench, 2026-10-29 (the crosshair panel)
+    {id = "b_vp_live"},
+    {id = "b_vp_bag", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
+    {id = "b_vp_remember", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
+    {id = "b_vp_keys"},
+    {id = "b_vp_locked"},
+    {id = "b_battery", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
+    {id = "b_slot_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
+    {id = "b_vp_gen"},
+    {id = "b_vp_icons", actions = {{"IconLog", function(p)
+        if not KnoxCrosshair or not KnoxCrosshair.logNoIcons then return end
+        KnoxCrosshair.logNoIcons(not KnoxCrosshair.noIconLog)
+        halo(p, KnoxCrosshair.noIconLog and "IGUI_KnoxTB_IconLogOn" or "IGUI_KnoxTB_IconLogOff")
+    end}}},
+    -- the crosshair panel's actions in the right-click menu's groups (the author, 2026-10-29)
+    {id = "b_vp_groups", actions = {{"DirtyClothes", function(p)
+        local worn = p:getWornItems()
+        for i = 0, worn:size() - 1 do
+            local it = worn:get(i):getItem()
+            if instanceof(it, "Clothing") then
+                it:setDirtiness(60)
+                it:setBloodLevel(40)
+            end
+        end
+        p:resetModelNextFrame()
+        halo(p, "IGUI_KnoxTB_A_DirtyClothes")
+    end}}},
+    -- the author's bench, 2026-10-29 (evening): a locked door, the car, "Disassemble", the car's radio
+    {id = "b_vp_door"},
+    {id = "b_vp_car"},
+    {id = "b_vp_scrap"},
+    {id = "b_car_radio_cursor"},
+    -- (the author's radio and TV, 2026-10-29: "Device Options" the main one, "Disassemble" centred)
+    {id = "b_vp_device"},
+    -- (the author, 2026-10-29: F held at a fence climbed nothing while the panel was up)
+    {id = "b_vp_fence"},
     -- stage 2 of the Steam reports, 2026-10-28
     {id = "s2_sandbox", menu = true},
     {id = "s2_colors", menu = true, check = checkColors},

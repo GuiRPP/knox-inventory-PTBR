@@ -156,6 +156,245 @@ run("actions", function()
     frames(2)
     check("action run", VP.ran[#VP.ran] == 1, VP.ran[#VP.ran])
     check("hints: use only", P.hintCount == 1 and P.shownLabels[1] == "IGUI_Knox_VPUse", P.hintCount)
+    -- (done: Viewpoint gathers them anew, as many as before - the row follows; 2026-10-29)
+    VP.actions[2] = {label = "Close Window", on = true}
+    VP.version = (VP.version or 0) + 1
+    frames(10)
+    local named = false
+    for _, r in ipairs(P.rows) do if r.name == "Close Window" then named = true end end
+    check("a renamed action shown", named)
+    check("the choice stays on it", P.pick[P.sel] and P.pick[P.sel].name == "Close Window", P.pick[P.sel] and P.pick[P.sel].name)
+end)
+
+-- a locked door: Viewpoint's "[Locked]" off the name, a lock and "LOCKED" at the right (2026-10-29)
+RATTLED = 0
+local door = {classes = {IsoDoor = true}, ToggleDoor = function() RATTLED = RATTLED + 1 end}
+run("locked door", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = door, false, false, jlist({})
+    VP.actions = {{label = "Open Door [EC_Locked]", on = false}, {label = "Enter Vehicle [EC_Locked]", on = true}}
+    VP.version = (VP.version or 0) + 1
+    frames(30)
+    local names, locked = {}, 0
+    for _, r in ipairs(P.rows) do
+        if r.kind == "act" then table.insert(names, r.name) if r.locked then locked = locked + 1 end end
+    end
+    check("names without the tail", names[1] == "Open Door" and names[2] == "Enter Vehicle", table.concat(names, ","))
+    check("both locked", locked == 2, locked)
+    -- (a locked one chosen first, not what comes after it - "Disassemble" was: the author, 2026-10-29)
+    check("the locked one chosen", #P.pick == 2 and P.pick[P.sel].name == "Open Door", #P.pick)
+    local ran0 = #VP.ran
+    VP.pressed = 1
+    frames(2)
+    check("the door tried", RATTLED == 1 and #VP.ran == ran0, RATTLED)
+    check("drawn", DRAWN.label > 0)
+end)
+
+-- the actions in the right-click menu's groups (the author, 2026-10-29: the mockup
+-- vp_groups_v1.html, no counts, titles as the menu's): "Wash: ..." under one row that
+-- unfolds, six of its rows at most, the thing washed as its picture
+local shirt = item("T-Shirt", 0.2)
+shirt.classes.InventoryItem = true
+local function names()
+    local out = {}
+    for _, r in ipairs(P.rows) do
+        table.insert(out, (r.kind == "act" or r.kind == "label") and (r.name or r.text) or r.kind)
+    end
+    return table.concat(out, ",")
+end
+local function rowNamed(n)
+    for _, r in ipairs(P.rows) do if r.name == n then return r end end
+end
+
+run("groups", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = {}, false, false, jlist({})
+    VP.actions = {{label = "Drink", on = true}, {label = "Wash: Yourself", on = true}, {label = "Wash: T-Shirt", on = true}}
+    for i = 1, 6 do table.insert(VP.actions, {label = "Wash: Socks " .. i, on = true}) end
+    for _, a in ipairs({"Fill: Bottle", "Disassemble", "Mod A", "Mod B: X", "Mod B: Y", "Smash Window"}) do
+        table.insert(VP.actions, {label = a, on = true})
+    end
+    ViewpointInteract = {actions = {}}
+    ViewpointInteract.actions[3] = {args = {n = 2, PLAYER, shirt}}
+    VP.version = (VP.version or 0) + 1
+    frames(30)
+    check("grouped as the menu", names() == "IGUI_Knox_MenuUse,Drink,Wash,Fill: Bottle,IGUI_Knox_MenuBuild,Disassemble,"
+        .. "sep,IGUI_Knox_MenuOther,sep,Smash Window", names())
+    local wash = rowNamed("Wash")
+    check("a group row", wash and wash.grp ~= nil and #wash.kids == 8)
+    chooseRow(function(r) return r == wash end)
+    frames(2)
+    check("hint: unfold", P.shownLabels[1] == "IGUI_Knox_VPUnfold", P.shownLabels[1])
+    VP.pressed = 1
+    frames(30)
+    check("nothing run", #VP.ran == 1, #VP.ran)
+    local kids, shown, strips = 0, 0, 0
+    for _, r in ipairs(P.rows) do
+        if r.parent == wash.key and r.kind == "act" then
+            kids = kids + 1
+            if r.h > 0 then shown = shown + 1 end
+        elseif r.kind == "gstrip" then strips = strips + 1 end
+    end
+    check("unfolded", kids == 8, kids)
+    check("six shown", shown == 6, shown)
+    check("two strips", strips == 2, strips)
+    check("hint: fold", P.shownLabels[1] == "IGUI_Knox_VPFold", P.shownLabels[1])
+    check("own names", rowNamed("Yourself") ~= nil and rowNamed("Socks 6") ~= nil)
+    check("own icon", rowNamed("Yourself").icon and rowNamed("Yourself").icon.path == "self")
+    check("the thing's picture", rowNamed("T-Shirt").item == shirt and rowNamed("T-Shirt").icon == nil)
+    -- down to the last: the window follows
+    VP.wheel = 8
+    frames(10)
+    local last = rowNamed("Socks 6")
+    check("last chosen", P.pick[P.sel] == last, P.pick[P.sel] and P.pick[P.sel].name)
+    check("last in the window", last.h > 0 and rowNamed("Yourself").h == 0, last.h)
+    VP.pressed = 1
+    frames(2)
+    check("its action run", VP.ran[#VP.ran] == last.index, VP.ran[#VP.ran])
+    -- "Other": the rest (a sub menu's by their whole names)
+    local other = rowNamed("IGUI_Knox_MenuOther")
+    check("other's rows", other and #other.kids == 3 and other.kids[2].name == "Mod B: X")
+    check("width in its bounds", P.w >= 260 and P.w <= 340, P.w)
+    check("stencils paired", DRAWN.stencil == DRAWN.unstencil, DRAWN.stencil .. "/" .. DRAWN.unstencil)
+    -- folded back
+    chooseRow(function(r) return r.name == "Wash" end)
+    VP.pressed = 1
+    frames(30)
+    local left = 0
+    for _, r in ipairs(P.rows) do if r.parent == wash.key then left = left + 1 end end
+    check("folded", left == 0, left)
+    -- one group of the menu's: no titles
+    VP.actions = {{label = "Drink", on = true}, {label = "Wash: A", on = true}, {label = "Wash: B", on = true}}
+    VP.version = VP.version + 1
+    frames(30)
+    check("no titles with one group", names() == "Drink,Wash", names())
+    ViewpointInteract = nil
+end)
+
+-- Viewpoint's first one on top (the author, 2026-10-29: a car - first it is got into; locked,
+-- the window to smash right under it; its doors under "Other")
+run("car", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = {}, false, false, jlist({})
+    VP.actions = {{label = "Enter Vehicle [EC_Locked]", on = true}, {label = "Open Door [EC_Locked]", on = true},
+                  {label = "Vehicle Mechanics", on = true}, {label = "Smash Window", on = true}}
+    ViewpointInteract = {actions = {{first = true}, {fn = ISVehicleMenu.onOpenDoor}}}
+    VP.version = (VP.version or 0) + 1
+    VP.ran = {}
+    frames(30)
+    check("enter first, smash under it, the rest under Other",
+        names() == "Enter Vehicle,Smash Window,sep,IGUI_Knox_MenuOther", names())
+    check("enter chosen", P.pick[P.sel] and P.pick[P.sel].name == "Enter Vehicle")
+    local other = rowNamed("IGUI_Knox_MenuOther")
+    check("the door in Other", other and other.kids and other.kids[1].name == "Open Door")
+    VP.pressed = 1
+    frames(2)
+    check("enter run (the game says it's locked)", VP.ran[1] == 0, VP.ran[1])
+    -- unlocked: smash at the bottom again
+    VP.actions[1].label, VP.actions[2].label = "Enter Vehicle", "Open Door"
+    VP.version = VP.version + 1
+    frames(30)
+    check("smash at the bottom", names() == "Enter Vehicle,sep,IGUI_Knox_MenuOther,sep,Smash Window", names())
+    ViewpointInteract = nil
+end)
+
+-- a TV: Viewpoint names the panel after its first sub menu ("Disassemble") and leaves that off
+-- its option ("TV"): the header the TV's name, the row "Disassemble" (the author, 2026-10-29)
+run("disassemble", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = {moveName = "TV"}, false, false, jlist({})
+    VP.title = "Disassemble"
+    VP.actions = {{label = "Set Up Device", on = true}, {label = "TV Premium", on = true}}
+    ViewpointInteract = {actions = {{}, {group = "Disassemble", fn = ISDisassembleMenu.disassemble}}}
+    VP.version = (VP.version or 0) + 1
+    frames(30)
+    check("rows", names() == "IGUI_Knox_MenuBuild,Disassemble,sep,Set Up Device", names())
+    check("header: the thing's name", P.title == "Named TV", P.title)
+    -- what it needs, under it (the mockup vp_scrap_v1.html): can't be done - only what is missing
+    local live = P.src.scrapNeeds
+    P.src.scrapNeeds = function() return {{s = "Electrical 3/2", bad = false}, {s = "Screwdriver", bad = true}} end
+    VP.actions[2].on = false
+    VP.version = VP.version + 1
+    frames(30)
+    local row = rowNamed("Disassemble")
+    check("only what is missing", row and row.req and #row.req == 1 and row.req[1].s == "IGUI_Knox_VPNeeds Screwdriver",
+        row and row.req and row.req[1].s)
+    check("a taller row", row and row.h > 32, row and row.h)
+    check("all shown", row and row.reqN == 1 and row.reqMore == nil)
+    -- too many: "N more" after what fits
+    P.src.scrapNeeds = function()
+        local t = {}
+        for k = 1, 6 do table.insert(t, {s = "Some long tool number " .. k, bad = true}) end
+        return t
+    end
+    VP.version = VP.version + 1
+    frames(30)
+    row = rowNamed("Disassemble")
+    check("the rest as more", row and row.reqN >= 1 and row.reqN < 6 and row.reqMore ~= nil and row.reqMoreBad, row and row.reqN)
+    check("width in its bounds", P.w <= 340, P.w)
+    P.src.scrapNeeds = live
+    -- the game's tooltip read: tools that would do instead are one need - the one the player has
+    -- by its name (the author's radio: "Screwdriver · 3 more", 2026-10-29)
+    local function c(r, g, b) return {r = r, g = g, b = b} end
+    ISMoveableSpriteProps.bhc = {getR = function() return 1 end, getG = function() return 0 end, getB = function() return 0 end}
+    local W, BAD = c(255, 255, 255), c(255, 0, 0)
+    local function ln(a, ac, b, bc)
+        return {{txt = a, r = ac.r, g = ac.g, b = ac.b}, b and {txt = b, r = bc.r, g = bc.g, b = bc.b} or nil}
+    end
+    local mine = {classes = {InventoryItem = true}, getDisplayName = function() return "My Screwdriver" end}
+    local hasTool = mine
+    local props = {getInfoPanelDescription = function()
+        local okc = hasTool and W or BAD
+        return {ln("IGUI_Name:", W, "TV", W), ln("IGUI_Skill:", W, "Electrical", W), ln("IGUI_Tool:", W, "Screwdriver", okc),
+                ln("", W, "Spoon", okc), ln("", W, "Knife", okc), ln("- Items on the surface", BAD)}
+    end, hasScrapTool = function() return hasTool end}
+    ViewpointInteract = {actions = {{}, {args = {n = 2, PLAYER, {moveProps = props}}}}}
+    local needs = live(1)
+    local said = {}
+    for _, p in ipairs(needs or {}) do table.insert(said, p.s .. (p.bad and "!" or "")) end
+    check("alternatives one need, mine by its name", table.concat(said, ",") == "Electrical,My Screwdriver,Items on the surface!",
+        table.concat(said, ","))
+    hasTool = nil
+    needs, said = live(1), {}
+    for _, p in ipairs(needs or {}) do table.insert(said, p.s .. (p.bad and "!" or "")) end
+    check("missing: the first of them", table.concat(said, ",") == "Electrical,Screwdriver!,Items on the surface!",
+        table.concat(said, ","))
+    ISMoveableSpriteProps.bhc = nil
+    -- a TV's "Device Options": on top, chosen (the author, 2026-10-29)
+    VP.actions = {{label = "Set Up Device", on = true}, {label = "TV Premium", on = true}}
+    VP.actions[2].on = true
+    ViewpointInteract = {actions = {{fn = ISRadioAndTvMenu.openTvPanel}, {group = "Disassemble", fn = ISDisassembleMenu.disassemble}}}
+    VP.version = VP.version + 1
+    frames(30)
+    check("device options on top", names() == "Set Up Device,IGUI_Knox_MenuBuild,Disassemble", names())
+    check("device options chosen", P.pick[P.sel] and P.pick[P.sel].name == "Set Up Device")
+    -- a window: its own sub menu "Window" names the panel - not put back on its options
+    -- ("Window: Close Window" - the author's screenshot, 2026-10-29)
+    VP.obj = {moveName = "Window"}
+    VP.title = "Window"
+    VP.actions = {{label = "Close Window", on = true}, {label = "Climb Through", on = true}}
+    ViewpointInteract = {actions = {{group = "Window", first = true}, {group = "Window"}}}
+    VP.version = VP.version + 1
+    frames(30)
+    check("a window's rows by their own names", rowNamed("Close Window") ~= nil and rowNamed("Climb Through") ~= nil, names())
+    check("header: the window's name", P.title == "Named Window", P.title)
+    VP.title, ViewpointInteract = nil, nil
+end)
+
+-- a fence, "Disassemble" greyed out: nothing chosen - the take key the game's, F held climbs it
+-- (the author, 2026-10-29); can be done - the panel's
+run("take key", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = {moveName = "Fence"}, false, false, jlist({})
+    VP.actions = {{label = "Disassemble", on = false}}
+    ViewpointInteract = {actions = {{fn = ISDisassembleMenu.disassemble}}}
+    VP.version = (VP.version or 0) + 1
+    frames(30)
+    check("nothing chosen: the game's", VP.wants == false, tostring(VP.wants))
+    VP.actions[1].on = true
+    VP.version = VP.version + 1
+    frames(30)
+    check("one to run: the panel's", VP.wants == true, tostring(VP.wants))
+    VP.shown = false
+    frames(5)
+    check("panel gone: the game's", VP.wants == false, tostring(VP.wants))
+    VP.shown = true
+    ViewpointInteract = nil
 end)
 
 run("locked", function()

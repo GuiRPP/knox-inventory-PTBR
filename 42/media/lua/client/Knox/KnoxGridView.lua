@@ -1807,41 +1807,129 @@ end
 
 --- The battery slot used (the author, 2026-10-21: it showed the battery, but it
 --- could not be taken out): `remove` - the battery out into the main inventory;
---- else `battery` (the fullest of the character's) put in. As the game does it:
---- a radio's or walkie's set - its battery action, the thing in the main inventory
---- first; a flashlight - its recipes (the game's light menu).
-function KnoxGridView.batteryAct(player, item, remove, battery)
-    if not player or not item then return end
+--- else `battery` put in - the one chosen in the slot's panel (the author,
+--- 2026-10-29: "choose which to put in"); with one in, it comes out first. As the
+--- game does it: a radio's or walkie's set - its battery action, the thing in the
+--- main inventory first; a flashlight - its recipes (the game's light menu).
+
+local function toMain(player, it)
     local inv = player:getInventory()
-    local function toMain(it)
-        if it:getContainer() ~= inv then
-            ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(player, it, it:getContainer(), inv))
-        end
+    if it:getContainer() ~= inv then
+        ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(player, it, it:getContainer(), inv))
     end
-    if instanceof(item, "Radio") then
-        if not remove and not battery then return end
-        toMain(item)
-        if battery then toMain(battery) end
-        local act = ISDeviceBatteryAction:new(player, remove, battery,
-            ISDeviceBatteryAction:getDeviceDataParameter(player, item, "InventoryItem"))
-        -- (the game finds the set by its ID in the main inventory only, when the
-        -- action is made - a set in a bag is moved there first, by the action
-        -- queued before: so it is looked for again when this one starts; the
-        -- author, 2026-10-22: "attempted index: getIsBatteryPowered of non-table")
-        local valid = act.isValid
-        act.isValid = function(self)
-            if not self.deviceData then
-                self.deviceData = ISDeviceBatteryAction:getDeviceDataFromParameter(self.character, self.parameter)
-            end
-            return self.deviceData ~= nil and valid(self)
+end
+
+local function radioAct(player, item, remove, battery)
+    toMain(player, item)
+    if battery then toMain(player, battery) end
+    local act = ISDeviceBatteryAction:new(player, remove, battery,
+        ISDeviceBatteryAction:getDeviceDataParameter(player, item, "InventoryItem"))
+    -- (the game finds the set by its ID in the main inventory only, when the
+    -- action is made - a set in a bag is moved there first, by the action
+    -- queued before: so it is looked for again when this one starts; the
+    -- author, 2026-10-22: "attempted index: getIsBatteryPowered of non-table")
+    local valid = act.isValid
+    act.isValid = function(self)
+        if not self.deviceData then
+            self.deviceData = ISDeviceBatteryAction:getDeviceDataFromParameter(self.character, self.parameter)
         end
-        ISTimedActionQueue.add(act)
+        return self.deviceData ~= nil and valid(self)
+    end
+    ISTimedActionQueue.add(act)
+end
+
+--- A flashlight's battery in: this one, as the game's craft window does with its
+--- inputs picked by hand (HandcraftLogic's manual inputs). false: it can't be
+--- done so (the caller lets the game pick).
+local function insertChosen(player, item, battery)
+    local ok, done = pcall(function()
+        local recipe = getScriptManager():getCraftRecipe("InsertBattery")
+        if not recipe or not HandcraftLogic or not ISEntityUI then return false end
+        toMain(player, item)
+        toMain(player, battery)
+        local logic = HandcraftLogic.new(player, nil, nil)
+        logic:setIsoObject(logic:findCraftSurface(player, 2))
+        logic:setContainers(ISInventoryPaneContextMenu.getContainers(player))
+        logic:setRecipeFromContextClick(recipe, item)
+        logic:setManualSelectInputs(true)
+        local inputs = recipe:getInputs()
+        for i = 0, inputs:size() - 1 do
+            local input = inputs:get(i)
+            if input:getResourceType() == ResourceType.Item then
+                local list = ArrayList.new()
+                if input:canUseItem(battery, player) then list:add(battery)
+                elseif input:canUseItem(item, player) then list:add(item) end
+                if list:isEmpty() or not logic:setManualInputsFor(input, list) then return false end
+            end
+        end
+        if not logic:canPerformCurrentRecipe() then return false end
+        return ISEntityUI.HandcraftStart(player, logic, false, true) ~= nil
+    end)
+    return ok and done == true
+end
+
+-- A battery chosen while one is in: it comes out first (its recipe), and the chosen
+-- one goes in once the flashlight is empty - the game's craft checks that when it is
+-- set up, so it is set up then. Given up when the character stopped (the way out
+-- cancelled) or after a while.
+local WAIT_MS = 20000
+local waiting = nil
+
+local function byId(w) return w.player:getInventory():getItemWithIDRecursiv(w.id) end
+
+local function waitOut()
+    local w = waiting
+    if not w then
+        Events.OnTick.Remove(waitOut)
         return
     end
+    local now = getTimestampMs()
+    -- (in a game with others a thing moved comes back as a new object: by its ID)
+    local found, again = pcall(byId, w)
+    local item = (found and again) or w.item
+    local b = item and KnoxGridView.batteryOf(item)
+    local busy = not w.player:getCharacterActions():isEmpty()
+    if b and not b.has then
+        waiting = nil
+        Events.OnTick.Remove(waitOut)
+        if not insertChosen(w.player, item, w.battery) then KnoxGridView.batteryAct(w.player, item, false, nil) end
+    elseif now - w.ms > WAIT_MS or (not busy and now - w.ms > 500) then
+        waiting = nil
+        Events.OnTick.Remove(waitOut)
+    end
+end
+
+function KnoxGridView.batteryAct(player, item, remove, battery)
+    if not player or not item then return end
+    local b = KnoxGridView.batteryOf(item)
+    local swap = not remove and battery ~= nil and b ~= nil and b.has
+    if instanceof(item, "Radio") then
+        if not remove and not battery then return end
+        if swap then radioAct(player, item, true, nil) end
+        radioAct(player, item, remove, battery)
+        return
+    end
+    -- (B42: a flashlight's battery goes out and in by the craft recipes RemoveBattery
+    -- and InsertBattery - the light menu's old recipes find nothing, the battery
+    -- stayed in: the author, 2026-10-29; the game's own way from an item's menu)
+    if swap then
+        if not KnoxGridView.batteryAct(player, item, true, nil) then return end
+        if waiting then Events.OnTick.Remove(waitOut) end
+        waiting = {player = player, item = item, id = item:getID(), battery = battery, ms = getTimestampMs()}
+        Events.OnTick.Add(waitOut)
+        return
+    end
+    if not remove and battery and insertChosen(player, item, battery) then return true end
+    local ok, recipe = pcall(function() return getScriptManager():getCraftRecipe(remove and "RemoveBattery" or "InsertBattery") end)
+    if ok and recipe and ISInventoryPaneContextMenu and ISInventoryPaneContextMenu.OnNewCraft then
+        ISInventoryPaneContextMenu.OnNewCraft(item, recipe, player:getPlayerNum(), false)
+        return true
+    end
     require "ISUI/ISLightSourceRadialMenu"
-    if not ISLightSourceRadialMenu then return end
+    if not ISLightSourceRadialMenu then return false end
     local menu = setmetatable({character = player, playerNum = player:getPlayerNum()}, {__index = ISLightSourceRadialMenu})
     if remove then menu:onRemoveBattery(item) else menu:onInsertBattery(item) end
+    return true
 end
 
 --- The fullest battery of `list`, or nil.
@@ -1871,24 +1959,32 @@ function KnoxGridView:offerBattery()
     end
     ref.e = e
     if not KnoxSlotPicker.isOpenFor(ref) and now - ref.sinceMs < KINDS_HOVER_MS then return end
-    if not b.has then
-        -- (looked for twice a second, not every frame the mouse rests on the radio)
-        if not ref.spares or now - (ref.sparesMs or 0) > 500 then
-            local spares = {}
-            local list = self:player():getInventory():getAllTypeRecurse("Base.Battery")
-            for i = 0, list:size() - 1 do table.insert(spares, list:get(i)) end
-            ref.spares, ref.sparesMs = spares, now
+    -- The character's batteries, fullest first, with their charge (the author,
+    -- 2026-10-29: choose which goes in - with one in as well, to swap it).
+    -- (looked for twice a second, not every frame the mouse rests on the radio)
+    if not ref.spares or now - (ref.sparesMs or 0) > 500 then
+        local spares, charge = {}, {}
+        local list = self:player():getInventory():getAllTypeRecurse("Base.Battery")
+        for i = 0, list:size() - 1 do
+            local it = list:get(i)
+            table.insert(spares, it)
+            charge[it] = it:getCurrentUsesFloat() or 0
         end
-        b.spares = ref.spares
+        table.sort(spares, function(x, y) return charge[x] > charge[y] end)
+        local charges = {}
+        for i, it in ipairs(spares) do charges[i] = charge[it] end
+        ref.spares, ref.charges, ref.sparesMs = spares, charges, now
     end
+    b.spares, b.charges = ref.spares, ref.charges
     local view = self
-    b.act = function(what)
+    -- ("put": `battery` - the one clicked; none - the fullest)
+    b.act = function(what, battery)
         local player = view:player()
         if what == "take" then
             KnoxGridView.batteryAct(player, ref.item, true, nil)
         elseif what == "put" then
-            local best = fullest(ref.spares)
-            if best then KnoxGridView.batteryAct(player, ref.item, false, best) end
+            local it = battery or fullest(ref.spares)
+            if it then KnoxGridView.batteryAct(player, ref.item, false, it) end
         end
         ref.spares = nil
         for _, v in ipairs(KnoxActions.allViews()) do v:markDirty() end

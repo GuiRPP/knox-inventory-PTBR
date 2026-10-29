@@ -555,6 +555,53 @@ do
     ISTimedActionQueue = nil
 end
 
+-- a swap of two quick slots: taken off, hung on - two steps the game ends on their
+-- animation's event (maxTime -1, no time of their own): filled by the time, not half
+-- at once and standing there (the author, 2026-10-29)
+do
+    local near = function(a, b) return a ~= nil and b ~= nil and math.abs(a - b) < 1e-6 end
+    local off = {action = {}, maxTime = -1, Type = "ISDetachItemHotbar"}
+    local on = {maxTime = -1, Type = "ISAttachItemHotbar"}
+    function off:getJobDelta() return 0 end
+    function on:getJobDelta() return 0 end
+    local q = {}
+    ISTimedActionQueue = {queues = {[naked] = {queue = q}}}
+    local knife = container("belt", 4):add(item("Base.HuntingKnife"))
+    local function swap()
+        G.track(naked, {knife}, {kind = "slot", id = "quick:1"}, {kind = "slot", id = "quick:2"}, function()
+            table.insert(q, off)
+            table.insert(q, on)
+        end)
+    end
+    local function at(ms)
+        clock = clock + ms
+        G.frame = G.frame + 1
+        local _, p = G.pendingOf(knife)
+        return p
+    end
+    swap()
+    check("swap: starts empty", near(at(0), 0), at(0))
+    check("swap: taking off fills by the time", near(at(250), 0.25), at(0))
+    check("swap: ...never to its end before done", near(at(500), 0.475), at(0))
+    -- taken off (850 ms): hanging on under way
+    table.remove(q, 1)
+    on.action = {}
+    check("swap: half when taken off", near(at(100), 0.5), at(0))
+    check("swap: hanging on fills by the time", near(at(250), 0.75), at(0))
+    check("swap: not full until hung on", near(at(5000), 0.975), at(0))
+    table.remove(q, 1)
+    check("swap: over when done", at(16) == nil)
+    -- the next swap: each step weighs as long as it took (850 ms; hanging on at most 3 s)
+    off.knoxStartMs, on.knoxStartMs, on.action = nil, nil, nil
+    swap()
+    local rec = G.pending[knife]
+    check("swap: a step weighs the time it took", rec ~= nil and near(rec.steps[1].weight, 42.5) and near(rec.steps[2].weight, 150),
+        rec and (rec.steps[1].weight .. "," .. rec.steps[2].weight))
+    q[1], q[2] = nil, nil
+    G.pending = {}
+    ISTimedActionQueue = nil
+end
+
 -- what stacks: a type's kind looked at once (its class and tags), the rest each time -
 -- (ten looks at Java a thing: 500 bullets, a build up to 9 ms - the author's bench 2026-10-28)
 do

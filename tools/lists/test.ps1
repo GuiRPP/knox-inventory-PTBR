@@ -15,4 +15,7 @@ try {
     # a grid with its lists: the cells, the quiet tiles (stage 3, 2026-10-29)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
         (Join-Path $here 'grid_pre.lua') (Join-Path $knox 'KnoxSelect.lua') (Join-Path $knox 'KnoxGridView.lua') (Join-Path $here 'grid.lua')
+    # the battery panel: the one in it and the character's to choose from (2026-10-29)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
+        (Join-Path $here 'picker_pre.lua') (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $here 'picker.lua')
 } finally { Pop-Location }

@@ -182,7 +182,7 @@ check("off: a tile's state without its modData", S.stateOf(glove) == nil and rea
 
 -- 7. A thing taken away mid-search takes no time -------------------------------------
 reset()
-local bin = newContainer("bin")
+local bin = newContainer("basket")
 local first, second = newItem("first", bin, 3, 3), newItem("second", bin)
 sel, selL = bin, layoutOf(bin)
 frame()
@@ -329,5 +329,18 @@ clock = clock + 1000
 U.pick(newThing({ft = "Base.Book", is = {"Literature"}}))
 check("ui: silent at 0 %", #emitted == 0, #emitted)
 uiSound = 100
+
+-- 9. A garbage can is searched slower (the author, 2026-10-29) ------------------------
+local function firstMs(kind)
+    reset()
+    local c = newContainer(kind)
+    newItem("thing", c)
+    sel, selL = c, layoutOf(c)
+    frame()
+    return S.queue[1] and S.queue[1].ms
+end
+local drawerMs, binMs, dumpMs = firstMs("drawer"), firstMs("bin"), firstMs("dumpster")
+check("trash: a bin takes twice a drawer's time", drawerMs and binMs == drawerMs * 2, tostring(drawerMs) .. " " .. tostring(binMs))
+check("trash: a dumpster too", dumpMs == binMs, tostring(dumpMs))
 
 print(string.format("DONE pass=%d fail=%d", pass, fail))

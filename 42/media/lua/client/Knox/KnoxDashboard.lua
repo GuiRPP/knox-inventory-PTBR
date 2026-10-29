@@ -974,6 +974,15 @@ function D:draw(st, now, dt)
         if not (card and card:getIsVisible() and card:isMouseOver()) then self.cardOpen = false end
     end
     self.wasPressed = pressed
+    -- (Viewpoint: its cursor mode turned off in the car - the card folds away with it;
+    -- the author, 2026-10-29)
+    if self.cardOpen and knoxViewpointCursorOn then
+        local cur = knoxViewpointCursorOn()
+        if self.cursorWas and not cur then self.cardOpen = false end
+        self.cursorWas = cur
+    else
+        self.cursorWas = nil
+    end
     if KnoxRadioCard then
         local r = self.cardRect
         r[1], r[2] = self:getAbsoluteX() + U(b.radio[1]), self:getAbsoluteY()

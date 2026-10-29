@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 66
+T.JAVA_NEEDED = 70
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 

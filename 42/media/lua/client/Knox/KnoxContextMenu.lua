@@ -299,6 +299,8 @@ local ICON_TEXT = {
     ContextMenu_Move_To = "move", ContextMenu_Unpack = "unpack", ContextMenu_PlaceItemOnGround = "place",
     IGUI_invpage_Transfer_all = "all", IGUI_invpage_Loot_all = "all",
     Fluid_Show_Info = "fluid_info", Fluid_Transfer_Fluids = "fluid_move",
+    -- (the author, 2026-10-29: a sink's "Pour on ground" had none)
+    Fluid_Empty = "pour", ContextMenu_Pour_on_Ground = "pour",
     IGUI_Knox_Inspect = "inspect", IGUI_invpanel_Inspect = "inspect", ContextMenu_Inspect = "inspect",
     ContextMenu_More = "more", ContextMenu_RenameBag = "rename", IGUI_CraftUI_Favorite = "star", ContextMenu_Unfavorite = "star",
     ContextMenu_ShowCraftRecipesUsed = "recipes", ContextMenu_Repair = "repair",
@@ -333,6 +335,14 @@ local ICON_TEXT = {
     ContextMenu_Gardening = "garden", ContextMenu_Unwanted = "unwanted",
     IGUI_Knox_Order_Rule = "sort_rule", IGUI_Knox_Order_SaveLayout = "layout_save", IGUI_Knox_Order_ForgetLayout = "layout_forget",
     IGUI_Knox_MoveTop = "move_top", IGUI_Knox_MoveUp = "move_up", IGUI_Knox_MoveDown = "move_down",
+    -- (the author, 2026-10-29: icons Knox has, for the world's options that had none -
+    -- seen in Viewpoint's crosshair panel)
+    ContextMenu_Dismantle = "dismantle", ContextMenu_Disassemble = "dismantle",
+    ContextMenu_Vehicle_Smashwindow = "smash", ContextMenu_Add_sheet = "curtains",
+    IGUI_OpenTrunk = "open", IGUI_CloseTrunk = "open", IGUI_OpenHood = "open", IGUI_CloseHood = "open",
+    IGUI_EnterVehicle = "door",
+    -- (the author, 2026-10-29: the car's "Mechanics" had none)
+    ContextMenu_VehicleMechanics = "repair",
 }
 local ICON_FN = {
     onEatItems = "eat", onDrinkFluid = "drink", onDrinkForThirst = "drink", onLiteratureItems = "read", onMediaText = "read",
@@ -394,10 +404,16 @@ local function knownTables()
     for key, frac in pairs(CHIP_TEXT) do known.chip[getText(key)] = frac end
     known.inspect = getText("IGUI_Knox_Inspect")
     known.take = getText("ContextMenu_GeneratorTake")
-    known.iconText, known.iconFn, known.tex = {}, {}, {}
+    known.iconText, known.iconFn, known.tex, known.iconPrefix = {}, {}, {}, {}
     for key, icon in pairs(ICON_TEXT) do
         local text = getText(key)
-        if text ~= key then known.iconText[text] = icon end
+        if text ~= key then
+            known.iconText[text] = icon
+            -- (a name with a thing in it - "Smash %1" - by what comes before the thing)
+            local pre = string.match(text, "^(.-)%%1")
+            pre = pre and string.gsub(pre, "%s+$", "")
+            if pre and pre ~= "" then table.insert(known.iconPrefix, {pre, icon}) end
+        end
     end
     for path, icon in pairs(ICON_FN) do
         local f = fnOf(path)
@@ -517,21 +533,52 @@ local function worldGroupOf(menu, o, depth, root)
     return "other"
 end
 
---- Knox's icon (a texture or nil) and world group ("danger"...) of an option
---- of the world's menu by its name: Viewpoint's crosshair actions are those
---- options (KnoxCrosshair; the author, 2026-10-25).
-function K.worldLook(name)
-    local kt = knownTables()
-    local g = kt.worldText[name]
-    if not g then
-        for _, p in ipairs(kt.worldPrefix) do
-            if string.sub(name, 1, #p[1]) == p[1] then
-                g = p[2]
-                break
-            end
-        end
-    end
+--- Knox's icon name of a world option by its name, or nil: the whole name; else
+--- (Viewpoint glues a sub menu's option to the sub menu's name - "Wash: Yourself")
+--- the option's own name, then the sub menu's; else a name with a thing in it
+--- ("Smash Rear Window") by its start; else the function behind it, as the
+--- right-click menu has it (the author, 2026-10-29: the panel's rows lacked icons
+--- Knox has).
+local function worldIcon(kt, name, fn)
     local icon = kt.iconText[name]
+    if icon then return icon end
+    local last, first = string.match(name, "^.*: (.-)$"), string.match(name, "^(.-): ")
+    icon = (last and kt.iconText[last]) or (first and kt.iconText[first])
+    if icon then return icon end
+    for _, p in ipairs(kt.iconPrefix) do
+        if string.sub(name, 1, #p[1]) == p[1] or (last and string.sub(last, 1, #p[1]) == p[1]) then return p[2] end
+    end
+    return fn and kt.iconFn[fn] or nil
+end
+
+--- Knox's icon (a texture or nil) and world group ("danger"...) of an option
+--- of the world's menu by its name (and the function it runs, when known):
+--- Viewpoint's crosshair actions are those options (KnoxCrosshair; the author,
+--- 2026-10-25).
+local function worldGroupByName(kt, name)
+    local g = kt.worldText[name]
+    if g then return g end
+    for _, p in ipairs(kt.worldPrefix) do
+        if string.sub(name, 1, #p[1]) == p[1] then return p[2] end
+    end
+    return nil
+end
+
+function K.worldLook(name, fn)
+    local kt = knownTables()
+    -- (the group as the right-click menu finds it: the name, a sub menu's option by its own
+    -- name and then the sub menu's, the function behind it - the panel's groups, the author
+    -- 2026-10-29)
+    local g = worldGroupByName(kt, name)
+    if not g then
+        local last, first = string.match(name, "^.*: (.-)$"), string.match(name, "^(.-): ")
+        g = (last and worldGroupByName(kt, last)) or (first and worldGroupByName(kt, first))
+    end
+    if not g and fn then
+        local ig = kt.group[fn]
+        if ig == "danger" or ig == "move" then g = ig elseif ig then g = "use" end
+    end
+    local icon = worldIcon(kt, name, fn)
     return icon and texOf(icon) or nil, g
 end
 

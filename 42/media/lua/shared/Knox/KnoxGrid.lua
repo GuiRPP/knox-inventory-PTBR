@@ -550,6 +550,20 @@ KnoxGrid.pending = {}       -- item -> record
 KnoxGrid.pendingEpoch = 0   -- bumped when a move ends, so grids rebuild at once
 local PENDING_MAX_MS = 60000
 
+-- Actions the game ends on their animation's event (taking a thing off, hanging it
+-- on the belt or in a quick slot: their maxTime is -1) have no time of their own -
+-- their progress reads 0 all along. A swap of two quick slots (taken off, hung on)
+-- jumped to half and stood there (the author, 2026-10-29). Such a step is filled by
+-- the time: as long as the same action took the last time (at first ANIM_FIRST_MS),
+-- never quite to its end before it is done.
+local ANIM_MS = {}               -- action type -> how long it took the last time
+local ANIM_FIRST_MS = 500
+local ANIM_MS_PER_WEIGHT = 20    -- (a step's weight is its maxTime: ~50 a second)
+
+local function animMs(a)
+    return ANIM_MS[a.Type or ""] or ANIM_FIRST_MS
+end
+
 local function queueOf(player)
     local queues = ISTimedActionQueue and ISTimedActionQueue.queues
     local q = queues and queues[player]
@@ -576,6 +590,7 @@ function KnoxGrid.track(player, items, source, target, queueFn)
     for i = n0 + 1, #q do
         local a = q[i]
         local wgt = math.max(1, tonumber(a.maxTime) or 1)
+        if a.maxTime == -1 then wgt = math.max(1, animMs(a) / ANIM_MS_PER_WEIGHT) end
         table.insert(steps, {action = a, weight = wgt, item = a.queueList and a.item or nil})
         total = total + wgt
     end
@@ -635,6 +650,12 @@ end
 
 local function deltaOf(a)
     if not a.action then return 0 end
+    if a.maxTime == -1 then
+        -- (by the time since it is under way: see ANIM_MS)
+        local now = getTimestampMs()
+        if not a.knoxStartMs then a.knoxStartMs = now end
+        return math.max(0, math.min(0.95, (now - a.knoxStartMs) / animMs(a)))
+    end
     return math.max(0, math.min(1, a:getJobDelta() or 0))
 end
 
@@ -666,6 +687,11 @@ local function progressOf(rec)
                     any = true
                     left = left + s.weight
                     if i == 1 then under = under + s.weight end
+                elseif s.action.knoxStartMs and not s.timed then
+                    -- (an animation's step just done: how long such takes, for the next time)
+                    s.timed = true
+                    local ms = getTimestampMs() - s.action.knoxStartMs
+                    ANIM_MS[s.action.Type or ""] = math.max(150, math.min(3000, ms))
                 end
             end
         end

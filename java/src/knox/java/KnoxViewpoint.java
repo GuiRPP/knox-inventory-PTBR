@@ -158,6 +158,16 @@ public class KnoxViewpoint {
         return viewEnabled != null && get(viewEnabled, false);
     }
 
+    /**
+     * Is Viewpoint's cursor mode on right now? (false without Viewpoint) - turned off in
+     * the car, the radio's card over the dashboard folds away (the author, 2026-10-29).
+     */
+    @LuaMethod(name = "knoxViewpointCursorOn", global = true)
+    public static boolean knoxViewpointCursorOn() {
+        Field f = field();
+        return f != null && get(f, false);
+    }
+
     /** Cursor on, and the view told at once that it doesn't hold the mouse (no capture for a frame). */
     private static void free() {
         set(cursorMode, true);
@@ -454,12 +464,15 @@ public class KnoxViewpoint {
     //   LootRows.move     the wheel (and a pad's up / down) moves Knox's choice
     //   LootMenu.asks     the take key is the panel's, whatever Viewpoint's own rows hold
     //   LootMenu.take     take and take all go to Knox; the open-window key stays Viewpoint's
+    //   InteractActions.update  anything the character finished counts as a run: the actions gathered anew
     // Lua asks each frame what is looked at and what was pressed (knoxVpPanel*).
     // A part of this not found (another Viewpoint) leaves Viewpoint's own panel.
 
     /** Knox draws the panel (Lua: knoxVpPanelOwn). Public: read by the patches inside Viewpoint. */
     public static volatile boolean panelOwned;
     private static int wheelAcc, pressed, takeKey = -1;
+    /** Knox's panel has a row chosen its take key does something with (Lua: knoxVpPanelWants). */
+    private static volatile boolean panelWants = true;
 
     private static boolean panelLooked;
     private static Field lmShown, lmLoot, lmPending, lmTarget, lmHeld;   // LootMenu's
@@ -468,6 +481,9 @@ public class KnoxViewpoint {
     private static Method iaCount, iaLabel, iaEnabled, iaProgress, iaTitle, iaRun;   // InteractActions'
     private static Method kiSlot, kiMenu, title, groundTitle;
     private static Object bindTake, bindAll;                              // Keys.LOOT_TAKE, Keys.LOOT_TAKE_ALL
+    private static Method iaVersion;                                      // (may be missing: the panel works on)
+    private static Field iaRan;
+    private static boolean wasBusy;
 
     private static Field declared(Class<?> c, String name) throws ReflectiveOperationException {
         Field f = c.getDeclaredField(name);
@@ -514,6 +530,15 @@ public class KnoxViewpoint {
                 groundTitle = method(rows, "groundTitle");
                 bindTake = declared(keys, "LOOT_TAKE").get(null);
                 bindAll = declared(keys, "LOOT_TAKE_ALL").get(null);
+                // (the actions gathered anew and the nudge: without them the panel
+                // only misses a change of an action's name)
+                try {
+                    iaVersion = method(ia, "version");
+                    iaRan = declared(ia, "ran");
+                } catch (Throwable t) {
+                    iaVersion = null;
+                    iaRan = null;
+                }
                 // (the target last: it is what says the parts are all here)
                 lmTarget = declared(lm, "target");
             } catch (Throwable t) {
@@ -661,6 +686,38 @@ public class KnoxViewpoint {
         }
     }
 
+    /**
+     * How many times Viewpoint has gathered the actions (it counts each gathering):
+     * a stove turned on keeps two actions, "Turn on" became "Turn off" - the
+     * panel builds its rows anew when this changes (the author, 2026-10-29).
+     */
+    @LuaMethod(name = "knoxVpPanelActionsVersion", global = true)
+    public static int knoxVpPanelActionsVersion() {
+        try {
+            return panel() && iaVersion != null ? (Integer) iaVersion.invoke(null) : 0;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /**
+     * InteractActions.update: Viewpoint gathers the actions again only after one
+     * run from its panel is done (or the thing's picture changed). While Knox draws
+     * the panel, anything the character finished - a stove turned on with E or in
+     * Knox's stove window, a window smashed by a swing - counts as such a run, so
+     * what is shown follows the world (the author, 2026-10-29).
+     */
+    public static void actionsUpdate(IsoPlayer player) {
+        if (!panelOwned || iaRan == null || player == null) return;
+        try {
+            boolean busy = !player.getCharacterActions().isEmpty();
+            if (wasBusy && !busy) iaRan.setBoolean(null, true);
+            wasBusy = busy;
+        } catch (Throwable t) {
+            iaRan = null;
+        }
+    }
+
     /** The actions' heading Viewpoint gives (a door's name...), or nil. */
     @LuaMethod(name = "knoxVpPanelActionsTitle", global = true)
     public static String knoxVpPanelActionsTitle() {
@@ -686,6 +743,12 @@ public class KnoxViewpoint {
         int n = wheelAcc;
         wheelAcc = 0;
         return n;
+    }
+
+    /** Has the panel a row chosen to run or take (set by Lua when it changes)? Without one the take key is the game's. */
+    @LuaMethod(name = "knoxVpPanelWants", global = true)
+    public static void knoxVpPanelWants(boolean on) {
+        panelWants = on;
     }
 
     /** A key pressed since asked: 1 take, 2 take all, 0 none. */
@@ -737,6 +800,9 @@ public class KnoxViewpoint {
             Object bind = kiMenu.invoke(null, key);
             if (bind == null) return result;
             if (bind == bindTake) {
+                // (only with something chosen to run or take: else the game's - F held at a
+                // fence climbs it, as with the panel shut; the author, 2026-10-29)
+                if (!panelWants) return 0;
                 takeKey = key;
                 return 1;
             }
@@ -790,6 +856,14 @@ public class KnoxViewpoint {
         @Patch.OnEnter(skipOn = true)
         public static boolean enter() {
             return KnoxViewpoint.take();
+        }
+    }
+
+    @Patch(className = "viewpoint.interact.InteractActions", methodName = "update")
+    public static class PanelActionsDone {
+        @Patch.OnEnter
+        public static void enter(@Patch.Argument(0) IsoPlayer player) {
+            KnoxViewpoint.actionsUpdate(player);
         }
     }
 }

@@ -35,6 +35,7 @@ Base.IceHockeyStick = 1x4
 Base.LeafRake = 1x4
 Base.LongHandle = 1x3
 Base.LongStick = 1x5
+Base.Macandcheese = 1x2
 Base.MenuCard = 1x1
 Base.Notebook = 1x1
 Base.Oxygen_Tank = 2x3

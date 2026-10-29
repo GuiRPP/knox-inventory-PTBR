@@ -64,14 +64,72 @@ function KnoxQuickSlot:item()
     return hb and hb.attachedItems and hb.attachedItems[self.index]
 end
 
+--- The hotbar index an item is being dragged from (another quick slot), or nil.
+local function fromQuick()
+    local e = KnoxDrag.entity
+    local from = e and e.fromBody and e.slotId and string.match(e.slotId, "^quick:(%d+)$")
+    return from and tonumber(from) or nil
+end
+
+--- An item dragged here from quick slot `from`: can the two change places? (what is
+--- here goes to `from`, if there is anything - the author, 2026-10-29)
+function KnoxQuickSlot:canSwap(item, from)
+    local hb, slot = self:hotbar(), self:slot()
+    local other = hb and hb.availableSlot[from]
+    if not slot or not other or from == self.index or not hb:canBeAttached(slot, item) then return false end
+    local here = self:item()
+    return here == nil or hb:canBeAttached(other, here)
+end
+
 function KnoxQuickSlot:accepts(item)
     local hb, slot = self:hotbar(), self:slot()
     if not hb or not slot then return false end
+    local from = fromQuick()
+    if from then return self:canSwap(item, from) end
     -- from the body only out of a hand (the game's attach takes it out of the
-    -- hand first); worn things and other hotbar slots stay where they are
+    -- hand first); worn things stay where they are
     local e = KnoxDrag.entity
     if e.fromBody and e.slotId ~= "hand1" and e.slotId ~= "hand2" then return false end
     return item ~= self:item() and hb:canBeAttached(slot, item)
+end
+
+--- The game's attachment of `item` in hotbar slot `slot` (a bag on the back moves
+--- what the back holds: ISHotbar.attachItem's replacements).
+local function attachmentIn(hb, slot, item)
+    local def = slot.def
+    local at = def.attachments[item:getAttachmentType()]
+    if def.name == "Back" and hb.replacements and hb.replacements[item:getAttachmentType()] then
+        at = hb.replacements[item:getAttachmentType()]
+    end
+    return at
+end
+
+--- Item `item` from quick slot `from` here, what is here to `from`: the item is taken
+--- off and put on here (as the game's own replacing in a slot), and as it is put on,
+--- what was here hangs in `from` at once. (Two takings off and two puttings on in a
+--- row stuck: the game ends these actions on their animation's event, and the same
+--- animation once more doesn't start again - the move stood still, the author's
+--- bench 2026-10-29.)
+function KnoxQuickSlot:swapFrom(item, from)
+    local hb, player = self:hotbar(), self.screen:player()
+    local slot, other, here, index = self:slot(), hb.availableSlot[from], self:item(), self.index
+    KnoxGrid.track(player, {item}, {kind = "slot", id = "quick:" .. from}, {kind = "slot", id = "quick:" .. index}, function()
+        hb:setAttachAnim(item, slot.def)
+        ISTimedActionQueue.add(ISDetachItemHotbar:new(player, item))
+        local put = ISAttachItemHotbar:new(player, item, attachmentIn(hb, slot, item), index, slot.def)
+        if here then
+            local perform = put.perform
+            put.perform = function(a)
+                perform(a)
+                local at = attachmentIn(hb, other, here)
+                if at and at ~= "null" and player:getInventory():contains(here) then
+                    hb:attachItem(here, at, from, other.def, false)
+                    if syncItemFields then syncItemFields(player, here) end
+                end
+            end
+        end
+        ISTimedActionQueue.add(put)
+    end)
 end
 
 -- A quick slot's ready list (the inventory's FPS, stage 2 - the author, 2026-10-29):
@@ -226,9 +284,12 @@ function KnoxQuickSlot:onMouseUp(x, y)
     if KnoxDrag.isActive() then
         local item = KnoxDrag.entity.item
         local ok = self:accepts(item)
+        local from = fromQuick()
         local source = KnoxDrag.sourceInfo()
         KnoxDrag.cancel()
-        if ok then
+        if ok and from then
+            self:swapFrom(item, from)
+        elseif ok then
             local index = self.index
             KnoxGrid.track(self.screen:player(), {item}, source, {kind = "slot", id = "quick:" .. index}, function()
                 hb:attachItem(item, slot.def.attachments[item:getAttachmentType()], index, slot.def, true)

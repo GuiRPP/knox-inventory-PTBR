@@ -51,6 +51,7 @@ end
 VP = {owned = false, shown = false, kind = 3, locked = false, loot = true, containers = jlist({}),
       actions = {}, wheel = 0, pressed = 0, held = false, left = false, obj = nil, sq = nil}
 function knoxVpPanelOwn(on) VP.owned = on return on end
+function knoxVpPanelWants(on) VP.wants = on end
 function knoxVpPanelShown() return VP.shown end
 function knoxVpPanelKind() return VP.kind end
 function knoxVpPanelLocked() return VP.locked end
@@ -62,8 +63,15 @@ function knoxVpPanelTitle(c) return c and ("Title " .. c.type) or "Ground" end
 function knoxVpPanelActions() return #VP.actions end
 function knoxVpPanelActionLabel(i) return VP.actions[i + 1].label end
 function knoxVpPanelActionOn(i) return VP.actions[i + 1].on end
-function knoxVpPanelActionProgress(i) return VP.actions[i + 1].p or 0 end
-function knoxVpPanelActionsTitle() return "Door" end
+function knoxVpPanelActionProgress(i) local a = VP.actions[i + 1] return a and a.p or 0 end   -- (as the Java part's: 0 past the end)
+function knoxVpPanelActionsTitle() return VP.title or "Door" end
+-- (the game's tables the panel knows functions of: a car's doors, "Disassemble"; a thing's name)
+ISVehicleMenu = {onOpenDoor = function() end, onCloseDoor = function() end}
+ISDisassembleMenu = {disassemble = function() end}
+ISRadioAndTvMenu = {openRadioPanel = function() end, openTvPanel = function() end}
+ISMoveableSpriteProps = {fromObject = function(obj) return obj and obj.moveName and {name = obj.moveName} or nil end}
+Translator = {getMoveableDisplayName = function(n) return "Named " .. n end}
+function knoxVpPanelActionsVersion() return VP.version or 0 end
 VP.ran = {}
 function knoxVpPanelRun(i) table.insert(VP.ran, i) end
 function knoxVpPanelWheel() local w = VP.wheel VP.wheel = 0 return w end
@@ -99,6 +107,7 @@ function T.label(ui, s, band, c, o)
     return T.measure(nil, s)
 end
 function T.inkOrigin(s, x, y) return x, y end
+function T.inkBox(f, s) return 0, 2, T.measure(f, s), 12 end
 -- (as the real one: clipped to its line, the clip taken off)
 function T.marquee(ui) ui:setStencilRect() DRAWN.label = DRAWN.label + 1 ui:clearStencilRect() end
 function T.fontH() return 16 end
@@ -145,8 +154,14 @@ function getSoundManager() return {playUISound = function() SOUNDS = SOUNDS + 1 
 Events = {OnGameStart = {Add = function() end}}
 KnoxCompat = {vpHas = function() return true end, windowOpen = function() return false end,
               topDown = function() return VP.topDown == true end}
+-- (by a sub menu's name as the real one: "Wash: Socks" is "use"; "Yourself" has an icon of its own)
+local LOOK = {Wash = "use", Drink = "use", Fill = "use", Disassemble = "build"}
 KnoxContextMenu = {worldLook = function(label)
     if string.find(label, "Smash") then return {path = "smash"}, "danger" end
+    local head = string.match(label, "^(.-): ") or label
+    if LOOK[head] then return {path = head}, LOOK[head] end
+    if label == "Yourself" then return {path = "self"}, nil end
+    if label == "T-Shirt" or label == "Socks" or label == "Window" then return nil, nil end
     return {path = "icon"}, "door"
 end}
 

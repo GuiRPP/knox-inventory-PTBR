@@ -380,12 +380,22 @@ function KnoxEquipSlot:items()
 end
 
 --- Would dropping this item here do something?
+--- A hand slot, an item dragged here from the other hand?
+function KnoxEquipSlot:fromOtherHand()
+    local e = KnoxDrag.entity
+    return self.kind == "hand" and e ~= nil and e.fromBody and e.slotId == (self.arg and "hand2" or "hand1")
+end
+
 function KnoxEquipSlot:accepts(item)
     if self.kind == "hand" then
         local player = self:player()
-        if KnoxDrag.entity.fromBody and not (item:getAttachedSlot() and item:getAttachedSlot() > -1) then
+        -- (from the body: off the hotbar, or out of the other hand - the author, 2026-10-29)
+        if KnoxDrag.entity.fromBody and not (item:getAttachedSlot() and item:getAttachedSlot() > -1)
+                and not self:fromOtherHand() then
             return false
         end
+        -- (held in both hands - a big thing: it stays as it is)
+        if self:fromOtherHand() and player:getPrimaryHandItem() == player:getSecondaryHandItem() then return false end
         if self.arg then return player:getPrimaryHandItem() ~= item end
         return player:getSecondaryHandItem() ~= item and not item:isTwoHandWeapon()
     end
@@ -425,6 +435,20 @@ function E.equipHand(player, item, primary, source)
     local playerNum = player:getPlayerNum()
     KnoxGrid.track(player, {item}, source, {kind = "slot", id = primary and "hand1" or "hand2"}, function()
         ISInventoryPaneContextMenu.equipWeapon(item, primary, primary and item:isTwoHandWeapon(), playerNum)
+    end)
+end
+
+--- An item from the other hand into this one; what this hand holds goes to the
+--- other hand (a two-handed one only into the bag: one hand can't hold it).
+--- (the author, 2026-10-29: "can't move from the left hand straight to the right")
+function KnoxEquipSlot:swapHands(item, source)
+    local player, primary = self:player(), self.arg
+    local playerNum = player:getPlayerNum()
+    local here = primary and player:getPrimaryHandItem() or player:getSecondaryHandItem()
+    if here == item or (here and here:isTwoHandWeapon()) then here = nil end
+    KnoxGrid.track(player, {item}, source, {kind = "slot", id = self:targetId()}, function()
+        ISInventoryPaneContextMenu.equipWeapon(item, primary, false, playerNum)
+        if here then ISInventoryPaneContextMenu.equipWeapon(here, not primary, false, playerNum) end
     end)
 end
 
@@ -717,9 +741,14 @@ function KnoxEquipSlot:onMouseUp(x, y)
     if KnoxDrag.isActive() then
         local e = KnoxDrag.entity
         local ok = self:accepts(e.item)
+        local other = self:fromOtherHand()
         local source = KnoxDrag.sourceInfo()
         KnoxDrag.cancel()
-        if ok then self:equip(e.item, source) end
+        if ok and other then
+            self:swapHands(e.item, source)
+        elseif ok then
+            self:equip(e.item, source)
+        end
         return true
     end
     local p = self.press

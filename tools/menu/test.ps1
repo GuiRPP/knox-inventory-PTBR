@@ -11,4 +11,6 @@ if (-not $file) { $file = Join-Path $mod '42\media\lua\client\Knox\KnoxContextMe
 Push-Location $game
 try {
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $here 'stubs.lua') $file (Join-Path $here 'test.lua')
+    # Viewpoint's panel rows' icons (2026-10-29)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $here 'stubs.lua') (Join-Path $here 'worldlook_pre.lua') $file (Join-Path $here 'worldlook.lua')
 } finally { Pop-Location }
