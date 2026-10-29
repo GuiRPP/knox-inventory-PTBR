@@ -419,9 +419,12 @@ local function drawMeters(ui, s, L, player, right, y)
         local text = KnoxGrid.sizeText(L)
         return right - T.label(ui, text, {right, y, 0, T.sectionH}, T.color.dim, {font = T.fontText, align = "right"})
     end
-    -- (the cells counted a few times a second, not every frame)
+    -- (the cells counted by the grid's own build while the grid is up - KnoxGrid.cellsOf;
+    -- rolled up, it isn't built: then counted a few times a second, not every frame)
     local now = getTimestampMs()
-    if not s.cellsMs or now - s.cellsMs > 250 then
+    if now - (s.view.prerenderMs or 0) <= 250 then
+        s.cellsUsed = KnoxGrid.cellsOf(L)
+    elseif not s.cellsMs or now - s.cellsMs > 250 then
         s.cellsMs = now
         s.cellsUsed = KnoxGrid.usedCells(L.container)
     end

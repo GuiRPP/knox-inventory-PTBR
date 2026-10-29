@@ -397,8 +397,13 @@ end
 
 --- Id of this slot for moves ("hand1", "wear:head", ...).
 function KnoxEquipSlot:targetId()
-    if self.kind == "hand" then return self.arg and "hand1" or "hand2" end
-    return "wear:" .. self.arg
+    -- (made once: each slot asks for it three times a frame - a new string each,
+    -- the author's FPS task 2026-10-28)
+    if self.tid and self.tidArg == self.arg then return self.tid end
+    local id
+    if self.kind == "hand" then id = self.arg and "hand1" or "hand2" else id = "wear:" .. self.arg end
+    self.tid, self.tidArg = id, self.arg
+    return id
 end
 
 --- Slot a wearable item lands in: "wear:<slot>" (accessories for a mod's own location).
@@ -486,37 +491,38 @@ local function chevron(ui, r, dir, c)
     end
 end
 
-function KnoxEquipSlot:render()
-    local w, h = self:getWidth(), self:getHeight()
-    local items, leaving, progress = self:contents()
-    local idx = self:shownIndex(items)
-    local item = items[idx]
-    local over = self:isMouseOver()
-    local player = self:player()
-    local alpha = 1
-    local twoHandGhost = false
-    if leaving then
-        item, alpha = leaving, 0.4
-    elseif self.kind == "hand" and not self.arg and item and item == player:getPrimaryHandItem() then
-        twoHandGhost, alpha = true, 0.3     -- two-handed: shown faint in the second hand
-    end
+-- A slot's ready list (the inventory's FPS, stage 2 - the author, 2026-10-29): one per
+-- slot of each player, for good (Java keeps every list: a screen made anew takes the same
+-- ones). It holds the slot's cell, item and frame while the slot is not under the mouse
+-- and its pick panel is shut; the marks over the frame (a move, a hint, the item in use)
+-- are drawn after it as ever.
+local slotLists = {}
 
-    T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
-    if item and not twoHandGhost then
-        T.rect(self, 0, 0, w, h, T.category[T.categoryOf(item)], alpha)
+--- The fill of the slot's condition meter, nil for none. (Clothing or a weapon - asked
+--- of the item once, not every frame.)
+local function meterFrac(slot, item)
+    if not item then return nil end
+    if slot.meterFor ~= item then
+        slot.meterFor = item
+        slot.meterKind = instanceof(item, "Clothing") or instanceof(item, "HandWeapon")
     end
-    local live = item and not leaving
-    if over and not KnoxDrag.isActive() and live then self:drawRect(0, 0, w, h, 0.06, 1, 1, 1) end
+    if not slot.meterKind or item:getConditionMax() <= 0 then return nil end
+    return item:getCondition() / math.max(1, item:getConditionMax())
+end
+
+--- The slot's own look: its cell, the item, its condition, the name, the layers.
+local function drawSlotBody(self, w, h, items, idx, item, alpha, cat, hl, over, dy, da, frac, leaving)
+    T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
+    if cat then T.rect(self, 0, 0, w, h, cat, alpha) end
+    if hl then self:drawRect(0, 0, w, h, 0.06, 1, 1, 1) end
 
     local fh = T.fontTileH
     if item then
         local areaH = h - fh
         local side = math.floor(math.min(w, areaH) * 0.8)
-        local dy, da = T.settleIn(self, live and item or nil)   -- just put here: it settles in
         ISInventoryItem.renderItemIcon(self, item, math.floor((w - side) / 2), fh + math.floor((areaH - side) / 2) + dy,
             alpha * da, side, side)
-        if item:getConditionMax() > 0 and (instanceof(item, "Clothing") or instanceof(item, "HandWeapon")) then
-            local frac = item:getCondition() / math.max(1, item:getConditionMax())
+        if frac then
             local c = frac > 0.6 and T.color.good or (frac > 0.25 and T.color.warn or T.color.bad)
             T.tileMeter(self, 0, 0, w, h, frac, c, alpha, 0)
         end
@@ -540,35 +546,78 @@ function KnoxEquipSlot:render()
             chevron(self, rect, a[2], hot and T.color.accent or T.color.text)
         end
     end
-    -- under the mouse: the quick pick panel with the carried items that fit
-    -- (an empty slot also shows their number and breathes in sand when some do)
-    if not KnoxDrag.isActive() and not leaving and not twoHandGhost then
-        local open = KnoxSlotPicker.isOpenFor(self)
-        local canAdd = not item or self.kind == "wear"   -- a worn zone takes another layer
-        if canAdd and (over or open) then
-            local cands = self:candidates()
-            if over and not item then E.drawAvailable(self, w, h, #cands, false) end
-            if #cands > 0 then
-                if not item then T.target(self, 0, 0, w, h) end
-                if over then KnoxSlotPicker.want(self, self.label, cands, self:pickFn()) end
+end
+
+function KnoxEquipSlot:render()
+    local w, h = self:getWidth(), self:getHeight()
+    local items, leaving, progress = self:contents()
+    local idx = self:shownIndex(items)
+    local item = items[idx]
+    local over = self:isMouseOver()
+    local player = self:player()
+    local alpha = 1
+    local twoHandGhost = false
+    if leaving then
+        item, alpha = leaving, 0.4
+    elseif self.kind == "hand" and not self.arg and item and item == player:getPrimaryHandItem() then
+        twoHandGhost, alpha = true, 0.3     -- two-handed: shown faint in the second hand
+    end
+    local live = item and not leaving
+    local dragging = KnoxDrag.isActive()
+    local dy, da = 0, 1
+    if item then dy, da = T.settleIn(self, live and item or nil) end   -- just put here: it settles in
+    local frac = meterFrac(self, item)
+    local cat = item and not twoHandGhost and T.category[T.categoryOf(item)] or false
+    local open = not dragging and not leaving and not twoHandGhost and KnoxSlotPicker.isOpenFor(self)
+    local windowOpen = live and ((KnoxInspectWindow and KnoxInspectWindow.isOpen(item))
+        or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item)))
+
+    -- (from the ready list while the slot is not under the mouse and its pick panel is
+    -- shut: the key is all the slot shows - the item, its place, how it comes in, its
+    -- condition, the layers, its colour, a window about it)
+    local L
+    if not over and not open then
+        L = self.readyList
+        if not L then
+            local key = self.panel.playerNum .. self:targetId()
+            L = slotLists[key] or T.newList()
+            slotLists[key], self.readyList = L, L
+        end
+        local layers = (#items > 1 and not leaving) and idx * 100 + #items or 0
+        local flags = (leaving and 1 or 0) + (twoHandGhost and 2 or 0) + (windowOpen and 4 or 0)
+        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, frac or -1, layers, cat) then L = false end
+    end
+    if L ~= false then
+        drawSlotBody(self, w, h, items, idx, item, alpha, cat, over and not dragging and live, over, dy, da, frac, leaving)
+        -- under the mouse: the quick pick panel with the carried items that fit
+        -- (an empty slot also shows their number and breathes in sand when some do)
+        if not dragging and not leaving and not twoHandGhost then
+            local canAdd = not item or self.kind == "wear"   -- a worn zone takes another layer
+            if canAdd and (over or open) then
+                local cands = self:candidates()
+                if over and not item then E.drawAvailable(self, w, h, #cands, false) end
+                if #cands > 0 then
+                    if not item then T.target(self, 0, 0, w, h) end
+                    if over then KnoxSlotPicker.want(self, self.label, cands, self:pickFn()) end
+                end
             end
         end
-    end
 
-    -- drag feedback
-    local edge = (over and not KnoxDrag.isActive() and live) and T.color.tileHover
-        or (live and T.color.tileFrame or T.color.tileEdge)
-    if KnoxDrag.isActive() and over then
-        local ok = self:accepts(KnoxDrag.entity.item)
-        local c = ok and T.color.ok or T.color.bad
-        self:drawRect(0, 0, w, h, 0.22, c.r, c.g, c.b)
-        edge = c
+        -- drag feedback
+        local edge = (over and not dragging and live) and T.color.tileHover
+            or (live and T.color.tileFrame or T.color.tileEdge)
+        if dragging and over then
+            local ok = self:accepts(KnoxDrag.entity.item)
+            local c = ok and T.color.ok or T.color.bad
+            self:drawRect(0, 0, w, h, 0.22, c.r, c.g, c.b)
+            edge = c
+        end
+        if windowOpen then
+            edge = T.color.accent   -- a window about it is open (inspect, pouring)
+        end
+        if live then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
+        if L then T.listEnd(L) end
     end
-    if live and ((KnoxInspectWindow and KnoxInspectWindow.isOpen(item))
-            or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item))) then
-        edge = T.color.accent   -- a window about it is open (inspect, pouring)
-    end
-    if live then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
     -- what the hinted move would take off: red frame
     if not leaving and E.isReplaced(items) then T.replaceMark(self, 0, 0, w, h) end
     if live and KnoxContextMenu and KnoxContextMenu.isTarget(item) then
@@ -581,7 +630,7 @@ function KnoxEquipSlot:render()
         T.target(self, 0, 0, w, h)
     end
 
-    if over and live and not KnoxDrag.isActive() then KnoxTooltip.want(item, self.panel.playerNum) end
+    if over and live and not dragging then KnoxTooltip.want(item, self.panel.playerNum) end
 end
 
 --- The item a click or drag on this slot works with: the layer shown (not one in a move).
@@ -863,6 +912,10 @@ function KnoxEquipmentPanel:updateModel(player)
     knoxAvatarMirror(av.javaObject, player, player:getVehicle() == nil)
 end
 
+-- The panel's title and the model's box: a ready list per player, for good (the
+-- inventory's FPS, stage 2 - the author, 2026-10-29)
+local panelLists = {}
+
 function KnoxEquipmentPanel:prerender()
     local player = self:player()
     self.worn = E.collect(player)
@@ -887,15 +940,24 @@ function KnoxEquipmentPanel:prerender()
         hd = {days = days, first = first, last = last, title = T.upper(getText("IGUI_Knox_Equipment")), who = T.upper(who)}
         self.headText = hd
     end
-    T.text(self, hd.title, pad, pad, T.color.bright, T.fontHeader)
-    -- a long name or a long word for "day" must not run into the title
-    local room = w - pad * 3 - T.measure(T.fontHeader, hd.title)
-    -- (in capitals, in the heavier caption font, on the title's middle)
-    local wf = T.fontCaps
-    T.textRight(self, T.fit(hd.who, wf, room), w - pad, pad + math.floor((fh - T.fontH(wf)) / 2), T.color.text, wf)
-
-    -- model box frame
+    -- (from the ready list while the name, the day and the sizes stay)
     local b = self.modelBox
-    T.rect(self, b.x, b.y, b.w, b.h, T.color.cell, T.modelAlpha())
-    T.border(self, b.x, b.y, b.w, b.h, T.color.border)
+    local L = panelLists[self.playerNum]
+    if not L then
+        L = T.newList()
+        panelLists[self.playerNum] = L
+    end
+    if not T.listDraw(self, L, hd, w, b.x * 10000 + b.y, b.w * 10000 + b.h) then
+        T.text(self, hd.title, pad, pad, T.color.bright, T.fontHeader)
+        -- a long name or a long word for "day" must not run into the title
+        local room = w - pad * 3 - T.measure(T.fontHeader, hd.title)
+        -- (in capitals, in the heavier caption font, on the title's middle)
+        local wf = T.fontCaps
+        T.textRight(self, T.fit(hd.who, wf, room), w - pad, pad + math.floor((fh - T.fontH(wf)) / 2), T.color.text, wf)
+
+        -- model box frame
+        T.rect(self, b.x, b.y, b.w, b.h, T.color.cell, T.modelAlpha())
+        T.border(self, b.x, b.y, b.w, b.h, T.color.border)
+        T.listEnd(L)
+    end
 end

@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 63
+T.JAVA_NEEDED = 66
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -374,6 +374,7 @@ end
 --- colour table sees the change). Also handed to the Java part (tooltips, the
 --- loading screen), when it has the call.
 function T.applySkin()
+    T.listEpoch = (T.listEpoch or 0) + 1   -- (the ready lists drawn with the old colours: anew)
     local id = T.skin()
     local over = {}
     for _, sk in ipairs(T.SKINS) do
@@ -504,6 +505,7 @@ end
 --- 48 px: the mockup's 20 / 17 / 15 / 14 / 12 px).
 --- 1280x720: 32, 1366x768: 34, 1280x1024: 37, 1920x1080: 48, 3440x1440: 64.
 function T.refresh()
+    T.listEpoch = (T.listEpoch or 0) + 1   -- (sizes and fonts change: the ready lists anew)
     local sw, sh = getCore():getScreenWidth(), getCore():getScreenHeight()
     local byHeight = sh * 48 / 1080
     local byWidth = (sw - 8) / 34
@@ -594,20 +596,28 @@ end
 --- accents and tails - a digit centred by those sits off the middle.
 -- (kept by font and text: every caption asks twice a frame - its own box and a
 -- capital's - each a call into Java and a pattern match; emptied when it grows)
-local inkCache, inkCount = {}, 0
+-- (by font, then by text: a key made of the two was a new string each ask, twice
+-- a caption - 140 captions a frame, the author's FPS task 2026-10-28)
+local inkCache, inkCount = {}, 0   -- font key -> text -> {left, top, right, bottom}
 
 local function inkBox(font, s)
     if type(font) == "table" and knoxTextInk then
-        local key = font.key .. "|" .. s
-        local box = inkCache[key]
+        local byFont = inkCache[font.key]
+        local box = byFont and byFont[s]
         if box then return box[1], box[2], box[3], box[4] end
         local ink = knoxTextInk(font.style, font.size, s)
         local l, t, r, b = string.match(ink or "", "^(-?%d+),(-?%d+),(-?%d+),(-?%d+)$")
         if l then
-            box = {tonumber(l), tonumber(t), tonumber(r), tonumber(b)}
+            -- (5th: the pixel a number starting with "1" goes back - see inkStart)
+            box = {tonumber(l), tonumber(t), tonumber(r), tonumber(b),
+                   (string.byte(s, 1) == 49 and string.find(s, "^%d+$")) and -1 or 0}
             inkCount = inkCount + 1
-            if inkCount > 4000 then inkCache, inkCount = {}, 1 end
-            inkCache[key] = box
+            if inkCount > 4000 then inkCache, inkCount, byFont = {}, 1, nil end
+            if not byFont then
+                byFont = {}
+                inkCache[font.key] = byFont
+            end
+            byFont[s] = box
             return box[1], box[2], box[3], box[4]
         end
     end
@@ -617,19 +627,33 @@ end
 -- each letter's pixels themselves: left, top, right, bottom from where it is drawn)
 T.inkBox = inkBox
 
-function T.inkCentre(ui, s, x, y, w, h, r, g, b, a, font)
-    font = font or T.fontCaps
-    local left, _, right = inkBox(font, s)
+-- where T.inkCentre starts drawing `s` in the box x, y, w, h
+-- (the boxes taken from the cache as they are when both are in it: some 1.6 us a
+-- caption went on asking for them value by value - offline, the game's Lua, 2026-10-28)
+local function inkStart(s, x, y, w, h, font)
+    local byFont = type(font) == "table" and inkCache[font.key]
+    local box, cap = byFont and byFont[s], byFont and byFont.H
     -- Up and down by a plain capital's height, whatever the text: letters with a
     -- tail (Д, Щ, Ц) or a mark (Ё, Й) moved a caption off the line, and a number
     -- next to it then sat on another level ("НАЙДЕНО 4" - seen 2026-10-14). So
     -- every caption and number in a bar of the same height stands on one line.
+    -- (a number starting with "1": by its pixels it looks pushed right - the eye
+    -- takes its stem, not its flag, for its middle; a pixel back, as type is set)
+    if box and cap then
+        return x + math.floor((w - (box[3] - box[1])) / 2 + 0.5) - box[1] + box[5],
+            y + math.floor((h - (cap[4] - cap[2])) / 2 + 0.5) - cap[2]
+    end
+    local left, _, right = inkBox(font, s)
     local _, top, _, bottom = inkBox(font, "H")
     local tx = x + math.floor((w - (right - left)) / 2 + 0.5) - left
     local ty = y + math.floor((h - (bottom - top)) / 2 + 0.5) - top
-    -- (a number starting with "1": by its pixels it looks pushed right - the eye
-    -- takes its stem, not its flag, for its middle; a pixel back, as type is set)
-    if string.sub(s, 1, 1) == "1" and string.find(s, "^%d+$") then tx = tx - 1 end
+    if string.byte(s, 1) == 49 and string.find(s, "^%d+$") then tx = tx - 1 end
+    return tx, ty
+end
+
+function T.inkCentre(ui, s, x, y, w, h, r, g, b, a, font)
+    font = font or T.fontCaps
+    local tx, ty = inkStart(s, x, y, w, h, font)
     if ui == nil then return tx, ty end   -- (asked only where the text would start: T.inkOrigin)
     T.drawText(ui, s, tx, ty, r, g, b, a, font)
     if T.layoutDebug() and s ~= "" then T.debugInk(ui, {x, y, w, h}, tx, ty, s, font, true) end
@@ -690,8 +714,10 @@ end
 --- Text in the band r = {x, y, w, h}: up and down by a capital's pixels;
 --- opts.align "left" (default: starts at x), "right" (ends at x + w) or
 --- "centre" (by its pixels). opts.font (T.fontCaps), opts.a. Returns its width.
+local NO_OPTS = {}   -- (T.label only reads its options: none given, no table made each call)
+
 function T.label(ui, s, r, c, opts)
-    opts = opts or {}
+    opts = opts or NO_OPTS
     local font = opts.font or T.fontCaps
     local align = opts.align or "left"
     s = s or ""
@@ -852,7 +878,7 @@ function T.countPlate(ui, st, text, right, y, h, on, inset, a)
 end
 --- Where T.inkCentre would start drawing `s` in the box: x, y.
 function T.inkOrigin(s, x, y, w, h, font)
-    return T.inkCentre(nil, s, x, y, w, h, 0, 0, 0, 1, font)
+    return inkStart(s, x, y, w, h, font or T.fontCaps)
 end
 
 --- A number on a plate that rolls when it changes, as the clock's digits do:
@@ -894,14 +920,81 @@ function T.rollNumber(ui, st, s, x, y, w, h, r, g, b, a, font)
 end
 --- Draw text at x,y of element `ui` (same arguments as ISUIElement:drawText).
 function T.drawText(ui, s, x, y, r, g, b, a, font)
-    if s == nil or not ui.javaObject then return end
+    local jo = ui.javaObject
+    if s == nil or not jo then return end
     font = font or T.fontText
     if type(font) == "table" then
-        knoxDrawText(font.style, font.size, s, ui:getAbsoluteX() + x + ui:getXScroll(),
-            ui:getAbsoluteY() + y + ui:getYScroll(), r, g, b, a)
+        -- (where the element is, asked of its Java object straight: ISUIElement's
+        -- getAbsoluteX and the rest are a Lua call each round the same - 140 texts
+        -- a frame, the author's FPS task 2026-10-28; none of Knox's drawn-on
+        -- elements has them of its own)
+        knoxDrawText(font.style, font.size, s, jo:getAbsoluteX() + x + jo:getXScroll(),
+            jo:getAbsoluteY() + y + jo:getYScroll(), r, g, b, a)
     else
         ui:drawText(s, x, y, r, g, b, a, font)
     end
+end
+
+-- Ready lists (the inventory's FPS, stage 1 - the author, 2026-10-28): a part of a
+-- window that looks the same frame after frame is drawn from Lua once, while Java
+-- (KnoxDrawList) writes down what it drew, and is drawn again by Java alone until
+-- its key changes - everything the part shows hangs on: what it says, where, what is
+-- under the mouse. Use:
+--     if not T.listDraw(self, L, k1, k2, k3, k4, k5) then   -- (up to k8: a slot's, 2026-10-29)
+--         ...draw the part as ever...
+--         T.listEnd(L)
+--     end
+-- (L = T.newList() once per part - and for good: Java keeps every list, so a window
+-- made anew takes the same ones; keys are compared with ==, so numbers, strings,
+-- booleans and the same tables). Drawn by Lua as before: an older jar, the settings
+-- window open (its sliders change the look under it), a list Java could not play
+-- back the same three times running (KnoxDrawList counts the sprites), and while
+-- T.listsOff is set (the bench's auto measure: the old way and the new one, side by side).
+T.listEpoch = T.listEpoch or 0
+local listCount = 0
+
+function T.newList()
+    listCount = listCount + 1
+    return {id = listCount, fails = 0}
+end
+
+--- Are the ready lists drawn now? (the jar has them, the settings window is shut,
+--- T.listsOff not set)
+function T.listsOn()
+    return not T.listsOff and knoxListDraw ~= nil and not (KnoxSettings and KnoxSettings.instance)
+end
+
+function T.listDraw(ui, L, k1, k2, k3, k4, k5, k6, k7, k8)
+    L.writing = false
+    if L.dead or not T.listsOn() then
+        L.ok = false
+        return false
+    end
+    local jo = ui.javaObject
+    if L.ok and L.ui == ui and L.epoch == T.listEpoch and L.k1 == k1 and L.k2 == k2 and L.k3 == k3
+            and L.k4 == k4 and L.k5 == k5 and L.k6 == k6 and L.k7 == k7 and L.k8 == k8 then
+        local drawn = knoxListDraw(jo, L.id)
+        if drawn == 2 then L.fails = 0 end
+        if drawn > 0 then return true end
+        L.fails = L.fails + 1
+        if L.fails >= 3 then
+            L.dead, L.ok = true, false
+            print("[Knox] ready list " .. L.id .. ": not the same when played back, drawn from Lua from now on")
+            return false
+        end
+    end
+    L.ok = false
+    L.ui, L.epoch, L.k1, L.k2, L.k3, L.k4, L.k5 = ui, T.listEpoch, k1, k2, k3, k4, k5
+    L.k6, L.k7, L.k8 = k6, k7, k8
+    knoxListBegin(jo, L.id)
+    L.writing = true
+    return false
+end
+
+function T.listEnd(L)
+    if not L.writing then return end
+    L.writing = false
+    L.ok = knoxListEnd()
 end
 
 function T.drawTextRight(ui, s, x, y, r, g, b, a, font)
@@ -1242,13 +1335,24 @@ end
 local fitCache, fitCount = {}, 0
 
 --- Text cut to fit `width`, with a trailing dot when shortened.
+-- (by font, width, text: a key made of the three was new strings each ask - every
+-- equipment slot's name, every frame; the author's FPS task 2026-10-28)
 function T.fit(s, font, width)
     local fkey = type(font) == "table" and font.key or tostring(font)
-    local key = s .. "|" .. fkey .. "|" .. width
-    local hit = fitCache[key]
+    local byFont = fitCache[fkey]
+    local byWidth = byFont and byFont[width]
+    local hit = byWidth and byWidth[s]
     if hit then return hit end
     fitCount = fitCount + 1
-    if fitCount > CACHE_MAX then fitCache, fitCount = {}, 1 end
+    if fitCount > CACHE_MAX then fitCache, fitCount, byFont, byWidth = {}, 1, nil, nil end
+    if not byFont then
+        byFont = {}
+        fitCache[fkey] = byFont
+    end
+    if not byWidth then
+        byWidth = {}
+        byFont[width] = byWidth
+    end
     local out = s
     if T.measure(font, s) > width then
         out = ""
@@ -1257,7 +1361,7 @@ function T.fit(s, font, width)
             if T.measure(font, cut) <= width then out = cut break end
         end
     end
-    fitCache[key] = out
+    byWidth[s] = out
     return out
 end
 

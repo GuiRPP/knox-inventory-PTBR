@@ -743,6 +743,10 @@ function KnoxLootPanel:runAction(a)
     end
 end
 
+-- The rows of the container list: ready lists by the row's place, a set per player,
+-- for good (the inventory's FPS, stage 2 - the author, 2026-10-29)
+local rowLists = {}
+
 function KnoxLootPanel:prerender()
     if self.queuedAction then
         local a = self.queuedAction
@@ -765,50 +769,26 @@ function KnoxLootPanel:prerender()
     self:setStencilRect(0, 0, m.listW, listH)
     self.rowRects = {}
     local y = -self.listScroll
-    for _, c in ipairs(self.containers) do
+    local lists = rowLists[self.playerNum]
+    if not lists then
+        lists = {}
+        rowLists[self.playerNum] = lists
+    end
+    for i, c in ipairs(self.containers) do
         local r = {0, y, m.listW, m.rowH}
         table.insert(self.rowRects, {rect = r, entry = c})
         local active = c.container == self.selected
         local hover = over and inRect(mx, my, r) and not c.locked
-        T.rect(self, r[1], r[2], r[3], r[4], active and T.color.header or T.color.cell, T.bgAlpha())
-        if hover then self:drawRect(r[1], r[2], r[3], r[4], 0.05, 1, 1, 1) end
         -- (while the chosen row's frame is sliding to it, the row has a plain one)
         local sliding = active and self.selMs ~= nil and T.anim((getTimestampMs() - self.selMs) / 140) < 1
         if sliding then self.selRow = r end
-        T.tileFrame(self, r[1], r[2], r[3], r[4], (active and not sliding) and T.color.accent or T.color.border)   -- two pixels thick
-        -- an item held over the row: it can be dropped on it, into that container
-        -- (green: it may go there, red: it may not)
-        if hover and KnoxDrag.isActive() then
-            local dc = (KnoxDrag.canDropInto(c.container, player) and not KnoxDrag.tooFarFor(player, c.container)) and T.color.ok or T.color.bad
-            self:drawRect(r[1], r[2], r[3], r[4], 0.18, dc.r, dc.g, dc.b)
-            T.tileFrame(self, r[1], r[2], r[3], r[4], dc)
-        end
+        local dragOver = hover and KnoxDrag.isActive()
         local ix = 12
         local iconS = math.floor((m.rowH - 7) * 0.7)   -- the icon's place; the picture itself: see below
         -- icon, name and count: centred in the row
         local area = m.rowH
         local iy = y + math.floor((area - iconS) / 2)
         local ty = y + math.floor((area - ft) / 2)
-        -- the picture sits on a small framed plate of its own, like an item on
-        -- its tile (bare on the row it looked lost); sand frame on the chosen one
-        local fp = 3
-        T.rect(self, ix - fp, iy - fp, iconS + fp * 2, iconS + fp * 2, T.color.header)
-        T.tileFrame(self, ix - fp, iy - fp, iconS + fp * 2, iconS + fp * 2, active and T.color.accent or T.color.tileEdge,
-            c.locked and 0.4 or 1)
-        if c.icon then
-            -- the game's container pictures are small pixel art: stretched or
-            -- squeezed to an odd size they blur. Drawn at their own size or a
-            -- whole number of times it, centred in the icon's place
-            local tw, th = c.icon:getWidth(), c.icon:getHeight()
-            local side = math.max(tw, th)
-            if side > 0 and side <= iconS then
-                local n = math.max(1, math.floor(iconS / side))
-                self:drawTextureScaled(c.icon, ix + math.floor((iconS - tw * n) / 2), iy + math.floor((iconS - th * n) / 2),
-                    tw * n, th * n, c.locked and 0.4 or 1, 1, 1, 1)
-            else
-                self:drawTextureScaledAspect(c.icon, ix, iy, iconS, iconS, c.locked and 0.4 or 1, 1, 1, 1)
-            end
-        end
         -- how many things are in it, in a small sand frame near the right edge.
         -- Not looked into yet: nobody knows - the plate is grey and empty;
         -- looked into: sand with the number, and the name a little dimmer
@@ -849,18 +829,8 @@ function KnoxLootPanel:prerender()
         local boxX = m.listW - 10 - boxW
         local cw = boxW + 4
         local nameX = ix + iconS + 12
+        local nameW = m.listW - nameX - cw - 12
         local nameC = c.locked and T.color.dim or (active and T.color.bright or (seen and T.color.dim or T.color.text))
-        -- (a long name is not cut with a dot: it slides to show its end and back -
-        -- the author, 2026-10-21: «Водительское сидень.»)
-        self.nameSt = self.nameSt or {}
-        local nst = self.nameSt[c.container]
-        if not nst then
-            nst = {}
-            self.nameSt[c.container] = nst
-        end
-        T.marquee(self, nst, c.name, nameX, ty, m.listW - nameX - cw - 12, nameC, T.fontText)
-        -- a plate with the number in the heavier caps font: sand with black
-        -- when looked into, plain grey when not yet; centred by its pixels
         -- The plate turns from grey to sand over a moment (a container just
         -- looked into, a search begun), and its number rolls when it changes.
         self.plates = self.plates or {}
@@ -885,29 +855,100 @@ function KnoxLootPanel:prerender()
             st.basePart = T.mixInto(st.basePart or {}, base, T.color.cell, st.part)
             base = st.basePart
         end
-        T.rect(self, boxX, ty - 2, boxW, boxH, base, pa)
-        if st.part > 0 then
-            -- half searched: a sand frame and a sand number on the dark plate
-            -- (2 px, as the frame of the row's icon - the user, 14.10)
-            local a = T.color.accent
-            T.tileFrame(self, boxX, ty - 2, boxW, boxH, a, st.part * pa)
-            T.rollNumber(self, st, countText, boxX, ty - 2, boxW, boxH, a.r, a.g, a.b, st.part, cf)
-        else
-            T.rollNumber(self, st, countText, boxX, ty - 2, boxW, boxH, 0.08, 0.08, 0.08, st.mix, cf)
-        end
-        if zero then
-            local dc = T.color.dim
-            T.inkCentre(self, "0", boxX, ty - 2, boxW, boxH, dc.r, dc.g, dc.b, 1 - st.mix, cf)   -- (by its pixels, as the plates' numbers)
-        end
-        -- (just clicked: the row dips for a moment)
         local rp = self.rowPress
-        if rp and rp.container == c.container then
-            local pt = T.anim((nowMs - rp.ms) / 130)
-            if pt < 1 then
-                self:drawRect(r[1] + 2, r[2] + 2, r[3] - 4, r[4] - 4, 0.22 * (1 - pt), 0, 0, 0)
+        local pressed = rp and rp.container == c.container
+
+        -- (from the row's ready list while nothing on it moves - no item held over
+        -- it, the chosen frame not sliding to it, its plate and number settled, its
+        -- name not sliding, not just clicked; the key is all the row shows. The
+        -- inventory's FPS, stage 2 - the author, 2026-10-29)
+        local L
+        if not dragOver and not sliding and not pressed and st.mix == want and st.part == wantPart
+                and T.measure(T.fontText, c.name) <= nameW then
+            local rolling
+            if st.text ~= countText then
+                rolling = st.text ~= nil and st.text ~= "" and countText ~= "" and T.anim(0) < 1
             else
-                self.rowPress = nil
+                rolling = countText ~= "" and st.old ~= nil and st.old ~= ""
+                    and T.anim((nowMs - (st.rollMs or 0)) / 180) < 1
             end
+            if not rolling then
+                L = lists[i]
+                if not L then
+                    L = T.newList()
+                    lists[i] = L
+                end
+                local flags = (active and 1 or 0) + (hover and 2 or 0) + (c.locked and 4 or 0) + (seen and 8 or 0)
+                    + (zero and 16 or 0) + (partial and 32 or 0) + (plateOff and 64 or 0)
+                if T.listDraw(self, L, c, y, flags, countText, c.name, c.icon or false, m) then L = false end
+            end
+        end
+        if L ~= false then
+            T.rect(self, r[1], r[2], r[3], r[4], active and T.color.header or T.color.cell, T.bgAlpha())
+            if hover then self:drawRect(r[1], r[2], r[3], r[4], 0.05, 1, 1, 1) end
+            T.tileFrame(self, r[1], r[2], r[3], r[4], (active and not sliding) and T.color.accent or T.color.border)   -- two pixels thick
+            -- an item held over the row: it can be dropped on it, into that container
+            -- (green: it may go there, red: it may not)
+            if dragOver then
+                local dc = (KnoxDrag.canDropInto(c.container, player) and not KnoxDrag.tooFarFor(player, c.container)) and T.color.ok or T.color.bad
+                self:drawRect(r[1], r[2], r[3], r[4], 0.18, dc.r, dc.g, dc.b)
+                T.tileFrame(self, r[1], r[2], r[3], r[4], dc)
+            end
+            -- the picture sits on a small framed plate of its own, like an item on
+            -- its tile (bare on the row it looked lost); sand frame on the chosen one
+            local fp = 3
+            T.rect(self, ix - fp, iy - fp, iconS + fp * 2, iconS + fp * 2, T.color.header)
+            T.tileFrame(self, ix - fp, iy - fp, iconS + fp * 2, iconS + fp * 2, active and T.color.accent or T.color.tileEdge,
+                c.locked and 0.4 or 1)
+            if c.icon then
+                -- the game's container pictures are small pixel art: stretched or
+                -- squeezed to an odd size they blur. Drawn at their own size or a
+                -- whole number of times it, centred in the icon's place
+                local tw, th = c.icon:getWidth(), c.icon:getHeight()
+                local side = math.max(tw, th)
+                if side > 0 and side <= iconS then
+                    local n = math.max(1, math.floor(iconS / side))
+                    self:drawTextureScaled(c.icon, ix + math.floor((iconS - tw * n) / 2), iy + math.floor((iconS - th * n) / 2),
+                        tw * n, th * n, c.locked and 0.4 or 1, 1, 1, 1)
+                else
+                    self:drawTextureScaledAspect(c.icon, ix, iy, iconS, iconS, c.locked and 0.4 or 1, 1, 1, 1)
+                end
+            end
+            -- (a long name is not cut with a dot: it slides to show its end and back -
+            -- the author, 2026-10-21: «Водительское сидень.»)
+            self.nameSt = self.nameSt or {}
+            local nst = self.nameSt[c.container]
+            if not nst then
+                nst = {}
+                self.nameSt[c.container] = nst
+            end
+            T.marquee(self, nst, c.name, nameX, ty, nameW, nameC, T.fontText)
+            -- a plate with the number in the heavier caps font: sand with black
+            -- when looked into, plain grey when not yet; centred by its pixels
+            T.rect(self, boxX, ty - 2, boxW, boxH, base, pa)
+            if st.part > 0 then
+                -- half searched: a sand frame and a sand number on the dark plate
+                -- (2 px, as the frame of the row's icon - the user, 14.10)
+                local a = T.color.accent
+                T.tileFrame(self, boxX, ty - 2, boxW, boxH, a, st.part * pa)
+                T.rollNumber(self, st, countText, boxX, ty - 2, boxW, boxH, a.r, a.g, a.b, st.part, cf)
+            else
+                T.rollNumber(self, st, countText, boxX, ty - 2, boxW, boxH, 0.08, 0.08, 0.08, st.mix, cf)
+            end
+            if zero then
+                local dc = T.color.dim
+                T.inkCentre(self, "0", boxX, ty - 2, boxW, boxH, dc.r, dc.g, dc.b, 1 - st.mix, cf)   -- (by its pixels, as the plates' numbers)
+            end
+            -- (just clicked: the row dips for a moment)
+            if pressed then
+                local pt = T.anim((nowMs - rp.ms) / 130)
+                if pt < 1 then
+                    self:drawRect(r[1] + 2, r[2] + 2, r[3] - 4, r[4] - 4, 0.22 * (1 - pt), 0, 0, 0)
+                else
+                    self.rowPress = nil
+                end
+            end
+            if L then T.listEnd(L) end
         end
 
         y = y + m.rowH + m.gap

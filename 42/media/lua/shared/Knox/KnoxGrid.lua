@@ -205,29 +205,57 @@ function KnoxGrid.getSize(container, player)
     return cols, rows
 end
 
+-- What things of a type are, as isStackable sees it - the same for all of them: a
+-- thing's class and tags come from its type's script. (Asked anew for each thing,
+-- some ten looks at Java each: 500 bullets in a bag, its build up to 9 ms four times
+-- a second - the author's bench 2026-10-28.)
+local kindOf = {}   -- full type -> "smoke" | "asked" (food players asked to stack) | "never" | "plain"
+-- (and whether a plain thing's type wears down: the game sets a thing's own maximum
+-- only where its type has one - a car's parts, furniture. Asked of each of 500 bullets
+-- every build and every count of their bag's cells: up to 5.3 ms a count, the author's
+-- detailed bench 2026-10-29. A fluid in it stays asked of each thing.)
+local wearsOf = {}   -- full type -> true | false
+
+local function kindOfType(item, ft)
+    local k
+    -- cigarettes and cigars are food that never spoils: they stack (not poisoned ones)
+    if KnoxFootprint.isSmoke(item) then
+        k = "smoke"
+    -- the small things players asked to stack (2026-10-19; only feathers, seeds and
+    -- grass, the author - magazines, hay, crackers and cans taken back) - and only as
+    -- long as each is like the others (not spoiled...)
+    elseif instanceof(item, "Food") then
+        k = KnoxGrid.askedToStack(item) and "asked" or "never"
+    elseif instanceof(item, "HandWeapon") or instanceof(item, "Clothing")
+        or instanceof(item, "InventoryContainer") or instanceof(item, "Literature")
+        or instanceof(item, "Moveable") or instanceof(item, "Radio") then
+        k = "never"
+    else
+        k = "plain"
+    end
+    kindOf[ft] = k
+    if k == "plain" then wearsOf[ft] = item:getConditionMax() > 0 end
+    return k
+end
+
 --- Items of one type that share a single tile (ammo, nails, pills...; also
 --- things used up bit by bit - batteries, tape, thread). How many: stackLimit.
-function KnoxGrid.isStackable(item)
+--- (`ft`: its full type, when the caller has it - one look at Java less)
+function KnoxGrid.isStackable(item, ft)
     -- the player's own line: "stack 1" never, "stack N" any alike ones (the item editor,
     -- the author 2026-10-25: whether a thing stacks and how many)
-    local o = KnoxFootprint.overrides[item:getFullType()]
+    ft = ft or item:getFullType()
+    local o = KnoxFootprint.overrides[ft]
     if o and o.stack then
         if o.stack <= 1 then return false end
         return KnoxGrid.isAlike(item)
     end
-    -- cigarettes and cigars are food that never spoils: they stack (not poisoned ones)
-    if KnoxFootprint.isSmoke(item) then return (item:getPoisonPower() or 0) <= 0 end
-    -- the small things players asked to stack (2026-10-19; only feathers, seeds and
-    -- grass, the author - magazines, hay, crackers and cans taken back) - and only as
-    -- long as each is like the others (not spoiled...)
-    if instanceof(item, "Food") then return KnoxGrid.askedToStack(item) and KnoxGrid.isPlainFood(item) end
-    if instanceof(item, "HandWeapon") or instanceof(item, "Clothing")
-        or instanceof(item, "InventoryContainer") or instanceof(item, "Literature")
-        or instanceof(item, "Moveable") or instanceof(item, "Radio") then
-        return false
-    end
+    local k = kindOf[ft] or kindOfType(item, ft)
+    if k == "smoke" then return (item:getPoisonPower() or 0) <= 0 end
+    if k == "asked" then return KnoxGrid.isPlainFood(item) end
+    if k == "never" then return false end
     if item:getFluidContainer() then return false end
-    if item:getConditionMax() > 0 and item:getCondition() < item:getConditionMax() then
+    if wearsOf[ft] and item:getCondition() < item:getConditionMax() then
         return false
     end
     return true
@@ -289,12 +317,22 @@ function KnoxGrid.isPlainFood(item)
     return ok and plain == true
 end
 
---- What tells apart things of one type that may not share a tile: the rounds in a
---- magazine, the title a piece of print got (the game gives magazines and papers
---- one of their own), the name a thing shows.
-function KnoxGrid.stateOf(item)
-    local s = KnoxGrid.rounds(item)
-    if instanceof(item, "Literature") or instanceof(item, "Food") then
+local named = {}   -- full type -> its things told apart by their names too: print, food (by its class, as kindOf)
+local loads = {}   -- full type -> it holds rounds (a magazine, a gun: its type's maximum)
+
+local function stateFor(item, ft)
+    local ld = loads[ft]
+    if ld == nil then
+        ld = (item:getMaxAmmo() or 0) > 0
+        loads[ft] = ld
+    end
+    local s = ld and KnoxGrid.rounds(item) or ""
+    local nm = named[ft]
+    if nm == nil then
+        nm = instanceof(item, "Literature") or instanceof(item, "Food")
+        named[ft] = nm
+    end
+    if nm then
         s = s .. "|" .. tostring(item:getDisplayName())
         if item:hasModData() then
             local md = item:getModData()
@@ -303,6 +341,13 @@ function KnoxGrid.stateOf(item)
         end
     end
     return s
+end
+
+--- What tells apart things of one type that may not share a tile: the rounds in a
+--- magazine, the title a piece of print got (the game gives magazines and papers
+--- one of their own), the name a thing shows.
+function KnoxGrid.stateOf(item)
+    return stateFor(item, item:getFullType())
 end
 
 --- What an item weighs carried loose, as the game counts it: the thing and what
@@ -338,9 +383,10 @@ function KnoxGrid.usedCells(container, extra)
     local n, stacks = 0, {}
     local function add(item)
         if item:isHidden() then return end
-        local w, h = KnoxFootprint.get(item)
-        if KnoxGrid.isStackable(item) then
-            local key = KnoxGrid.stackKey(item)
+        local ft = item:getFullType()   -- (asked once, handed on)
+        local w, h = KnoxFootprint.get(item, ft)
+        if KnoxGrid.isStackable(item, ft) then
+            local key = KnoxGrid.stackKey(item, ft)
             local s = stacks[key]
             if not s then
                 s = {count = 0, area = w * h, limit = math.max(1, KnoxGrid.stackLimit(item))}
@@ -377,8 +423,17 @@ function KnoxGrid.steppedBag(container, w, h, used, total)
     return footprintOf(cells, aspect, w, h)
 end
 
-local grown = {}       -- item ID -> {sig, w, h}
+local grown = {}       -- item ID -> {sig, w, h, bw, bh, waits}
 local grownN = 0
+
+-- The bags' own grids up on the screen (KnoxGridView sets them: container -> its view,
+-- its `layout` and `prerenderMs`): a bag's cells are taken from its grid's build, not
+-- counted again - 500 bullets moved, their bag counted anew up to 4.4 ms, ~7 times a
+-- second, just after its own grid had counted them (the author's bench 2026-10-29; the
+-- author: "давай попробуем" - the bag's tile in the grid around it a frame later).
+KnoxGrid.liveGrids = setmetatable({}, {__mode = "k"})
+local waitIn = nil   -- the layout being built (not a dry one): it may wait for a bag's grid
+local WAITS = 3      -- frames a bag's tile may wait in a row; then it is counted
 
 --- KnoxFootprint.get for a bag: its tile as it is filled now.
 function KnoxGrid.bagFootprint(item, w, h)
@@ -395,10 +450,33 @@ function KnoxGrid.bagFootprint(item, w, h)
     local sig = count .. "|" .. tostring(inv:getCapacityWeight()) .. "|" .. tostring(KnoxFootprint.gridScale()) .. "|" .. w .. "x" .. h
     local c = grown[id]
     if c and c.sig == sig then return c.w, c.h end
-    local gw, gh = KnoxGrid.steppedBag(inv, w, h, KnoxGrid.usedCells(inv), KnoxGrid.totalCells(inv, nil))
+    -- (the detailed counter: how often a bag is counted anew and what it costs - the
+    -- grids' long builds with 500 bullets moved, 2026-10-29)
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()
+    local used
+    local v = KnoxGrid.liveGrids[inv]
+    local L = v and v.layout
+    if L and L.itemCount == count and L.frame ~= nil and L.frame >= KnoxGrid.frame - 1 then
+        -- its own grid has just been built with these things in it: its count
+        used = KnoxGrid.cellsOf(L)
+        if pt then pt = Pf.part("part: bag growth, from its grid", pt, count) end
+    elseif waitIn and waitIn.frame == KnoxGrid.frame and c and c.bw == w and c.bh == h and (c.waits or 0) < WAITS
+        and v and v.prerenderMs and getTimestampMs() - v.prerenderMs <= 250 then
+        -- its grid is up and builds anew in a moment: the tile as it was, this once, and
+        -- the grid being built looks again the next frame (KnoxGridView.prerender)
+        c.waits = (c.waits or 0) + 1
+        waitIn.bagWait = true
+        if pt then Pf.part("part: bag growth, waits for its grid", pt, count) end
+        return c.w, c.h
+    else
+        used = KnoxGrid.usedCells(inv)
+        if pt then pt = Pf.part("part: bag growth, counted anew", pt, count) end
+    end
+    local gw, gh = KnoxGrid.steppedBag(inv, w, h, used, KnoxGrid.totalCells(inv, nil))
     if grownN > 4000 then grown, grownN = {}, 0 end
     if not c then grownN = grownN + 1 end
-    grown[id] = {sig = sig, w = gw, h = gh}
+    grown[id] = {sig = sig, w = gw, h = gh, bw = w, bh = h}
     return gw, gh
 end
 KnoxFootprint.bagGrowth = KnoxGrid.bagFootprint
@@ -419,6 +497,8 @@ function KnoxGrid.nestRefusal(item, dest, player)
     if c.item == item and c.dest == dest and now - c.ms < 300 then return c.why end
     local inv = holder:getInventory()
     if not inv or (inv:getCapacity() or 0) <= KnoxFootprint.NEST_CAPACITY then return nil end   -- an organizer doesn't grow
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()   -- (the detailed counter, 2026-10-29)
     local w0, h0 = KnoxFootprint.get(holder)
     local bw, bh = KnoxFootprint.getBase(holder)
     local w1, h1 = KnoxGrid.steppedBag(inv, bw, bh, KnoxGrid.usedCells(inv, item), KnoxGrid.totalCells(inv, nil))
@@ -453,6 +533,7 @@ function KnoxGrid.nestRefusal(item, dest, player)
         end
         if not ok then why = "IGUI_Knox_BagGrowsNoRoom" end
     end
+    if pt then Pf.part("part: bag in a bag, checked", pt, inv:getItems():size()) end
     nestCache = {item = item, dest = dest, ms = now, why = why}
     return why
 end
@@ -511,18 +592,29 @@ end
 -- A move was asked for each of its items and each faded tile of it, and every
 -- ask went through the whole queue for each of its steps: thirty things on their
 -- way at once cost some 29 ms a frame (offline bench; 30-35 FPS while they moved,
--- the author's test bench 2026-10-21). Made anew when the clock or the queue's
--- shape changes (an action done, a transfer's entry moved), so a move that has
--- just ended is never taken for running.
+-- the author's test bench 2026-10-21). Made anew when the queue's shape changes (an
+-- action done, a transfer's entry taken off - the game takes off a whole entry at
+-- once, up to 20 small things of a type: ISInventoryTransferAction - or merged), so a
+-- move that has just ended is never taken for running; when a move starts or ends;
+-- and every QI_MS all the same. (By the clock's millisecond, as at first, it was made
+-- anew every frame: 285 things on their way looked over ~175 times a second, up to
+-- 0.9 ms each - the author's detailed bench 2026-10-29.)
 local qi = {stamp = 0, ms = -1, n = -1, act = {}, entry = {}, pos = {}}
+local QI_MS = 250
 
 local function queueIndex(q)
     local now = getTimestampMs()
     local first = q[1]
     local fl = first and first.queueList
     local flN = fl and #fl or -1
-    if qi.q == q and qi.ms == now and qi.n == #q and qi.first == first and qi.flN == flN then return qi end
-    qi.q, qi.ms, qi.n, qi.first, qi.flN = q, now, #q, first, flN
+    if qi.q == q and now - qi.ms < QI_MS and qi.epoch == KnoxGrid.pendingEpoch and qi.n == #q
+        and qi.first == first and qi.flN == flN then
+        return qi
+    end
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()   -- (the detailed counter, 2026-10-29)
+    local seen = 0
+    qi.q, qi.ms, qi.epoch, qi.n, qi.first, qi.flN = q, now, KnoxGrid.pendingEpoch, #q, first, flN
     qi.stamp = qi.stamp + 1
     local act, entry, pos = {}, {}, {}
     for i, a in ipairs(q) do
@@ -531,11 +623,13 @@ local function queueIndex(q)
             for k, e in ipairs(a.queueList) do
                 for _, it in ipairs(e.items or {}) do
                     if act[it] == nil then act[it], entry[it] = a, k end
+                    seen = seen + 1
                 end
             end
         end
     end
     qi.act, qi.entry, qi.pos = act, entry, pos
+    if pt then Pf.part("part: moves list, queue looked over", pt, seen) end
     return qi
 end
 
@@ -545,47 +639,161 @@ local function deltaOf(a)
 end
 
 --- Progress 0..1 of a move, or nil when it is over (done or cancelled).
---- (worked out once per look at the queue, then kept on the move: all its items share it)
+--- (worked out once per look at the queue, then kept on the move: all its items share it.
+--- What of the move is still queued, and what of that the action under way carries, is
+--- the queue's: counted once per look at it. A frame takes only the action's progress -
+--- its steps were gone over every frame, 260 bullets: up to 3.7 ms, the author's
+--- detailed bench 2026-10-29. A move's progress goes on only in the game's tick: once
+--- a frame.)
 local function progressOf(rec)
     if getTimestampMs() - rec.t > PENDING_MAX_MS then return nil end
     local q = queueOf(rec.player)
     if not q then return nil end
     local ix = queueIndex(q)
-    if rec.pStamp == ix.stamp then return rec.p or nil end
-    local left, any = 0, false
-    for _, s in ipairs(rec.steps) do
-        if s.item then
-            local a = ix.act[s.item]
-            if a then
-                any = true
-                local delta = (a == q[1] and ix.entry[s.item] == 1) and deltaOf(a) or 0
-                left = left + s.weight * (1 - delta)
-            end
-        else
-            local i = ix.pos[s.action]
-            if i then
-                any = true
-                left = left + s.weight * (1 - (i == 1 and deltaOf(s.action) or 0))
+    if rec.pStamp ~= ix.stamp then
+        local left, under, any = 0, 0, false   -- weights still queued, of them the action's under way
+        for _, s in ipairs(rec.steps) do
+            if s.item then
+                local a = ix.act[s.item]
+                if a then
+                    any = true
+                    left = left + s.weight
+                    if a == q[1] and ix.entry[s.item] == 1 then under = under + s.weight end
+                end
+            else
+                local i = ix.pos[s.action]
+                if i then
+                    any = true
+                    left = left + s.weight
+                    if i == 1 then under = under + s.weight end
+                end
             end
         end
+        rec.pStamp, rec.left, rec.under, rec.any, rec.pFrame = ix.stamp, left, under, any, nil
     end
-    local p = any and (1 - left / rec.total) or nil
-    rec.pStamp, rec.p = ix.stamp, p or false
-    return p
+    if not rec.any then
+        rec.p = false
+        return nil
+    end
+    if rec.pFrame ~= KnoxGrid.frame then
+        local delta = rec.under > 0 and deltaOf(q[1]) or 0
+        rec.pFrame, rec.p = KnoxGrid.frame, 1 - (rec.left - rec.under * delta) / rec.total
+    end
+    return rec.p
 end
 
---- Moves still running: list of {item, rec, progress}. Drops finished ones.
+-- (an item's entry kept from one list to the next, its progress brought up to date:
+-- 500 bullets on their way made 500 tables a call, 2-3 calls a frame)
+local entryOf = setmetatable({}, {__mode = "k"})
+
+--- Moves still running: list of {item, rec, progress}; `list.slots` - those of
+--- them from or to a slot. Drops finished ones.
+--- (the progress worked out once a move, not once an item: 500 bullets moved, the
+--- list took up to 20 ms and most of each grid's build - the author, 2026-10-28)
+local listN = 0
+
+-- (made once a frame and handed to all who ask in it: the screen, the slots and
+-- every grid's build asked for it each, 2-3 times a frame - 300 us a frame with
+-- 500 bullets on their way, the author's bench 2026-10-28. The same list in a frame
+-- as long as the moves and each mover's queue are as they were: a move's progress
+-- goes on only in the game's tick, not while the screen is drawn. By the clock's
+-- millisecond, as at first, it was made anew 2 times a frame all the same - a frame
+-- takes several: the author's bench, 2026-10-28.)
+-- (and kept from frame to frame while they are as they were, only each move's progress
+-- brought up to date: made anew every frame, 260 bullets on their way cost 0.45-0.6 ms
+-- a frame, up to 4.5 ms - the author's detailed bench 2026-10-29)
+KnoxGrid.frame = 0   -- frames drawn
+if Events and Events.OnPreUIDraw then Events.OnPreUIDraw.Add(function() KnoxGrid.frame = KnoxGrid.frame + 1 end) end
+local last = {frame = -1}
+
+local function lastHolds()
+    if not last.list or last.epoch ~= KnoxGrid.pendingEpoch or last.pending ~= KnoxGrid.pending then
+        return false
+    end
+    for player, shape in pairs(last.queues) do
+        local q = queueOf(player)
+        local first = q and q[1]
+        local fl = first and first.queueList
+        if shape.q ~= q or shape.n ~= (q and #q or -1) or shape.first ~= first or shape.flN ~= (fl and #fl or -1) then
+            return false
+        end
+    end
+    return true
+end
+
 function KnoxGrid.pendingList()
-    local list, done = {}, {}
+    -- (the detailed counter: the list kept or made, its parts - 500 bullets moved:
+    -- ~0.6 ms a frame, now and then up to 7 ms, the author's bench 2026-10-29)
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()
+    if lastHolds() then
+        if last.frame == KnoxGrid.frame then
+            if pt then Pf.part("part: moves list, kept", pt) end
+            return last.list
+        end
+        -- a new frame, the same moves: their progress (one look a move); one over -
+        -- made anew below, which lets it go
+        local over = false
+        for _, rec in ipairs(last.recs) do
+            if not progressOf(rec) then over = true break end
+        end
+        if not over then
+            local list = last.list
+            for i = 1, #list do
+                local g = list[i]
+                g.progress = g.rec.p
+            end
+            last.frame = KnoxGrid.frame
+            if pt then Pf.part("part: moves list, progress brought up", pt, #list) end
+            return list
+        end
+    end
+    if pt then pt = Pf.part("part: moves list, looked if kept", pt) end
+    local progUs, c0 = 0, 0
+    listN = listN + 1
+    local list, slots, recP, done = {n = listN}, {}, {}, nil
+    local queues, recs = {}, {}
     for item, rec in pairs(KnoxGrid.pending) do
-        local p = progressOf(rec)
+        local p = recP[rec]
+        if p == nil then
+            if pt then c0 = Pf.now() end
+            p = progressOf(rec) or false
+            if pt then progUs = progUs + Pf.now() - c0 end
+            recP[rec] = p
+            if p then table.insert(recs, rec) end
+            if rec.player ~= nil and not queues[rec.player] then
+                local q = queueOf(rec.player)
+                local first = q and q[1]
+                local fl = first and first.queueList
+                queues[rec.player] = {q = q, n = q and #q or -1, first = first, flN = fl and #fl or -1}
+            end
+        end
         if p then
-            table.insert(list, {item = item, rec = rec, progress = p})
+            local g = entryOf[item]
+            if not g or g.rec ~= rec then
+                g = {item = item, rec = rec}
+                entryOf[item] = g
+            end
+            g.progress, g.listN = p, listN
+            table.insert(list, g)
+            local s, t = rec.source, rec.target
+            if (s and s.kind == "slot") or (t and t.kind == "slot") then table.insert(slots, g) end
         else
+            done = done or {}
             table.insert(done, item)
         end
     end
-    for _, item in ipairs(done) do finish(item) end
+    if pt then
+        Pf.addPart("part: moves list, progress of moves", progUs)
+        pt = Pf.part("part: moves list, made", pt, #list)
+    end
+    if done then
+        for _, item in ipairs(done) do finish(item) end
+    end
+    if pt and done then Pf.part("part: moves list, ended", pt, #done) end
+    list.slots = slots
+    last.frame, last.epoch, last.pending, last.queues, last.list = KnoxGrid.frame, KnoxGrid.pendingEpoch, KnoxGrid.pending, queues, list
+    last.recs = recs
     return list
 end
 
@@ -659,9 +867,16 @@ function KnoxGrid.pendingOf(item)
     return rec, p
 end
 
+--- Is the item in this list of moves (one that pendingList made)?
+function KnoxGrid.inList(item, list)
+    local g = entryOf[item]
+    return g ~= nil and g.listN == list.n
+end
+
 --- The move leaving a slot right now: item, progress; or nil.
+--- (`list.slots` when there: every slot looked over all 500 bullets of a move each frame)
 function KnoxGrid.leavingSlot(list, id)
-    for _, g in ipairs(list) do
+    for _, g in ipairs(list.slots or list) do
         local s = g.rec.source
         if s and s.kind == "slot" and s.id == id then return g.item, g.progress end
     end
@@ -670,7 +885,7 @@ end
 
 --- Is an item on its way to slot `id`?
 function KnoxGrid.arrivingSlot(list, id)
-    for _, g in ipairs(list) do
+    for _, g in ipairs(list.slots or list) do
         local t = g.rec.target
         if t and t.kind == "slot" and t.id == id then return true end
     end
@@ -736,9 +951,8 @@ end
 --- player. Items in a corpse, on a shelf or in a trunk can carry the game's own
 --- worn / attached flags (a zombie's clothes and bag), but they are loot, not
 --- something on the player's body, and must stay visible in their grid.
-local function lieOnPlayer(item, player)
+local function inPlayers(c, player)
     local inv = player:getInventory()
-    local c = item:getContainer()
     for _ = 1, 12 do
         if not c then return false end
         if c == inv then return true end
@@ -749,15 +963,24 @@ local function lieOnPlayer(item, player)
     return false
 end
 
+local function lieOnPlayer(item, player)
+    return inPlayers(item:getContainer(), player)
+end
+
+-- (`hand1`, `hand2`: the player's hands, looked at once for a whole grid's build)
+local function equippedOn(item, player, hand1, hand2)
+    -- items in hands stay in the main inventory; isEquipped() doesn't count them in B42
+    if item == hand1 or item == hand2 then return true end
+    if player:isEquipped(item) or item:isEquipped() then return true end
+    local slot = item:getAttachedSlot()
+    return slot ~= nil and slot > -1
+end
+
 --- Worn, in a hand or on the hotbar right now.
 function KnoxGrid.isEquippedNow(item, player)
     if not player then return false end
     if not lieOnPlayer(item, player) then return false end
-    -- items in hands stay in the main inventory; isEquipped() doesn't count them in B42
-    if item == player:getPrimaryHandItem() or item == player:getSecondaryHandItem() then return true end
-    if player:isEquipped(item) or item:isEquipped() then return true end
-    if item:getAttachedSlot() and item:getAttachedSlot() > -1 then return true end
-    return false
+    return equippedOn(item, player, player:getPrimaryHandItem(), player:getSecondaryHandItem())
 end
 
 -- Places ------------------------------------------------------------------------
@@ -984,8 +1207,10 @@ local function rounds(item)
 end
 KnoxGrid.rounds = rounds
 
-function KnoxGrid.stackKey(item)
-    return item:getFullType() .. KnoxGrid.stateOf(item) .. "|" .. tostring(item:getModData().knoxS or "")
+--- (`ft`: its full type, when the caller has it)
+function KnoxGrid.stackKey(item, ft)
+    ft = ft or item:getFullType()
+    return ft .. stateFor(item, ft) .. "|" .. tostring(item:getModData().knoxS or "")
 end
 
 function KnoxGrid.setStackId(items, id)
@@ -1015,55 +1240,167 @@ function KnoxGrid.canMerge(a, b)
     return a ~= nil and KnoxGrid.mergeRoom(a, b) == #a.items
 end
 
+-- KnoxGrid.isEquippedNow for a thing of `container` (`onPlayer`, `hand1`, `hand2`: of it and the player)
+local function equippedHere(item, container, player, onPlayer, hand1, hand2)
+    if not player then return false end
+    if item:getContainer() ~= container then return KnoxGrid.isEquippedNow(item, player) end
+    return onPlayer and equippedOn(item, player, hand1, hand2)
+end
+
 --- Group the container's visible items into entities (tiles). Items on the
 --- body or in a move are left out: a move shows as its faded copy instead.
-local function collectEntities(container, player)
+--- Also counts the cells it all takes, as KnoxGrid.usedCells does (KnoxGrid.cellsOf):
+--- the tiles' cells and stacks here, what is left out kept to be counted when asked.
+local function collectEntities(container, player, moving)
     local entities = {}
     local stacks = {}
+    local tally, loose, away, moved = {}, 0, nil, nil   -- stack key -> {n, area, limit, item}
     local items = container:getItems()
+    -- (the detailed counter: the look at "worn, in a hand" and at stacks, summed over
+    -- the things - the grids' long builds, 2026-10-29)
+    local Pf = KnoxPerf
+    local pd = Pf and Pf.detail and Pf.now
+    local wornUs, stackUs, sizeUs, c0 = 0, 0, 0, 0
+    -- (whether the container is on the player, and its hands: once for the grid, not
+    -- once a thing - a bag's chain of holders was walked up for each of 500 bullets)
+    local onPlayer = player ~= nil and inPlayers(container, player)
+    local hand1 = onPlayer and player:getPrimaryHandItem()
+    local hand2 = onPlayer and player:getSecondaryHandItem()
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         -- (not what the game hides from its own inventory either: item:isHidden() -
         -- the fists of unarmed-combat mods, Hardship Brawler's, Bruce Lee's gloves,
         -- piled up in the pockets as tiles: AssassinKody's and Eleorn's reports, 2026-10-16)
-        if not item:isHidden() and not KnoxGrid.isEquippedNow(item, player) and not KnoxGrid.pendingOf(item) then
-            -- (asked once, and the stack's key made only for what stacks)
-            local stackable = KnoxGrid.isStackable(item)
-            local ft = stackable and KnoxGrid.stackKey(item)
-            local stack = stackable and stacks[ft]
-            local limit = stack and KnoxGrid.stackLimit(item)
-            if stack and limit and #stack.items >= limit then stack = nil end   -- full: a new tile
-            if stack then
-                table.insert(stack.items, item)
+        if not item:isHidden() then
+            -- (on its way: by the list the build has just made, not asked again item
+            -- by item - two looks at the clock each, 33 000 a 10 s with 500 bullets moved)
+            local g = entryOf[item]
+            if pd then c0 = pd() end
+            local worn = not (g and g.listN == moving.n) and equippedHere(item, container, player, onPlayer, hand1, hand2)
+            if pd then wornUs = wornUs + pd() - c0 end
+            if g and g.listN == moving.n then
+                moved = moved or {}
+                table.insert(moved, g)
+            elseif worn then
+                away = away or {}
+                table.insert(away, item)
             else
-                local w, h = KnoxFootprint.get(item)
-                local e = {item = item, items = {item}, w = w, h = h}
-                if stackable then stacks[ft] = e end
-                table.insert(entities, e)
+                -- (asked once, and the stack's key made only for what stacks)
+                if pd then c0 = pd() end
+                local fullType = item:getFullType()   -- (asked once, handed on)
+                local stackable = KnoxGrid.isStackable(item, fullType)
+                local ft = stackable and KnoxGrid.stackKey(item, fullType)
+                local t = stackable and tally[ft]
+                local stack = t and stacks[ft]
+                -- (a stack's limit asked once a build: it is its type's - KnoxFootprint.stack)
+                local limit = t and t.limit
+                if t and not limit then
+                    limit = KnoxGrid.stackLimit(item)
+                    t.limit = limit
+                end
+                if stack and limit and #stack.items >= limit then stack = nil end   -- full: a new tile
+                if pd then stackUs = stackUs + pd() - c0 end
+                if stack then
+                    table.insert(stack.items, item)
+                    t.n = t.n + 1
+                else
+                    if pd then c0 = pd() end
+                    local w, h = KnoxFootprint.get(item, fullType)
+                    if pd then sizeUs = sizeUs + pd() - c0 end
+                    local e = {item = item, items = {item}, w = w, h = h}
+                    table.insert(entities, e)
+                    if stackable then
+                        stacks[ft] = e
+                        if t then
+                            t.n = t.n + 1
+                        else
+                            tally[ft] = {n = 1, area = w * h, item = item}
+                        end
+                    else
+                        loose = loose + w * h
+                    end
+                end
             end
         end
     end
-    return entities
+    if pd then
+        Pf.addPart("part: grid build 2a worn / in hand", wornUs)
+        Pf.addPart("part: grid build 2b stacks", stackUs)
+        Pf.addPart("part: grid build 2c sizes", sizeUs, #entities)
+    end
+    return entities, tally, loose, away, moved
+end
+
+--- How many cells the things in a built grid's container take: what KnoxGrid.usedCells
+--- says, from what the build has already looked at (once a build, kept on it).
+--- (the bags' meters counted them on their own four times a second: up to 6 ms a
+--- count for a bag of 500 bullets - the author's bench 2026-10-28)
+function KnoxGrid.cellsOf(L)
+    if L.used then return L.used end
+    local tally = L.tally
+    if not tally then return KnoxGrid.usedCells(L.container) end   -- (not a build's: emptyLike)
+    local n = L.loose
+    local function add(item, key)
+        if key then
+            local t = tally[key]
+            if t then t.n = t.n + 1 else tally[key] = {n = 1, item = item} end
+        else
+            local w, h = KnoxFootprint.get(item)
+            n = n + w * h
+        end
+    end
+    if L.away then
+        for _, item in ipairs(L.away) do add(item, KnoxGrid.isStackable(item) and KnoxGrid.stackKey(item)) end
+    end
+    -- (a thing on its way keeps its stack's key for the move - set before it starts,
+    -- KnoxDrag, KnoxActions: 500 bullets moved, each looked at once, not each build)
+    if L.moved then
+        for _, g in ipairs(L.moved) do
+            if g.cellKey == nil then g.cellKey = KnoxGrid.isStackable(g.item) and KnoxGrid.stackKey(g.item) end
+            add(g.item, g.cellKey)
+        end
+    end
+    for _, t in pairs(tally) do
+        if not t.area then
+            local w, h = KnoxFootprint.get(t.item)
+            t.area = w * h
+        end
+        local limit = t.n > 1 and math.max(1, t.limit or KnoxGrid.stackLimit(t.item)) or 1
+        n = n + math.ceil(t.n / limit) * t.area
+    end
+    L.used = n
+    return n
 end
 
 --- Build the grid for a container. Saves first-free places it picks - unless
 --- `dry`: then the places are only worked out, nothing is written on the items
 --- (what a hero carries, written for the menu's bag while the player may use
 --- the game's own inventory: KnoxMenuBag - their things must not change).
-function KnoxGrid.build(container, player, dry)
+--- `mayWait`: a grid on the screen, built again when it asks - a bag's tile in it
+--- may wait a frame for the bag's own grid (bagFootprint); a drop, an action, a dry
+--- build get every size at once.
+function KnoxGrid.build(container, player, dry, mayWait)
+    -- (the detailed counter: each step's time - the grids' long builds, 2026-10-29)
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()
     local cols, rows, limit = KnoxGrid.getSize(container, player)
     local key = KnoxGrid.containerKey(container, player)
     local layout = setmetatable({
         container = container, key = key, cols = cols, rows = rows, baseRows = rows, limit = limit,
         shape = KnoxGrid.shapeOf(container, player), cells = {}, placed = {}, overflow = {},
+        frame = KnoxGrid.frame,
     }, Layout)
+    local outerWait = waitIn
+    waitIn = (mayWait and not dry) and layout or nil
+    if pt then pt = Pf.part("part: grid build 0 size, shape", pt) end
 
     -- Moves first: the faded copy of an item leaving this grid keeps its old
     -- cells. The cells an item is coming to are held (nothing drawn there),
     -- but only after the tiles that lie in the grid have taken their places:
     -- items coming to join a stack must not push that stack off its cells.
     local seen, coming = {}, {}
-    for _, g in ipairs(KnoxGrid.pendingList()) do
+    local moving = KnoxGrid.pendingList()
+    for _, g in ipairs(moving) do
         local rec = g.rec
         if not seen[rec] then
             seen[rec] = true
@@ -1083,7 +1420,11 @@ function KnoxGrid.build(container, player, dry)
         end
     end
 
-    local entities = collectEntities(container, player)
+    if pt then pt = Pf.part("part: grid build 1 moves", pt, #moving) end
+
+    local entities
+    entities, layout.tally, layout.loose, layout.away, layout.moved = collectEntities(container, player, moving)
+    if pt then pt = Pf.part("part: grid build 2 things", pt, container:getItems():size()) end
     local homeless = {}
 
     -- Saved places. A stack keeps the place of its first member that has one.
@@ -1107,6 +1448,8 @@ function KnoxGrid.build(container, player, dry)
         local dw, dh = KnoxGrid.dims(c.e, c.t.r)
         if layout:fits(c.t.x, c.t.y, dw, dh) then layout:occupy(c.e, c.t.x, c.t.y, c.t.r) end
     end
+
+    if pt then pt = Pf.part("part: grid build 3 saved places", pt, #entities) end
 
     -- found in the world, never placed: at random free places, the biggest first;
     -- when one finds no room so (the others took it in bits), they all go back to
@@ -1149,6 +1492,8 @@ function KnoxGrid.build(container, player, dry)
         end
     end
 
+    if pt then pt = Pf.part("part: grid build 4 found in the world", pt) end
+
     -- (a tile that found no room: no tile at least as big either way finds any -
     -- the grid only fills up. Without this a shelf of 300 things that don't all
     -- fit looked over the whole grid for each of the rest: 55 of 56 ms a build)
@@ -1169,6 +1514,8 @@ function KnoxGrid.build(container, player, dry)
             table.insert(layout.overflow, e)
         end
     end
+
+    if pt then pt = Pf.part("part: grid build 5 new places", pt, #homeless) end
 
     -- Items the game put in although the grid has no room left (spawned,
     -- crafted, added by its own actions - it only checks weight): shown in
@@ -1206,7 +1553,10 @@ function KnoxGrid.build(container, player, dry)
         layout:occupy(e, bestX, bestY, r)
     end
 
+    if pt then Pf.part("part: grid build 6 not fitting", pt, #layout.overflow) end
+
     layout.itemCount = container:getItems():size()
+    waitIn = outerWait
     return layout
 end
 

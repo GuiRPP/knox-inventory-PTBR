@@ -5,6 +5,9 @@ KnoxSelect = KnoxSelect or {}
 local S = KnoxSelect
 
 S.items = {}   -- item -> true (every member of a selected stack)
+-- (toggles counted: S.items changed in place - a grid's ready list of quiet tiles,
+-- KnoxGridView renderGrid, is written anew; a new selection is a new S.items)
+S.toggles = S.toggles or 0
 
 function S.isSelected(entity)
     return entity ~= nil and S.items[entity.item] == true
@@ -15,6 +18,7 @@ function S.toggle(entity)
     for _, it in ipairs(entity.items) do
         if on then S.items[it] = true else S.items[it] = nil end
     end
+    S.toggles = S.toggles + 1
 end
 
 function S.clear()

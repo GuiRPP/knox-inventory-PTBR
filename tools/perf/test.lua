@@ -21,6 +21,7 @@ if perf ~= "1" then
     check("off: nothing written", FILES["knox_perf.txt"] == nil)
     P.mark("x")
     check("off: a mark writes nothing", FILES["knox_perf.txt"] == nil)
+    check("off: no detailed mode", P.setDetail == nil)
     print("perf off: " .. pass .. " pass, " .. fail .. " fail")
     return
 end
@@ -30,6 +31,10 @@ check("on: events taken over", Events.OnTick.Add ~= ORIGINAL_ADD)
 check("on: the file has its header", string.find(FILES["knox_perf.txt"] or "", "=== KnoxPerf on", 1, true) ~= nil)
 local own = #LISTS.OnPreUIDraw
 check("on: the counter's own frame handler is there, not wrapped as Knox's", own == 1 and P.knoxHandlers == 0, own)
+-- (its handlers of a frame's parts, 2026-10-28: set aside - the checks below count OnTick's list)
+check("on: the counter's own tick and UI-end handlers", #LISTS.OnTick == 1 and #LISTS.OnPostUIDraw == 1, #LISTS.OnTick)
+local ownTick, ownPost = LISTS.OnTick[1], LISTS.OnPostUIDraw[1]
+table.remove(LISTS.OnTick, 1)
 
 -- Knox's handler wrapped, a foreign one passed through
 local calls = 0
@@ -98,6 +103,7 @@ local base = {render = foreignFile(function() return "base" end)}
 KnoxScreen = setmetatable({prerender = knox(function() return "knox" end, 703)}, {__index = base})
 ISHotbar = {render = foreignFile(function() return "game" end)}
 local before, hotbarBefore = KnoxScreen.prerender, ISHotbar.render
+check("detail: not before a game has started", P.setDetail(true) == false and P.detail == false)
 fire("OnGameStart")
 fire("OnPreUIDraw")
 check("Knox's prerender wrapped", KnoxScreen.prerender ~= before and KnoxScreen.prerender() == "knox")
@@ -111,6 +117,10 @@ check("a second game start wraps nothing again", P.wrapped == 1, P.wrapped)
 -- the 10 s block
 FILES["knox_perf.txt"] = ""
 list[1](1, 1)
+ownTick()
+fire("OnPreUIDraw")
+ownPost()
+ownTick()
 NOW_MS = NOW_MS + 11000
 fire("OnPreUIDraw")
 local out = FILES["knox_perf.txt"] or ""
@@ -118,9 +128,70 @@ check("block: frames line", string.find(out, "\nT\t", 1, true) ~= nil or string.
 check("block: the handler's line", string.find(out, "KnoxMain.lua:169 OnTick", 1, true) ~= nil, out)
 check("block: the prerender's line", string.find(out, "KnoxScreen.prerender", 1, true) ~= nil, out)
 check("block: sizes line", string.find(out, "C\t", 1, true) ~= nil, out)
+check("block: the frame in three parts", string.find(out, "\tframe_us=tick>ui ", 1, true) ~= nil, out)
 check("block: handlers per event", string.find(out, "E\tOnTick=1/3", 1, true) ~= nil, out)
 check("block: window counters start again", P.recs["KnoxMain.lua:169 OnTick"].calls == 0)
 P.mark("reload 1")
 check("a mark is written", string.find(FILES["knox_perf.txt"], "M\t", 1, true) ~= nil)
+
+-- Knox's own time in a frame and the UI's longest part (2026-10-28: "no frame over
+-- 33 ms because of Knox"): a Knox handler of 20 ms in one frame, a UI of 40 ms
+local slowH = knox(function() NOW_US = NOW_US + 20000 end, 600)
+Events.OnTick.Add(slowH)
+FILES["knox_perf.txt"] = ""
+fire("OnPreUIDraw")
+ownPost()
+ownTick()
+LISTS.OnTick[#LISTS.OnTick]()
+fire("OnPreUIDraw")
+NOW_US = NOW_US + 40000
+ownPost()
+ownTick()
+NOW_MS = NOW_MS + 11000
+fire("OnPreUIDraw")
+local out2 = FILES["knox_perf.txt"] or ""
+check("Knox's frame: its longest", string.find(out2, "\tknox_max_ms=20.0\t", 1, true) ~= nil, out2)
+check("Knox's frame: over 8 and 16 ms once", string.find(out2, "\tknox_slow8=1\tknox_slow16=1", 1, true) ~= nil, out2)
+check("the UI's longest part and its slow frames", string.find(out2, "\tui_max_ms=40.0\tui_slow16=1\tui_slow33=1\t", 1, true) ~= nil, out2)
+Events.OnTick.Remove(slowH)
+
+-- the detailed mode: Knox's helpers timed, the drawing calls counted - inside Knox only;
+-- everything as it was once it is off
+ISUIElement = {drawRect = foreignFile(function() return "drawn" end)}
+KnoxTheme = {measure = knox(function(_, s) return #s end, 572)}
+getText = function(k) return k end
+local drawOrig, measureOrig, getTextOrig = ISUIElement.drawRect, KnoxTheme.measure, getText
+local drawer = knox(function() ISUIElement.drawRect({}) ISUIElement.drawRect({}) end, 700)
+Events.OnTick.Add(drawer)
+check("detail: off at first", P.detail == false)
+check("detail: switched on", P.setDetail(true) == true and P.detail == true)
+check("detail: a helper of Knox's timed, its result the same", KnoxTheme.measure ~= measureOrig and KnoxTheme.measure(nil, "abc") == 3)
+check("detail: the game's drawing wrapped, its result the same", ISUIElement.drawRect ~= drawOrig and ISUIElement.drawRect({}) == "drawn")
+check("detail: the game's getText timed", getText ~= getTextOrig and getText("x") == "x")
+check("detail: on twice changes nothing", P.setDetail(true) == true and ISUIElement.drawRect({}) == "drawn")
+FILES["knox_perf.txt"] = ""
+LISTS.OnTick[#LISTS.OnTick]()
+NOW_MS = NOW_MS + 11000
+fire("OnPreUIDraw")
+local out3 = FILES["knox_perf.txt"] or ""
+check("detail: two draws inside Knox, none of those outside", string.find(out3, "D\trect=2.0 ", 1, true) ~= nil, out3)
+check("detail: the handler's line has its draws", string.find(out3, "KnoxMain.lua:700 OnTick\td=2.0", 1, true) ~= nil, out3)
+check("detail: the block says so", string.find(out3, "\tdetail=on", 1, true) ~= nil, out3)
+check("detail: the game's getText called by the game is not counted", string.find(out3, "getText", 1, true) == nil, out3)
+-- parts of a slow function (the grids' long builds, 2026-10-29): time and n= a call
+local t0 = P.now()
+local t1 = P.part("part: test a", t0, 10)
+P.part("part: test a", t1, 30)
+P.addPart("part: test b", 5)
+FILES["knox_perf.txt"] = ""
+NOW_MS = NOW_MS + 11000
+fire("OnPreUIDraw")
+local out4 = FILES["knox_perf.txt"] or ""
+check("parts: a part's line, two calls, n a call", string.find(out4, "\t2\t[%d.]+\t[%d.]+\tpart: test a\tn=20.0") ~= nil, out4)
+check("parts: one without n has none", string.find(out4, "\t1\t5\t5\tpart: test b\r\n", 1, true) ~= nil, out4)
+check("detail: switched off", P.setDetail(false) == false and P.detail == false)
+check("detail: all put back", ISUIElement.drawRect == drawOrig and KnoxTheme.measure == measureOrig and getText == getTextOrig)
+check("detail: switching off marked", string.find(FILES["knox_perf.txt"], "\tdetail off", 1, true) ~= nil, FILES["knox_perf.txt"])
+Events.OnTick.Remove(drawer)
 
 print("perf on: " .. pass .. " pass, " .. fail .. " fail")

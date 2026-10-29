@@ -782,16 +782,23 @@ function F.resolveRaw(item, fullType)
     return c
 end
 
-local function answer(item)
-    local fullType = item:getFullType()
+local function answer(item, fullType)
+    fullType = fullType or item:getFullType()
     return cache[fullType] or resolve(item, fullType)
 end
 
 --- @return number w, number h  unrotated footprint in cells (short side, long side)
 --- (a bag with things in it takes more: F.bagGrowth, set by KnoxGrid)
-function F.get(item)
-    local c = answer(item)
-    if F.bagGrowth and instanceof(item, "InventoryContainer") then return F.bagGrowth(item, c.w, c.h) end
+--- (`fullType`: when the caller has it. Whether it is a bag is its type's, kept with
+--- its answer: asked of each of 500 bullets, the author's detailed bench 2026-10-29)
+function F.get(item, fullType)
+    local c = answer(item, fullType)
+    local bag = c.bag
+    if bag == nil then
+        bag = instanceof(item, "InventoryContainer") == true
+        c.bag = bag
+    end
+    if bag and F.bagGrowth then return F.bagGrowth(item, c.w, c.h) end
     return c.w, c.h
 end
 

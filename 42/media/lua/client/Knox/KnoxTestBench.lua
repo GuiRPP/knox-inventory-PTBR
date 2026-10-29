@@ -598,6 +598,7 @@ end
 --- Everything the bench made: off the floor, out of the pockets and bags, the backpack too.
 function B.cleanup(player)
     B.clearDump()
+    if B.clearStuffed then B.clearStuffed() end   -- (defined further down)
     B.removeBodies()
     if not player then return end
     local function walk(inv, depth)
@@ -878,7 +879,7 @@ local EDITOR_KIT = {"Base.Bag_Schoolbag", "Base.Bag_FannyPackFront", "Base.Jacke
                     "Base.Nails", "Base.Nails", "Base.Pen"}
 
 local function openEditor(p)
-    giveKit(p, EDITOR_KIT)
+    if p then giveKit(p, EDITOR_KIT) end   -- (from the main menu: no one to give it to)
     if KnoxEditor then KnoxEditor.open("Base.Bag_Schoolbag") end
 end
 
@@ -930,16 +931,430 @@ local function checkEditorErrors()
         getText("IGUI_KnoxTB_Res_EdErrors", tostring(n - editorErrors0), grp, w and "+" or "-")
 end
 
+-- Stage 2 of the Steam reports (2026-10-28) ------------------------------------------
+
+-- a white outline saved black (糕级冻雾): the options' colours; Knox's cell colour in
+-- one of them is the old fault's mark (the swatch painted, then read back on "Apply")
+local function checkColors()
+    local cell = T.color.cell
+    local ok, out = true, {}
+    for _, name in ipairs({"getObjectHighlitedColor", "getWorldItemHighlightColor", "getGoodHighlitedColor",
+                           "getBadHighlitedColor", "getTargetColor", "getNoTargetColor"}) do
+        local okc, c = pcall(function() return getCore()[name](getCore()) end)
+        if okc and c then
+            local r, g, b = c:getR(), c:getG(), c:getB()
+            if math.abs(r - cell.r) < 0.01 and math.abs(g - cell.g) < 0.01 and math.abs(b - cell.b) < 0.01 then ok = false end
+            table.insert(out, string.format("%s %.2f/%.2f/%.2f", string.sub(name, 4, -6), r, g, b))
+        end
+    end
+    print("[Knox] bench colours: " .. table.concat(out, ", "))
+    return ok, getText("IGUI_KnoxTB_Res_Colors", table.concat(out, ", "))
+end
+
+-- eating, then a thing moved, the move cancelled (D, Love <3): the queue of actions
+-- written to console.txt each time it changes, for 60 s
+local watch = nil
+local function queueTick()
+    local w, p = watch, getSpecificPlayer(0)
+    if not w or not p or getTimestampMs() > w.till then
+        watch = nil
+        Events.OnTick.Remove(queueTick)
+        print("[Knox] bench queue: watch ends")
+        return
+    end
+    local q = ISTimedActionQueue.getTimedActionQueue(p)
+    local list = q and q.queue or {}
+    local first, last = list[1], list[#list]
+    if #list == w.n and first == w.first and last == w.last then return end
+    w.n, w.first, w.last = #list, first, last
+    local names = {}
+    for i, a in ipairs(list) do names[i] = tostring(a.Type) end
+    print("[Knox] bench queue " .. getTimestampMs() .. ": " .. (#names > 0 and table.concat(names, ", ") or "(empty)"))
+end
+
+function B.watchQueue()
+    if not watch then Events.OnTick.Add(queueTick) end
+    watch = {till = getTimestampMs() + 60000, n = -1}
+    print("[Knox] bench queue: watch starts")
+    halo(getSpecificPlayer(0), "IGUI_KnoxTB_WatchOn")
+end
+
+local FOOD = {"Base.Apple", "Base.Crisps", "Base.WaterBottle", "Base.TinnedBeans", "Base.TinOpener"}
+local function giveFood(p) giveKit(p, FOOD) end
+
+-- a big stack moved, the game froze (sychmil): 500 bullets in one bag, an empty one
+-- beside; the longest frame of the next 20 s
+--- @return the full bag, the empty one
+function B.ammo(player)
+    local bags = {}
+    for i = 1, 2 do
+        local bag = tag(player:getInventory():AddItem("Base.Bag_DuffelBag"))
+        if bag and i == 1 then
+            for _ = 1, 500 do tag(bag:getItemContainer():AddItem("Base.Bullets9mm")) end
+        end
+        bags[i] = bag
+    end
+    dirtyAll()
+    return bags[1], bags[2]
+end
+
+local hitch, hitchLast = nil, nil
+local function hitchTick()
+    local h, t = hitch, getTimestampMs()
+    if not h then
+        Events.OnTick.Remove(hitchTick)
+        return
+    end
+    if h.prev then
+        local dt = t - h.prev
+        if dt > h.max then h.max = dt end
+        if dt > 100 then h.long = h.long + 1 end
+    end
+    h.prev = t
+    if t > h.till then
+        hitch, hitchLast = nil, h
+        Events.OnTick.Remove(hitchTick)
+        print("[Knox] bench hitch: longest frame " .. h.max .. " ms, over 100 ms: " .. h.long)
+        halo(getSpecificPlayer(0), "IGUI_KnoxTB_HitchDone", tostring(h.max), tostring(h.long))
+    end
+end
+
+function B.hitch()
+    if not hitch then Events.OnTick.Add(hitchTick) end
+    hitch = {till = getTimestampMs() + 20000, max = 0, long = 0}
+    halo(getSpecificPlayer(0), "IGUI_KnoxTB_HitchOn")
+end
+
+local function checkHitch()
+    local h = hitchLast
+    if not h then return false, getText("IGUI_KnoxTB_Res_NoHitch") end
+    return h.max < 250, getText("IGUI_KnoxTB_Res_Hitch", tostring(h.max), tostring(h.long))
+end
+
+-- The inventory's FPS (the author, 2026-10-28: the open screen, a big move, big
+-- containers must not cost frames) - round 0, measuring: the counter's detailed
+-- mode, and a piece of furniture nearby filled until its grid is full
+function B.perfDetail()
+    if not (KnoxPerf and KnoxPerf.setDetail) then return end
+    local on = KnoxPerf.setDetail(not KnoxPerf.detail)
+    halo(getSpecificPlayer(0), on and "IGUI_KnoxTB_PerfDetailOn" or "IGUI_KnoxTB_PerfDetailOff")
+end
+
+B.stuffed = B.stuffed or {}   -- {container, item}: what B.wardrobe put in
+local WARDROBE = {"Base.Tshirt_DefaultTEXTURE", "Base.Socks_Ankle", "Base.Shirt_FormalWhite", "Base.Trousers_Denim",
+                  "Base.Jacket_Padded", "Base.Hat_BaseballCap", "Base.Shoes_TrainerTINT", "Base.Bandage",
+                  "Base.Pills", "Base.Pencil", "Base.Book", "Base.Magazine", "Base.Spoon", "Base.Nails"}
+
+--- The biggest container of furniture within 3 squares (a wardrobe, a shelf, a counter).
+local function nearFurniture(player)
+    local sq = player:getCurrentSquare()
+    if not sq then return nil end
+    local best, bestCap = nil, -1
+    for dx = -3, 3 do
+        for dy = -3, 3 do
+            local s = getCell():getGridSquare(sq:getX() + dx, sq:getY() + dy, sq:getZ())
+            local objs = s and s:getObjects()
+            for i = 0, (objs and objs:size() or 0) - 1 do
+                local o = objs:get(i)
+                if not instanceof(o, "IsoDeadBody") and not instanceof(o, "IsoWorldInventoryObject") then
+                    for c = 0, o:getContainerCount() - 1 do
+                        local cont = o:getContainerByIndex(c)
+                        local cap = cont and cont:getCapacity() or 0
+                        if cap > bestCap then best, bestCap = cont, cap end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+function B.wardrobe(player)
+    local cont = player and nearFurniture(player)
+    if not cont then
+        halo(player, "IGUI_KnoxTB_WardrobeNone")
+        return
+    end
+    local types = {}
+    for _, ft in ipairs(WARDROBE) do
+        if exists(ft) then table.insert(types, ft) end
+    end
+    if #types == 0 then return end
+    -- things until Knox's grid of it has no free cell left (looked at every ten)
+    local total, n, rounds = KnoxGrid.totalCells(cont, player), 0, 0
+    while rounds < 40 and KnoxGrid.usedCells(cont) < total do
+        rounds = rounds + 1
+        for _ = 1, 10 do
+            local it = cont:AddItem(types[ZombRand(#types) + 1])
+            if it then
+                table.insert(B.stuffed, {container = cont, item = tag(it)})
+                n = n + 1
+            end
+        end
+    end
+    -- (looked into already: the measure is of a full one, not of its search)
+    if KnoxLootPanel and KnoxLootPanel.markSeen then KnoxLootPanel.markSeen(cont) end
+    halo(player, "IGUI_KnoxTB_WardrobeDone", tostring(n))
+    dirtyAll()
+end
+
+function B.clearStuffed()
+    for _, s in ipairs(B.stuffed) do
+        if s.item:getContainer() == s.container then s.container:Remove(s.item) end
+    end
+    B.stuffed = {}
+    dirtyAll()
+end
+
+local function checkPerfInv()
+    local v = knoxJavaVersion and tonumber(knoxJavaVersion()) or 0
+    local on = KnoxPerf ~= nil and KnoxPerf.on == true
+    return on, getText("IGUI_KnoxTB_Res_PerfInv", tostring(on), tostring(KnoxPerf and KnoxPerf.detail == true),
+        tostring(KnoxPerf and KnoxPerf.wrapped or 0), tostring(v))
+end
+
+-- The inventory's FPS measured by the bench itself (the author, 2026-10-28: the same
+-- steps by hand for the fourth time): the screen closed; then open and left alone,
+-- 500 bullets moved between two bags, 300 things on the floor - each of these twice
+-- running, the old way and with the ready lists (T.listsOff; stage 1), so the two are
+-- measured on the same scene. Each measured stretch lies between two marks in
+-- knox_perf.txt ("auto: 2 idle, old" ... "auto: 2 end"); what the bench itself makes
+-- (the bullets, the pile) is made outside them, and its own tick goes to the game
+-- past the counter: what is measured is the inventory. The character and the mouse
+-- are left alone the whole time.
+local auto = nil
+local AUTO_SPAN = 40000     -- a stretch measured: three whole 10 s blocks of the counter
+local AUTO_SETTLE = 3000    -- (the screen or a window coming up: not measured)
+local AUTO_MOVE_MAX = 20000 -- one move of the bullets, at the longest
+
+local function autoMark(text)
+    if KnoxPerf then KnoxPerf.mark("auto: " .. text) end
+end
+
+local autoTick
+-- (the bench's tick straight to the game, not through the counter: not Knox's time)
+local function autoTickOn(on)
+    local add = KnoxPerf and KnoxPerf.origAdd and KnoxPerf.origAdd.OnTick
+    local remove = KnoxPerf and KnoxPerf.origRemove and KnoxPerf.origRemove.OnTick
+    if remove then remove(autoTick) else Events.OnTick.Remove(autoTick) end
+    if on then
+        if add then add(autoTick) else Events.OnTick.Add(autoTick) end
+    end
+end
+
+--- Every tile of the full bag dropped onto the other one's tile (as a drag does it,
+--- KnoxDrag's dropIntoBag): onto a stack there, else a place of its own.
+local function moveAll(player, from, to)
+    local w = KnoxContainerWindow and KnoxContainerWindow.isOpen(from)
+    local view = (w and w.view and w.view.layout) and w.view or {layout = KnoxGrid.build(from:getInventory(), player)}
+    local layout = KnoxGrid.build(to:getInventory(), player)
+    local tiles = {}
+    for _, e in ipairs(view.layout.placed) do
+        if not e.ghost and not e.reserved then table.insert(tiles, e) end
+    end
+    for _, e in ipairs(tiles) do
+        local x, y, r, joined = KnoxDrag.settle(layout, e)
+        if x then
+            KnoxDrag.moveTo(player, e, KnoxDrag.sourceOf(e, view), layout, x, y, r)
+            if not joined then
+                local tw, th = KnoxGrid.dims(e, r)
+                layout:occupy({item = e.item, items = e.items, w = tw, h = th, reserved = true}, x, y, 0)
+            end
+        end
+    end
+end
+
+--- The floor chosen in the surroundings list, as a click on it.
+local function selectFloor(screen)
+    local loot = screen and screen.loot
+    if not loot then return end
+    for _, c in ipairs(loot.containers or {}) do
+        if c.container:getType() == "floor" then
+            loot:select(c.container, true)
+            return
+        end
+    end
+end
+
+local function lists(on)
+    T.listsOff = not on or nil
+end
+
+--- The bullets back and forth between the bags until the stretch is over (a move
+--- begun is waited for: the stretch ends between two moves).
+local function moveLoop(a, player, _, t)
+    if a.moving then
+        local src = a.back and a.to or a.from
+        if src:getInventory():getItems():size() > 0 and t - a.moveMs < AUTO_MOVE_MAX then return 500, true end
+        a.moving, a.back, a.moves = false, not a.back, a.moves + 1
+    end
+    if t >= a.untilMs then return 0 end
+    local src, dst = a.from, a.to
+    if a.back then src, dst = a.to, a.from end
+    moveAll(player, src, dst)
+    a.moving, a.moveMs = true, t
+    return 500, true
+end
+
+local function moveStart(name)
+    return function(a, _, _, t)
+        autoMark(name)
+        a.untilMs, a.moves = t + AUTO_SPAN, 0
+        return 0
+    end
+end
+
+-- The steps in order: each does its part and says how long to wait (ms) before the
+-- next one - or, with a second `true`, before it is done again.
+local AUTO_STEPS = {
+    function() autoMark("1 closed") return AUTO_SPAN end,
+    function() autoMark("1 end") Knox.open(0) return AUTO_SETTLE end,
+    function() lists(false) autoMark("2 idle, old") return AUTO_SPAN end,
+    function() autoMark("2 end") lists(true) return 1000 end,
+    function() autoMark("2 idle, lists") return AUTO_SPAN end,
+    function(a, player) autoMark("2 end") a.from, a.to = B.ammo(player) return 1000 end,
+    function(a)
+        -- the full bag's window, as by hand: the stack is taken from there
+        if a.from and KnoxContainerWindow and not KnoxContainerWindow.isOpen(a.from) then
+            KnoxContainerWindow.toggle(a.from, 0)
+        end
+        lists(false)
+        return AUTO_SETTLE
+    end,
+    moveStart("3 move, old"),
+    moveLoop,
+    function(a) autoMark("3 end (" .. a.moves .. " moves)") lists(true) return 1000 end,
+    moveStart("3 move, lists"),
+    moveLoop,
+    function(a, player)
+        autoMark("3 end (" .. a.moves .. " moves)")
+        if KnoxContainerWindow then KnoxContainerWindow.closeAll() end
+        B.dump(player)
+        return 2000
+    end,
+    function(_, _, s) selectFloor(s) lists(false) return AUTO_SETTLE end,
+    function() autoMark("4 floor, old") return AUTO_SPAN end,
+    function() autoMark("4 end") lists(true) return 1000 end,
+    function() autoMark("4 floor, lists") return AUTO_SPAN end,
+    function() autoMark("4 end") return 0 end,
+}
+
+local function detail(on)
+    if KnoxPerf and KnoxPerf.setDetail then KnoxPerf.setDetail(on) end
+end
+
+-- The same scenes once each, the ready lists on and the counter's detailed mode on
+-- (stage 3, the grids - the author, 2026-10-29: what a grid's frame is made of, before
+-- it is touched): the helpers' times and the draws by kind. About 2.5 minutes.
+local AUTO_DETAIL = {
+    function() Knox.open(0) return AUTO_SETTLE end,
+    function() detail(true) autoMark("2 idle, detail") return AUTO_SPAN end,
+    function(a, player) autoMark("2 end") a.from, a.to = B.ammo(player) return 1000 end,
+    function(a)
+        if a.from and KnoxContainerWindow and not KnoxContainerWindow.isOpen(a.from) then
+            KnoxContainerWindow.toggle(a.from, 0)
+        end
+        return AUTO_SETTLE
+    end,
+    moveStart("3 move, detail"),
+    moveLoop,
+    function(a, player)
+        autoMark("3 end (" .. a.moves .. " moves)")
+        if KnoxContainerWindow then KnoxContainerWindow.closeAll() end
+        B.dump(player)
+        return 2000
+    end,
+    function(_, _, s) selectFloor(s) return AUTO_SETTLE end,
+    function() autoMark("4 floor, detail") return AUTO_SPAN end,
+    function() autoMark("4 end") return 0 end,
+}
+
+local function autoStop(player, mark, key)
+    auto = nil
+    lists(true)
+    detail(false)
+    autoMark(mark)
+    halo(player, key)
+end
+
+function autoTick()
+    local a = auto
+    if not a then
+        autoTickOn(false)
+        return
+    end
+    local t = getTimestampMs()
+    if t < a.at then return end
+    local player = getSpecificPlayer(0)
+    local s = KnoxScreen.instance
+    -- (the character dead, or the screen closed by hand once it was opened: the run is off)
+    if not player or player:isDead() or (a.step >= 2 and not s) then
+        autoStop(player, "stopped", "IGUI_KnoxTB_AutoStopped")
+        return
+    end
+    local fn = a.steps[a.step + 1]
+    if not fn then
+        B.cleanup(player)
+        autoStop(player, "end", "IGUI_KnoxTB_AutoDone")
+        return
+    end
+    local wait, again = fn(a, player, s, t)
+    if not again then a.step = a.step + 1 end
+    a.at = t + (wait or 0)
+end
+
+--- Start the run (`detailed`: the detailed one), or stop it when it goes.
+function B.autoPerf(player, detailed)
+    if auto then
+        autoStop(player, "stopped", "IGUI_KnoxTB_AutoStopped")
+        return
+    end
+    if not (KnoxPerf and KnoxPerf.on) then
+        halo(player, "IGUI_KnoxTB_AutoNoPerf")
+        return
+    end
+    B.cleanup(player)
+    if KnoxScreen.instance then KnoxScreen.instance:close() end
+    autoMark("start")
+    halo(player, "IGUI_KnoxTB_AutoOn")
+    -- (5 s for the clean-up and the closing to settle before the first step)
+    auto = {step = 0, at = getTimestampMs() + 5000, steps = detailed and AUTO_DETAIL or AUTO_STEPS}
+    autoTickOn(true)
+end
+
+-- the menu radio's hiss went on in the game (FlamingDragon96)
+local function checkHiss()
+    local on = false
+    pcall(function() on = getSoundManager():isPlayingUISound("KnoxRadioStatic") end)
+    local inCar = getSpecificPlayer(0) ~= nil and getSpecificPlayer(0):getVehicle() ~= nil
+    return not on or inCar, getText("IGUI_KnoxTB_Res_Hiss", tostring(on), tostring(T.settings["menu.radio"] or "0"), tostring(inCar))
+end
+
 B.POINTS = {
+    -- the inventory's FPS: measuring, by itself since stage 0 (the author, 2026-10-28)
+    {id = "perf_inv", actions = {{"AutoPerf", function(p) B.autoPerf(p) end},
+        {"AutoPerfDetail", function(p) B.autoPerf(p, true) end},
+        {"Mark", function() mark("perf_inv") end}, {"PerfDetail", function() B.perfDetail() end},
+        {"Ammo500", function(p) B.ammo(p) end}, {"Dump", function(p) B.dump(p) end},
+        {"Wardrobe", function(p) B.wardrobe(p) end}}, check = checkPerfInv},
+    -- stage 2 of the Steam reports, 2026-10-28
+    {id = "s2_sandbox", menu = true},
+    {id = "s2_colors", menu = true, check = checkColors},
+    {id = "s2_eat_move", actions = {{"Food", giveFood}, {"Watch", function() B.watchQueue() end}}},
+    {id = "s2_stack", actions = {{"Ammo500", function(p) B.ammo(p) end}, {"Hitch", function() B.hitch() end},
+        {"Mark", function() mark("s2_stack") end}}, check = checkHitch},
+    {id = "s2_hiss", menu = true, check = checkHiss},
+    {id = "s2_traits", menu = true},
     -- stage 1 of the Steam reports, 2026-10-28
-    {id = "s1_editor", actions = {{"Editor", openEditorCounted}}, check = checkEditorErrors},
-    {id = "s1_editor_menu"},
+    {id = "s1_editor", menu = true, actions = {{"Editor", openEditorCounted}}, check = checkEditorErrors},
+    {id = "s1_editor_menu", menu = true},
     {id = "s1_disassemble"},
     {id = "s1_item_tips"},
     {id = "s1_far", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
     {id = "s1_near", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
     -- the reason plate by the held thing (option A, "Чертёж": the author 2026-10-28)
     {id = "s1_reason", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
+    {id = "s1_bench_menu", menu = true},
     -- the trunk's button on the pickup's body (linlin; the plate wider - the author, 2026-10-28)
     {id = "s1_trunk", actions = {{"Van", function(p) B.car(p, "Base.Van") end}, {"Pickup", function(p) B.car(p, "Base.PickUpTruck") end},
         {"Car", function(p) B.car(p) end}}},
@@ -993,11 +1408,10 @@ end
 
 -- The window -----------------------------------------------------------------------
 
-function B:new(host, playerNum)
+function B:new(playerNum)
     local o = ISPanel:new(0, 0, 10, 10)
     setmetatable(o, self)
     self.__index = self
-    o.host = host
     o.playerNum = playerNum
     o.background = false
     o.moveWithMouse = false
@@ -1176,13 +1590,19 @@ function B:prerender()
         bx = bx + bw + 6
         return at
     end
-    for _, a in ipairs(p.actions or {}) do
+    -- (in the main menu - no player - only the points marked menu get their buttons)
+    local canRun = p.menu or self:player() ~= nil
+    if not canRun and (p.actions or p.check) then
+        T.text(self, getText("IGUI_KnoxTB_NeedGame"), x, y, T.color.dim, T.fontText)
+        y = y + ft + pad
+    end
+    for _, a in ipairs(canRun and p.actions or {}) do
         local label = getText("IGUI_KnoxTB_A_" .. a[1])
         local bw = T.buttonW(label) + pad * 2
         local at = place(bw)
         table.insert(self.btns, {at, y, bw, bh, label, fn = a[2]})
     end
-    if p.check then
+    if canRun and p.check then
         local label = getText("IGUI_KnoxTB_Check")
         local bw = T.buttonW(label) + pad * 2
         local at = place(bw)
@@ -1223,8 +1643,10 @@ function B:onMouseDown(x, y)
     end
     for _, b in ipairs(self:headerButtons()) do
         if T.inRect(x, y, b) then
-            if b.id == "items" and KnoxDevPanel then
-                KnoxDevPanel.toggle(self.host, self.playerNum)
+            if b.id == "items" and KnoxDevPanel and self:player() then
+                -- (the items panel lives on the Knox screen: opened for it when closed)
+                if not KnoxScreen.instance then Knox.open(self.playerNum) end
+                if KnoxScreen.instance then KnoxDevPanel.toggle(KnoxScreen.instance, self.playerNum) end
             elseif b.id == "cleanup" then
                 B.cleanup(self:player())
             elseif b.id == "tiles" then
@@ -1294,24 +1716,45 @@ end
 function B:close()
     B.save()
     self:setVisible(false)
-    self.host:removeChild(self)
+    self:removeFromUIManager()
     if B.instance == self then B.instance = nil end
 end
 
-function B.toggle(host, playerNum)
+-- A window of its own over everything, not a child of the Knox screen: it stays
+-- when the inventory is closed, and opens in the game's main menu too (the author
+-- 2026-10-28)
+function B.toggle(playerNum)
     if B.instance then
         B.instance:close()
         return
     end
-    local p = B:new(host, playerNum)
+    T.ensure()   -- (the main menu: the theme may not be set up yet)
+    local p = B:new(playerNum or 0)
     p:initialise()
     p:instantiate()
     -- at the right of the screen: the inventory stays in view behind it
-    p:setX(host:getWidth() - p:getWidth() - T.cell)
-    p:setY(math.floor((host:getHeight() - p:getHeight()) / 2))
-    host:addChild(p)
+    p:setX(getCore():getScreenWidth() - p:getWidth() - T.cell)
+    p:setY(math.floor((getCore():getScreenHeight() - p:getHeight()) / 2))
+    p:addToUIManager()
+    p:setAlwaysOnTop(true)   -- (the main menu and the Knox screen come up on a click)
     B.instance = p
 end
+
+-- Main menu <-> game: the screen's windows are thrown away there, and the cell and
+-- fonts change - the bench left open is made anew in the next one
+local function reopen()
+    local b = B.instance
+    if not b then return end
+    local sel, scroll = b.sel, b.scroll
+    b:close()
+    B.toggle(0)
+    if B.instance then
+        B.instance.sel, B.instance.scroll = sel, scroll
+        B.instance:showNote()
+    end
+end
+Events.OnMainMenuEnter.Add(reopen)
+Events.OnGameStart.Add(reopen)
 
 -- DEV mode: Insert (no -debug needed) - only
 -- where Zomboid/Lua/knox_dev.txt exists (the author's computer): the bench
@@ -1335,21 +1778,21 @@ end
 B.devAllowed = devAllowed
 
 -- Insert (the author's wish, 2026-10-15; was Ctrl+Shift+D): DEV mode on and the
--- bench opened - the Knox screen too, when it is closed; pressed again, the
--- bench closes. Only where knox_dev.txt is (or with -debug).
+-- bench opened - in the game the Knox screen too, when it is closed; pressed
+-- again, the bench closes. Only where knox_dev.txt is (or with -debug). In the
+-- main menu the bench alone (and its DEV part on the menu's Knox plate).
 Events.OnKeyPressed.Add(function(key)
     if key ~= Keyboard.KEY_INSERT or not (devAllowed() or isDebugEnabled()) then return end
-    if not getSpecificPlayer(0) or not KnoxScreen then return end
     if T.settings.dev ~= "1" then
         T.settings.dev = "1"
         T.saveSettings()
     end
-    if not KnoxScreen.instance then
-        Knox.open(0)
-        if not KnoxScreen.instance then return end
-        if B.instance then return end
+    if B.instance then
+        B.instance:close()
+        return
     end
-    B.toggle(KnoxScreen.instance, KnoxScreen.instance.playerNum or 0)
+    if getSpecificPlayer(0) and KnoxScreen and not KnoxScreen.instance then Knox.open(0) end
+    B.toggle(KnoxScreen and KnoxScreen.instance and KnoxScreen.instance.playerNum or 0)
 end)
 
 return B

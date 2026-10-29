@@ -76,6 +76,8 @@ public class KnoxFonts {
     public static void knoxDrawText(String style, double size, String text, double x, double y,
                                     double r, double g, double b, double a) {
         if (text == null) return;
+        // (a ready list being written takes it down too: KnoxDrawList)
+        if (KnoxDrawList.rec != null) KnoxDrawList.addText(style, size, text, x, y, r, g, b, a);
         AngelCodeFont f = font(style, size);
         if (f == null) return;
         if (f.isLoading()) {

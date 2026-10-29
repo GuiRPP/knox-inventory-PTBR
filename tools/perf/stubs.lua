@@ -23,7 +23,7 @@ end
 -- events as the game keeps them
 LISTS = {}
 Events = {}
-for _, name in ipairs({"OnTick", "OnPreUIDraw", "OnGameStart", "OnMainMenuEnter", "OnPlayerDeath", "OnCreatePlayer", "OnSave"}) do
+for _, name in ipairs({"OnTick", "OnPreUIDraw", "OnPostUIDraw", "OnGameStart", "OnMainMenuEnter", "OnPlayerDeath", "OnCreatePlayer", "OnSave"}) do
     local list = {}
     LISTS[name] = list
     Events[name] = {

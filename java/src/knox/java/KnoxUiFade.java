@@ -61,6 +61,7 @@ public class KnoxUiFade {
     // each names its parameters, so the patcher takes that one overload; the
     // alpha is the 9th parameter in all of them. Outside a fade they cost a look
     // at two fields.
+    // (they also count the sprites while a ready list is written or checked: KnoxDrawList)
 
     @Patch(className = "zombie.core.SpriteRenderer", methodName = "renderi")
     public static class Ri {
@@ -70,6 +71,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(6) float g, @Patch.Argument(7) float b,
                                  @Patch.Argument(value = 8, readOnly = false) float a,
                                  @Patch.Argument(9) Consumer<TextureDraw> c) {
+            if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
         }
     }
@@ -82,6 +84,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(6) float g, @Patch.Argument(7) float b,
                                  @Patch.Argument(value = 8, readOnly = false) float a,
                                  @Patch.Argument(9) Consumer<TextureDraw> c) {
+            if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
         }
     }
@@ -96,6 +99,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(9) float u1, @Patch.Argument(10) float v1, @Patch.Argument(11) float u2,
                                  @Patch.Argument(12) float v2, @Patch.Argument(13) float u3, @Patch.Argument(14) float v3,
                                  @Patch.Argument(15) float u4, @Patch.Argument(16) float v4) {
+            if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
         }
     }

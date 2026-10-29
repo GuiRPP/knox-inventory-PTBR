@@ -74,6 +74,11 @@ function KnoxQuickSlot:accepts(item)
     return item ~= self:item() and hb:canBeAttached(slot, item)
 end
 
+-- A quick slot's ready list (the inventory's FPS, stage 2 - the author, 2026-10-29):
+-- one per slot of each player, for good, as the equipment slots' (KnoxEquipment).
+-- It holds the cell, the item and the frame while the slot is not under the mouse.
+local quickLists = {}
+
 function KnoxQuickSlot:render()
     if self.defName then
         self.index = KnoxQuickSlot.indexOf(self:hotbar(), self.defName) or 0
@@ -85,31 +90,53 @@ function KnoxQuickSlot:render()
     local alpha = 1
     local leaving, progress = KnoxGrid.leavingSlot(self.screen.pendingNow or {}, "quick:" .. self.index)
     if leaving then item, alpha = leaving, 0.4 end
-    T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
+    local cat, dy, da = false, 0, 1
     if item then
-        T.rect(self, 0, 0, w, h, T.category[T.categoryOf(item)], alpha)
-        local side = math.floor(math.min(w, h) * 0.66)
-        local dy, da = T.settleIn(self, (not leaving) and item or nil)   -- just hung here: it settles in
-        ISInventoryItem.renderItemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, alpha * da, side, side)
+        cat = T.category[T.categoryOf(item)]
+        dy, da = T.settleIn(self, (not leaving) and item or nil)   -- just hung here: it settles in
     end
-    if self.label then
-        T.text(self, T.fit(T.upper(self.label), T.fontTile, w - 8), 5, 2, T.color.dim, T.fontTile, item and 1 or 0.8)
-    else
-        T.text(self, tostring(self.pos or self.index), 4, 1, T.color.dim, T.fontTile)
+    local windowOpen = item and not leaving and ((KnoxInspectWindow and KnoxInspectWindow.isOpen(item))
+        or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item)))
+    -- (from the ready list while the slot is not under the mouse: the key is all it
+    -- shows - the item, its place, how it comes in, its colour, its number, a window
+    -- about it)
+    local L
+    if not over then
+        L = self.readyList
+        if not L then
+            local key = self.screen.playerNum .. (self.defName or self.index)
+            L = quickLists[key] or T.newList()
+            quickLists[key], self.readyList = L, L
+        end
+        local flags = (leaving and 1 or 0) + (windowOpen and 2 or 0)
+        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, cat, self.pos or self.index) then L = false end
     end
-    local edge = item and T.color.tileFrame or T.color.tileEdge
-    if KnoxDrag.isActive() and over then
-        local c = self:accepts(KnoxDrag.entity.item) and T.color.ok or T.color.bad
-        self:drawRect(0, 0, w, h, 0.22, c.r, c.g, c.b)
-        edge = c
-    elseif over then
-        edge = item and T.color.tileHover or T.color.hoverEdge
+    if L ~= false then
+        T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
+        if item then
+            T.rect(self, 0, 0, w, h, cat, alpha)
+            local side = math.floor(math.min(w, h) * 0.66)
+            ISInventoryItem.renderItemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, alpha * da, side, side)
+        end
+        if self.label then
+            T.text(self, T.fit(T.upper(self.label), T.fontTile, w - 8), 5, 2, T.color.dim, T.fontTile, item and 1 or 0.8)
+        else
+            T.text(self, tostring(self.pos or self.index), 4, 1, T.color.dim, T.fontTile)
+        end
+        local edge = item and T.color.tileFrame or T.color.tileEdge
+        if KnoxDrag.isActive() and over then
+            local c = self:accepts(KnoxDrag.entity.item) and T.color.ok or T.color.bad
+            self:drawRect(0, 0, w, h, 0.22, c.r, c.g, c.b)
+            edge = c
+        elseif over then
+            edge = item and T.color.tileHover or T.color.hoverEdge
+        end
+        if windowOpen then
+            edge = T.color.accent   -- being inspected, or in the pouring window
+        end
+        if item and not leaving then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
+        if L then T.listEnd(L) end
     end
-    if item and not leaving and ((KnoxInspectWindow and KnoxInspectWindow.isOpen(item))
-            or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item))) then
-        edge = T.color.accent   -- being inspected, or in the pouring window
-    end
-    if item and not leaving then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
     if item and not leaving and KnoxEquip.isReplaced({item}) then T.replaceMark(self, 0, 0, w, h) end
     if item and not leaving and KnoxContextMenu and KnoxContextMenu.isTarget(item) then
         KnoxContextMenu.drawTarget(self, 0, 0, w, h)   -- its context menu is open
@@ -254,6 +281,13 @@ function KnoxScreen:new(playerNum)
     o.quickSlots = {}
     o.quickCount = -1
     o.tab = "Equipment"
+    -- the parts drawn from ready lists (T.listDraw; the inventory's FPS, stage 1) - the
+    -- same lists for every opening (written anew for the new screen: Java keeps them)
+    if not KnoxScreen.readyLists then
+        KnoxScreen.readyLists = {top = T.newList(), buttons = T.newList(), time = T.newList(), cols = T.newList(),
+                                 invW = T.newList(), lootW = T.newList(), bot = T.newList(), hints = T.newList()}
+    end
+    o.lists = KnoxScreen.readyLists
     return o
 end
 
@@ -645,6 +679,17 @@ local function over(ui, x, y, w, h)
     return ui:isMouseOver() and T.inRect(ui:getMouseX(), ui:getMouseY(), {x, y, w, h})
 end
 
+-- (the same with the mouse asked once a frame, no table: the ready lists' keys)
+local function overAt(on, mx, my, x, y, w, h)
+    return on and mx >= x and my >= y and mx < x + w and my < y + h
+end
+
+-- The bottom bar's coin pictures (only once read: KnoxRoadmap's pinned pictures, T.readyTex;
+-- up here: the prerender asks whether they are there for its ready list)
+local function coinTexture(name)
+    return KnoxRoadmap and KnoxRoadmap.tex(name) or nil
+end
+
 --- A car's dashboard puts itself on top of everything when the character gets
 --- in - over this screen too, if it was open. It is hidden while the screen is
 --- open and shown again when it closes.
@@ -720,58 +765,81 @@ function KnoxScreen:prerender()
 
     local W, H = self:getWidth(), self:getHeight()
     local fh = T.fontH(T.fontHeader)
-    T.rect(self, 0, 0, W, H, T.color.screen, 0.93 * T.bgAlpha())
+    -- The parts that look the same frame after frame come from ready lists (Java,
+    -- T.listDraw), each drawn here again when its key changes - what it shows, where,
+    -- which of it is under the mouse (the inventory's FPS, stage 1, the author
+    -- 2026-10-28). The mouse is asked once.
+    local L = self.lists
+    local mOver = self:isMouseOver()
+    local mx, my = self:getMouseX(), self:getMouseY()
 
     -- top bar: tabs in capitals, the active one bright with a sand underline
-    T.rect(self, 0, 0, W, self.topH, T.color.header, T.bgAlpha())
-    T.rect(self, 0, self.topH - 1, W, 1, T.color.border)
-    local tabH = T.fontH(T.fontTab)
-    for _, tr in ipairs(self:tabRects()) do
-        local active = tr.id == self.tab
-        local usable = KnoxScreen.tabAvailable(tr.id)
-        local hover = usable and not active and over(self, tr.x, 0, tr.w, self.topH)
-        local c = active and T.color.bright or (hover and T.color.text or T.color.dim)
-        T.textCentre(self, tr.label, tr.x + math.floor(tr.w / 2),
-            math.floor((self.topH - tabH) / 2), c, T.fontTab, usable and 1 or 0.35)
-        if active then T.rect(self, tr.x, self.topH - 2, tr.w, 2, T.color.accent) end
-        self:drawTabStage(tr)
+    local tabs = self:tabRects()
+    local hotTab = false
+    for _, tr in ipairs(tabs) do
+        if tr.id ~= self.tab and overAt(mOver, mx, my, tr.x, 0, tr.w, self.topH) and KnoxScreen.tabAvailable(tr.id) then
+            hotTab = tr.id
+        end
+    end
+    if not T.listDraw(self, L.top, W, H, self.tab, hotTab, KnoxScreen.tabAvailable("Map")) then
+        T.rect(self, 0, 0, W, H, T.color.screen, 0.93 * T.bgAlpha())
+        T.rect(self, 0, 0, W, self.topH, T.color.header, T.bgAlpha())
+        T.rect(self, 0, self.topH - 1, W, 1, T.color.border)
+        local tabH = T.fontH(T.fontTab)
+        for _, tr in ipairs(tabs) do
+            local active = tr.id == self.tab
+            local usable = KnoxScreen.tabAvailable(tr.id)
+            local hover = tr.id == hotTab
+            local c = active and T.color.bright or (hover and T.color.text or T.color.dim)
+            T.textCentre(self, tr.label, tr.x + math.floor(tr.w / 2),
+                math.floor((self.topH - tabH) / 2), c, T.fontTab, usable and 1 or 0.35)
+            if active then T.rect(self, tr.x, self.topH - 2, tr.w, 2, T.color.accent) end
+            self:drawTabStage(tr)
+        end
+        T.listEnd(L.top)
     end
     self:drawSearch()
     if self.searchBox and self.searchBox:getIsVisible() then self:drawFoundButton() end
 
     local cx, cy, cw, ch, closeText, keyW = self:closeRect()
     local capH = T.fontH(T.fontCaps)
-    -- close button: [Tab] ЗАКРЫТЬ
-    local closeOver = over(self, cx, cy, cw, ch)
-    T.button(self, {cx, cy, cw, ch}, "", {hover = closeOver})
-    local kh = T.fontH(T.fontTile) + 4
-    local kx, ky = cx + T.pad, cy + math.floor((ch - kh) / 2)
-    T.rect(self, kx, ky, keyW, kh, T.color.header)
-    T.border(self, kx, ky, keyW, kh, T.color.tileEdge)
-    T.text(self, self:closeKey(), kx + 5, ky + 2, T.color.text, T.fontTile)
-    T.caps(self, closeText, kx + keyW + 8, cy + math.floor((ch - capH) / 2),
-        closeOver and T.color.accent or T.color.text)
-
-    -- settings button
-    local sx, sy, sw0, sh0, setText = self:settingsRect()
-    local setHot = over(self, sx, sy, sw0, sh0)
+    local closeOver = overAt(mOver, mx, my, cx, cy, cw, ch)
+    local sx, sy, sw0, sh0 = self:settingsRect()
+    local setHot = overAt(mOver, mx, my, sx, sy, sw0, sh0)
     local setOpen = KnoxSettings ~= nil and KnoxSettings.instance ~= nil
-    T.button(self, {sx, sy, sw0, sh0}, "", {hover = setHot, active = setOpen})
-    do
-        -- a cog: Knox's own smooth picture (tools/make_gear.ps1), tinted
-        if KnoxScreen.gearTex == nil then KnoxScreen.gearTex = getTexture("media/ui/knox_gear.png") or false end
-        local c = (setHot or setOpen) and T.color.accent or T.color.text
-        local side = math.floor(sw0 * 0.64)
-        if KnoxScreen.gearTex then
-            self:drawTextureScaledAspect(KnoxScreen.gearTex, sx + math.floor((sw0 - side) / 2), sy + math.floor((sh0 - side) / 2),
-                side, side, 1, c.r, c.g, c.b)
-        end
-    end
-    -- developer button
     local dx, dy, dw, dh, devText = self:devRect()
-    if dx then
-        local on = KnoxDevPanel.instance ~= nil
-        T.button(self, {dx, dy, dw, dh}, devText, {hover = over(self, dx, dy, dw, dh), active = on, color = T.color.warn})
+    local devOn = dx ~= nil and KnoxDevPanel.instance ~= nil
+    local devHot = dx ~= nil and overAt(mOver, mx, my, dx, dy, dw, dh)
+    local lit = (closeOver and 1 or 0) + (setHot and 2 or 0) + (setOpen and 4 or 0)
+        + (dx and 8 or 0) + (devOn and 16 or 0) + (devHot and 32 or 0)
+    if not T.listDraw(self, L.buttons, W, H, lit, KnoxControls.stamp) then
+        -- close button: [Tab] ЗАКРЫТЬ
+        T.button(self, {cx, cy, cw, ch}, "", {hover = closeOver})
+        local kh = T.fontH(T.fontTile) + 4
+        local kx, ky = cx + T.pad, cy + math.floor((ch - kh) / 2)
+        T.rect(self, kx, ky, keyW, kh, T.color.header)
+        T.border(self, kx, ky, keyW, kh, T.color.tileEdge)
+        T.text(self, self:closeKey(), kx + 5, ky + 2, T.color.text, T.fontTile)
+        T.caps(self, closeText, kx + keyW + 8, cy + math.floor((ch - capH) / 2),
+            closeOver and T.color.accent or T.color.text)
+
+        -- settings button
+        T.button(self, {sx, sy, sw0, sh0}, "", {hover = setHot, active = setOpen})
+        do
+            -- a cog: Knox's own smooth picture (tools/make_gear.ps1), tinted
+            if KnoxScreen.gearTex == nil then KnoxScreen.gearTex = getTexture("media/ui/knox_gear.png") or false end
+            local c = (setHot or setOpen) and T.color.accent or T.color.text
+            local side = math.floor(sw0 * 0.64)
+            if KnoxScreen.gearTex then
+                self:drawTextureScaledAspect(KnoxScreen.gearTex, sx + math.floor((sw0 - side) / 2), sy + math.floor((sh0 - side) / 2),
+                    side, side, 1, c.r, c.g, c.b)
+            end
+        end
+        -- developer button
+        if dx then
+            T.button(self, {dx, dy, dw, dh}, devText, {hover = devHot, active = devOn, color = T.color.warn})
+        end
+        T.listEnd(L.buttons)
     end
 
     -- the clock and the game's speed: at the right of the top bar, before the buttons
@@ -779,42 +847,55 @@ function KnoxScreen:prerender()
     local sr = self:foundRect() or self:searchRect()
     self:drawTime(sr[1] + sr[3] + T.pad * 2, (dx or sx) - T.pad * 2)
     if self.tab == "Equipment" then
-        -- columns
-        for _, col in ipairs(self.columns) do
-            if col.w > 0 then drawPanel(self, col.x, self.colY, col.w, self.colH) end
-        end
         local inv = self.columns[2]
+        local loot = self.columns[3]
         local titleY = self.colY + T.pad   -- as KnoxEquipmentPanel draws its own title
-        T.caps(self, getText("IGUI_Knox_Inventory"), inv.x + T.pad, titleY, T.color.bright, T.fontHeader)
+        if not T.listDraw(self, L.cols, W, H, loot.w, self.colY) then
+            -- columns
+            for _, col in ipairs(self.columns) do
+                if col.w > 0 then drawPanel(self, col.x, self.colY, col.w, self.colH) end
+            end
+            T.caps(self, getText("IGUI_Knox_Inventory"), inv.x + T.pad, titleY, T.color.bright, T.fontHeader)
+            if loot.w > 0 then
+                T.caps(self, getText("IGUI_Knox_Tab_Surroundings"), loot.x + T.pad, titleY, T.color.bright, T.fontHeader)
+            end
+            T.listEnd(L.cols)
+        end
         -- what the character carries, at the right end of the column's title:
-        -- "4.5 / 8 kg" and a thin bar under it
+        -- "4.5 / 8 kg" and a thin bar under it (from a ready list while they stay;
+        -- where the bar stood is kept for the change a drag would make, drawn live)
         do
             local player = self:player()
             local wNow, wMax = player:getInventoryWeight(), player:getMaxWeight()
             local heavy = wNow > wMax
             local right = inv.x + T.pad + KnoxInventoryPanel.headerW()   -- the right edge of the grids' headers under it
-            local valH = T.fontH(T.fontText)
-            local wy = titleY + math.floor((fh - valH) / 2)
-            local maxText = " / " .. KnoxInventoryPanel.round1(wMax) .. " " .. T.upper(getText("IGUI_Knox_Kg"))
-            local maxW = T.measure(T.fontText, maxText)
-            local nowText = KnoxInventoryPanel.round1(wNow)
-            T.textRight(self, maxText, right, wy, T.color.dim, T.fontText)
-            T.textRight(self, nowText, right - maxW, wy, heavy and T.color.bad or T.color.bright, T.fontText)
-            -- the bar: left of the figures, on the middle of the title's line
-            local barW = T.cell * 2
-            local bx = right - maxW - T.measure(T.fontText, nowText) - T.pad - barW
-            local by = titleY + math.floor(fh / 2) - 1
-            T.rect(self, bx, by, barW, 3, T.color.line)
             local frac = eased(self, "inventory", math.min(1, wNow / math.max(0.1, wMax)))
-            T.rect(self, bx, by, math.floor(barW * frac), 3, heavy and T.color.bad or T.color.accent)
+            local at = self.invWeightAt
+            if not T.listDraw(self, L.invW, wNow, wMax, frac, right, titleY) then
+                local valH = T.fontH(T.fontText)
+                local wy = titleY + math.floor((fh - valH) / 2)
+                local maxText = " / " .. KnoxInventoryPanel.round1(wMax) .. " " .. T.upper(getText("IGUI_Knox_Kg"))
+                local maxW = T.measure(T.fontText, maxText)
+                local nowText = KnoxInventoryPanel.round1(wNow)
+                T.textRight(self, maxText, right, wy, T.color.dim, T.fontText)
+                T.textRight(self, nowText, right - maxW, wy, heavy and T.color.bad or T.color.bright, T.fontText)
+                -- the bar: left of the figures, on the middle of the title's line
+                local barW = T.cell * 2
+                local bx = right - maxW - T.measure(T.fontText, nowText) - T.pad - barW
+                local by = titleY + math.floor(fh / 2) - 1
+                T.rect(self, bx, by, barW, 3, T.color.line)
+                T.rect(self, bx, by, math.floor(barW * frac), 3, heavy and T.color.bad or T.color.accent)
+                at = self.invWeightAt or {}
+                self.invWeightAt = at
+                at[1], at[2], at[3], at[4] = bx, by, barW, wy
+                T.listEnd(L.invW)
+            end
             -- an item being dragged: what the drop under the mouse would do to
             -- the weight - red "+" for a thing coming onto the character, green
             -- "-" for one of the character's own leaving
-            self:drawWeightDelta("inventory", self:dragWeightDelta(player), bx, by, barW, frac, wMax, wy)
+            self:drawWeightDelta("inventory", self:dragWeightDelta(player), at[1], at[2], at[3], frac, wMax, at[4])
         end
-        local loot = self.columns[3]
         if loot.w > 0 then
-            T.caps(self, getText("IGUI_Knox_Tab_Surroundings"), loot.x + T.pad, titleY, T.color.bright, T.fontHeader)
             -- what the chosen container holds, as the inventory column shows the
             -- character's load: a bar and "12.3 / 50 kg", ending where its grid does
             local chosen = self.loot and self.loot.selected
@@ -823,25 +904,34 @@ function KnoxScreen:prerender()
                 local player = self:player()
                 local wNow = chosen:getCapacityWeight() or 0
                 local wMax = chosen:getType() ~= "floor" and (chosen:getEffectiveCapacity(player) or 0) or 0
-                local valH = T.fontH(T.fontText)
-                local wy = titleY + math.floor((fh - valH) / 2)
                 local right = self.loot:getX() + self.loot.m.gridX + head.w
-                local kg = T.upper(getText("IGUI_Knox_Kg"))
-                -- (the floor has no limit: the weight alone)
-                local maxText = wMax > 0 and (" / " .. KnoxInventoryPanel.round1(wMax) .. " " .. kg) or (" " .. kg)
-                local maxW = T.measure(T.fontText, maxText)
-                local nowText = KnoxInventoryPanel.round1(wNow)
-                local full = wMax > 0 and wNow >= wMax * 0.95
-                T.textRight(self, maxText, right, wy, T.color.dim, T.fontText)
-                T.textRight(self, nowText, right - maxW, wy, full and T.color.bad or T.color.bright, T.fontText)
+                local lfrac = wMax > 0 and eased(self, "loot", math.min(1, wNow / wMax)) or 0
+                local at = self.lootWeightAt
+                if not T.listDraw(self, L.lootW, chosen, wNow, wMax, lfrac, right * 10000 + titleY) then
+                    local valH = T.fontH(T.fontText)
+                    local wy = titleY + math.floor((fh - valH) / 2)
+                    local kg = T.upper(getText("IGUI_Knox_Kg"))
+                    -- (the floor has no limit: the weight alone)
+                    local maxText = wMax > 0 and (" / " .. KnoxInventoryPanel.round1(wMax) .. " " .. kg) or (" " .. kg)
+                    local maxW = T.measure(T.fontText, maxText)
+                    local nowText = KnoxInventoryPanel.round1(wNow)
+                    local full = wMax > 0 and wNow >= wMax * 0.95
+                    T.textRight(self, maxText, right, wy, T.color.dim, T.fontText)
+                    T.textRight(self, nowText, right - maxW, wy, full and T.color.bad or T.color.bright, T.fontText)
+                    if wMax > 0 then
+                        local barW = T.cell * 2
+                        local bx = right - maxW - T.measure(T.fontText, nowText) - T.pad - barW
+                        local by = titleY + math.floor(fh / 2) - 1
+                        T.rect(self, bx, by, barW, 3, T.color.line)
+                        T.rect(self, bx, by, math.floor(barW * lfrac), 3, full and T.color.bad or T.color.accent)
+                        at = self.lootWeightAt or {}
+                        self.lootWeightAt = at
+                        at[1], at[2], at[3], at[4] = bx, by, barW, wy
+                    end
+                    T.listEnd(L.lootW)
+                end
                 if wMax > 0 then
-                    local barW = T.cell * 2
-                    local bx = right - maxW - T.measure(T.fontText, nowText) - T.pad - barW
-                    local by = titleY + math.floor(fh / 2) - 1
-                    T.rect(self, bx, by, barW, 3, T.color.line)
-                    local lfrac = eased(self, "loot", math.min(1, wNow / wMax))
-                    T.rect(self, bx, by, math.floor(barW * lfrac), 3, full and T.color.bad or T.color.accent)
-                    self:drawWeightDelta("loot", self:lootWeightDelta(chosen, player), bx, by, barW, lfrac, wMax, wy)
+                    self:drawWeightDelta("loot", self:lootWeightDelta(chosen, player), at[1], at[2], at[3], lfrac, wMax, at[4])
                 end
             end
         end
@@ -854,44 +944,54 @@ function KnoxScreen:prerender()
 
     -- bottom bar: "БЫСТРЫЕ СЛОТЫ", the slots, key hints on the right
     local botY = H - self.botH
-    T.rect(self, 0, botY, W, self.botH, T.color.header, T.bgAlpha())
-    T.rect(self, 0, botY, W, 1, T.color.border)
-    T.caps(self, getText("IGUI_Knox_QuickSlots"), self.margin, botY + math.floor((self.botH - capH) / 2), T.color.dim)
     -- the mod's name and stage in the bottom right corner: KNOX INVENTORY [STAGE 1].
     -- It opens the news page: lit on hover, underlined while open, a breathing
     -- sand dot on the stage plate while there are unread posts
     -- (the beta says so here: on a player's screenshot it is the first thing seen)
-    local stage = T.MOD_ID == "KnoxInventoryBeta" and "1.0 BETA" or T.upper(getText("IGUI_Knox_Stage"))
-    local sf, bf = T.fontTile, T.fontCaps
-    local sh = T.fontH(sf) + 6
-    local sw = T.measure(sf, stage) + 14
-    local knox, inv = "KNOX", "INVENTORY"
-    local kw, iw = T.measure(bf, knox), T.measure(bf, inv)
-    local space = T.measure(bf, " ")
     -- (the right edge of the columns above; its lit plate and its line under it
     -- stop there too - they stood out past it by a pad, the author 2026-10-18)
     local last = self.columns and self.columns[#self.columns]
     local right = (last and last.w > 0) and (last.x + last.w) or (W - self.margin)
-    local left = right - sw - T.pad - iw - space - kw
-    local r = {left - T.pad, botY + 1, right - left + T.pad, self.botH - 1}
+    -- (where its pieces stand: worked out again for a new size, place or look only)
+    local bb = self.botAt
+    if not (bb and bb.right == right and bb.botY == botY and bb.epoch == T.listEpoch) then
+        local stage = T.MOD_ID == "KnoxInventoryBeta" and "1.0 BETA" or T.upper(getText("IGUI_Knox_Stage"))
+        local sf, bf = T.fontTile, T.fontCaps
+        local sh = T.fontH(sf) + 6
+        local sw = T.measure(sf, stage) + 14
+        local kw, iw = T.measure(bf, "KNOX"), T.measure(bf, "INVENTORY")
+        local space = T.measure(bf, " ")
+        local left = right - sw - T.pad - iw - space - kw
+        bb = {right = right, botY = botY, epoch = T.listEpoch, stage = stage, sh = sh, sw = sw, kw = kw,
+              space = space, left = left, rect = {left - T.pad, botY + 1, right - left + T.pad, self.botH - 1},
+              ty = botY + math.floor((self.botH - T.fontH(bf)) / 2),
+              px = right - sw, py = botY + math.floor((self.botH - sh) / 2)}
+        self.botAt = bb
+    end
+    local r = bb.rect
     self.brandRect = r
     local open = self.tab == "News"
-    local hot = over(self, r[1], r[2], r[3], r[4])
-    local ty = botY + math.floor((self.botH - T.fontH(bf)) / 2)
-    T.text(self, knox, left, ty, T.color.bright, bf)
-    T.text(self, inv, left + kw + space, ty, T.color.accent, bf)
-    -- under the mouse only the stage plate lights up - sand, dark letters - not
-    -- the whole corner (the author, 2026-10-20); while the news is open it is tinted
-    local px, py = right - sw, botY + math.floor((self.botH - sh) / 2)
-    if hot then
-        T.rect(self, px, py, sw, sh, T.color.accent)
-    elseif open then
-        T.rect(self, px, py, sw, sh, T.color.accent, 0.18)
+    local hot = overAt(mOver, mx, my, r[1], r[2], r[3], r[4])
+    local px, py, sw, sh = bb.px, bb.py, bb.sw, bb.sh
+    if not T.listDraw(self, L.bot, W, H, hot, open, right) then
+        T.rect(self, 0, botY, W, self.botH, T.color.header, T.bgAlpha())
+        T.rect(self, 0, botY, W, 1, T.color.border)
+        T.caps(self, getText("IGUI_Knox_QuickSlots"), self.margin, botY + math.floor((self.botH - capH) / 2), T.color.dim)
+        T.text(self, "KNOX", bb.left, bb.ty, T.color.bright, T.fontCaps)
+        T.text(self, "INVENTORY", bb.left + bb.kw + bb.space, bb.ty, T.color.accent, T.fontCaps)
+        -- under the mouse only the stage plate lights up - sand, dark letters - not
+        -- the whole corner (the author, 2026-10-20); while the news is open it is tinted
+        if hot then
+            T.rect(self, px, py, sw, sh, T.color.accent)
+        elseif open then
+            T.rect(self, px, py, sw, sh, T.color.accent, 0.18)
+        end
+        T.border(self, px, py, sw, sh, T.color.accent)
+        local sc = hot and T.color.ink or T.color.accent
+        T.inkCentre(self, bb.stage, px, py, sw, sh, sc.r, sc.g, sc.b, 1, T.fontTile)
+        if open then T.rect(self, r[1], botY + 1, r[3], 2, T.color.accent) end
+        T.listEnd(L.bot)
     end
-    T.border(self, px, py, sw, sh, T.color.accent)
-    local sc = hot and T.color.ink or T.color.accent
-    T.inkCentre(self, stage, px, py, sw, sh, sc.r, sc.g, sc.b, 1, sf)
-    if open then T.rect(self, r[1], botY + 1, r[3], 2, T.color.accent) end
     if KnoxNews.hasUnread() then
         local d = math.max(6, math.floor(T.cell / 7))
         local c = T.color.accent
@@ -904,11 +1004,19 @@ function KnoxScreen:prerender()
     local cs = math.floor(22 * s + 0.5)
     local coin = self.coinRect or {0, 0, 0, 0}
     self.coinRect = coin
-    coin[1], coin[2], coin[3], coin[4] = left - math.floor(12 * s + 0.5) - cs, botY + math.floor((self.botH - cs) / 2), cs, cs
-    self.coinHot = self:isMouseOver() and T.inRect(self:getMouseX(), self:getMouseY(), coin)
-    self:drawCoin(coin, self.coinHot)
-    -- the key hints: 24 px left of the coin
-    self:drawHints(coin[1] - math.floor(24 * s + 0.5), botY + math.floor(self.botH / 2))
+    coin[1], coin[2], coin[3], coin[4] = bb.left - math.floor(12 * s + 0.5) - cs, botY + math.floor((self.botH - cs) / 2), cs, cs
+    self.coinHot = overAt(mOver, mx, my, coin[1], coin[2], coin[3], coin[4])
+    -- (the coin's pictures come later than the screen: there or not is in the key)
+    local coinKey = (self.coinHot and 1 or 0) + (coinTexture("coin_fill") and 2 or 0) + (coinTexture("coin_lines") and 4 or 0)
+    -- (the quick slots on the left: the hints leave room for them)
+    local lastQ = self.quickSlots[#self.quickSlots]
+    local quickRight = lastQ and (lastQ:getX() + lastQ:getWidth()) or -1
+    if not T.listDraw(self, L.hints, coin[1] * 10000 + botY, coinKey, KnoxControls.stamp, quickRight, W) then
+        self:drawCoin(coin, self.coinHot)
+        -- the key hints: 24 px left of the coin
+        self:drawHints(coin[1] - math.floor(24 * s + 0.5), botY + math.floor(self.botH / 2))
+        T.listEnd(L.hints)
+    end
 end
 
 -- The bottom bar's coin (two coins, lines only; the front one filled with the bar's colour)
@@ -916,10 +1024,6 @@ local COIN_REST = {r = 0x6f / 255, g = 0x74 / 255, b = 0x6d / 255}
 local COIN_FILL = {r = 0x1a / 255, g = 0x1d / 255, b = 0x1d / 255}
 local COIN_FILL_HOT = {r = 0x25 / 255, g = 0x25 / 255, b = 0x1f / 255}
 local TIP_EDGE = {r = 0x4a / 255, g = 0x4f / 255, b = 0x4f / 255}   -- (the item tooltip header's frame)
--- (only once read: KnoxRoadmap's pinned pictures, T.readyTex)
-local function coinTexture(name)
-    return KnoxRoadmap and KnoxRoadmap.tex(name) or nil
-end
 
 function KnoxScreen:drawCoin(r, hot)
     local fill, lines = coinTexture("coin_fill"), coinTexture("coin_lines")
@@ -1187,28 +1291,32 @@ local function clockText()
 end
 
 --- Pause bars and play triangles of plain rectangles in rect r.
+-- (no function made for them each call: four a frame - the author's FPS task 2026-10-28)
 local function drawSpeedIcon(ui, r, speed, c)
     local s = r[3]
     local p = math.floor(s * 0.28 + 0.5)
     local h = s - p * 2
     local y0 = r[2] + p
-    local function box(x, y, w, hh) ui:drawRect(x, y, w, hh, 1, c.r, c.g, c.b) end
     if speed == 0 then
         local bw = math.max(2, math.floor(h / 3.5))
         local cx = r[1] + math.floor(s / 2)
-        box(cx - bw - math.floor(bw / 2), y0, bw, h)
-        box(cx + math.floor(bw / 2), y0, bw, h)
+        ui:drawRect(cx - bw - math.floor(bw / 2), y0, bw, h, 1, c.r, c.g, c.b)
+        ui:drawRect(cx + math.floor(bw / 2), y0, bw, h, 1, c.r, c.g, c.b)
         return
     end
     -- `speed` triangles pointing right, side by side
     local half = math.floor(h / 2)
     local tw = half + 1
     local x = r[1] + math.floor((s - tw * speed) / 2)
-    for n = 1, speed do
-        for i = 0, half do box(x + i, y0 + i, 1, h - i * 2) end
+    for _ = 1, speed do
+        for i = 0, half do ui:drawRect(x + i, y0 + i, 1, h - i * 2, 1, c.r, c.g, c.b) end
         x = x + tw
     end
 end
+
+-- (the speed buttons' places and options filled in, not made anew each frame)
+local speedOpts = {}
+local SPEED_LIT = {r = 0.08, g = 0.08, b = 0.08}
 
 --- Lay the clock and the four speed buttons out in the top bar between x0 and x1; draw them.
 function KnoxScreen:drawTime(x0, x1)
@@ -1233,6 +1341,24 @@ function KnoxScreen:drawTime(x0, x1)
         self.clockText = text
     end
     local roll = self.clockOld and T.anim((now - (self.clockMs or 0)) / 180) or 1
+    -- (from a ready list between two rolls: the key is the time shown, where, the speed
+    -- lit and the button under the mouse - by the buttons of the last drawing, the
+    -- same while the rest of the key is)
+    local L = self.lists.time
+    if roll >= 1 then
+        local lit = buttons > 0 and math.min(3, sc:getCurrentGameSpeed()) or -1
+        local hotI = 0
+        if buttons > 0 and self.speedBuf then
+            local mx, my = self:getMouseX(), self:getMouseY()
+            for i, r in ipairs(self.speedBuf) do
+                if T.inRect(mx, my, r) then hotI = i end
+            end
+        end
+        if T.listDraw(self, L, text, date or false, x0 * 10000 + x1, lit * 100 + hotI, self.topH) then
+            if buttons > 0 then self.speedRects = self.speedBuf end
+            return
+        end
+    end
     local cy = math.floor((self.topH - T.fontH(tf)) / 2)
     local cc = known and T.color.bright or T.color.dim
     if roll >= 1 or #self.clockOld ~= #text then
@@ -1256,23 +1382,30 @@ function KnoxScreen:drawTime(x0, x1)
         T.text(self, date, x + T.pad, math.floor((self.topH - T.fontH(df)) / 2) + 1, T.color.dim, df)
         x = x + dateW
     end
-    if buttons == 0 then return end
+    if buttons == 0 then
+        T.listEnd(L)
+        return
+    end
     x = x + T.pad * 2
     local now = sc:getCurrentGameSpeed()
     if now > 3 then now = 3 end
     local y = math.floor((self.topH - s) / 2)
     local mx, my = self:getMouseX(), self:getMouseY()
-    self.speedRects = {}
-    for _, sp in ipairs(SPEEDS) do
-        local r = {x, y, s, s, sp}
+    self.speedBuf = self.speedBuf or {}
+    for i, sp in ipairs(SPEEDS) do
+        local r = self.speedBuf[i] or {}
+        self.speedBuf[i] = r
+        r[1], r[2], r[3], r[4], r[5] = x, y, s, s, sp
         local hot = T.inRect(mx, my, r)
         local lit = now == sp
-        T.button(self, r, "", {hover = hot})
+        speedOpts.hover = hot
+        T.button(self, r, "", speedOpts)
         if lit then T.rect(self, r[1], r[2], r[3], r[4], T.color.accent) end
-        drawSpeedIcon(self, r, sp, lit and {r = 0.08, g = 0.08, b = 0.08} or (hot and T.color.accent or T.color.text))
-        table.insert(self.speedRects, r)
+        drawSpeedIcon(self, r, sp, lit and SPEED_LIT or (hot and T.color.accent or T.color.text))
         x = x + s + gap
     end
+    self.speedRects = self.speedBuf
+    T.listEnd(L)
 end
 
 function KnoxScreen:onMouseDown(x, y)
@@ -1337,7 +1470,7 @@ function KnoxScreen:onMouseDown(x, y)
     end
     local dx, dy, dw, dh = self:devRect()
     if dx and x >= dx and x < dx + dw and y >= dy and y < dy + dh then
-        KnoxTestBench.toggle(self, self.playerNum)
+        KnoxTestBench.toggle(self.playerNum)
         return true
     end
     local sx, sy, sw0, sh0 = self:settingsRect()
