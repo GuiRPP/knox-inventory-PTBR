@@ -1,0 +1,1101 @@
+; Notícias do Knox Inventory (em inglês, também exibidas para idiomas sem arquivo próprio). Da mais nova para a mais antiga.
+; Como escrever:
+;   # versão | data | tipo | título     - uma nova publicação. Tipo: update, news, plans ou tech (atualização técnica: correções, desempenho, compatibilidade - moldura e imagens próprias).
+;                                          A versão pode ficar vazia: # | 10.10.2026 | news | ...
+;   ## Seção                             - um título dentro de uma publicação
+;   + texto                              - adicionado (marca verde)
+;   * texto                              - alterado (areia)
+;   - texto                              - corrigido (cinza)
+;   ! texto                              - importante (vermelho)
+;   @ imagem.png                         - uma imagem de media/knox/news
+;   @banner imagem.png                   - o fundo do cartão da publicação no menu principal (912 x 204)
+;   @art imagem.png                      - a imagem grande à direita na publicação aberta (960 x 1080, exibida inteira na cor da moldura)
+;   @frame #rrggbb                       - cor própria para a moldura do cartão no menu principal (padrão: cor principal)
+;   @dash sedan / @dash pickup hot       - painel do carro ao vivo no texto da publicação
+;   @gen / @gen worn                     - janela do gerador ao vivo no texto da publicação (novo / desgastado)
+;   @art gen                             - o próprio gerador à direita no lugar de uma imagem (ao vivo, nítido em qualquer tela)
+;   @back power                          - fundo ilustrado da publicação: grade e lâmpada que acendem quando o gerador da publicação funciona
+;   @vp / @vp fridge                     - painel de mira do Viewpoint ao vivo no texto da publicação (armário / geladeira com freezer)
+;   @art vp                              - o próprio painel de mira à direita no lugar de uma imagem (ao vivo)
+;   @back aim                            - fundo ilustrado da publicação: grade e mira que brilham enquanto um painel da publicação está em uso
+;   @open settings                       - botão "Abrir configurações do Knox" no texto da publicação
+;   # | data | pinned | título           - publicação fixada (roteiro e Boosty): sempre o primeiro cartão. Só recebe "Novo" quando uma linha @road é adicionada.
+;   @lead texto                          - segunda linha do cartão (quando não é o primeiro parágrafo)
+;   @boosty                              - bloco de apoio com o botão do Boosty
+;   @road data | versão | título | texto | prévia | publicação
+;                                         - uma linha do roteiro: prévia - road_<nome>_en.png de media/knox/news/road, publicação - o título de uma publicação deste arquivo
+;                                           aberta ao clicar no cartão. Data "-" - etapa futura. A última linha com data é "Agora".
+;   texto simples                        - um parágrafo; uma linha vazia inicia outro
+;   ; ...                                - comentário, não exibido no jogo
+; Uma publicação é considerada lida pela versão, data e título: altere-os e ela aparecerá como nova novamente.
+
+# | 25.10.2026 | pinned | O caminho do Knox Inventory
+@lead O que já saiu, o que vem por aí - e como apoiar o mod
+O Knox Inventory é feito nas horas vagas, de graça e com código aberto. Se você gosta do mod e quer ver saúde, habilidades e o restante da interface chegarem ao Knox mais rápido, você pode apoiá-lo no Boosty!
+
+@boosty
+@road 10.10 | 0.6 | Etapa 1: Teste público | Inventário no estilo Tarkov: grades, equipamentos e arredores. | u060 | Atualização 0.6.0
+@road 10.10 | 0.7 | TV e rádio | Janelas próprias para a TV e o rádio. | u070 | Atualização 0.7.0: TV e rádio
+@road 11.10 | 0.8 | O acampamento junto à fogueira | Menu principal com seus heróis junto à fogueira e o passaporte do sobrevivente. | u080 | Atualização 0.8.0: O acampamento junto à fogueira
+@road 13.10 | 0.9 | Saqueador | Tamanhos dos itens, bolsas, bolsos e busca. | u090 | Atualização 0.9.0: Saqueador
+@road 15.10 | 0.9.8 | Organização | Organização por categoria, pilhas e aparências. | u098 | Atualização 0.9.8: Organização
+@road 17.10 | 0.9.8.7 | Pelo ouvido | Sons do Knox, saves e carregadores. | u0987 | Atualização 0.9.8.7: Pelo ouvido
+@road 20.10 | 1.0 BETA | Coletes táticos e multijogador | Bolsas com compartimentos e menu do botão direito. | r10 | Knox Inventory 1.0 BETA
+@road 21.10 | Beta 3 | Ao volante | Painel, rádio e música. | b3 | Ao volante
+@road 22.10 | Beta 5 | Mantenha as luzes acesas | Janela do gerador e gerador desgastado. | g1 | Mantenha as luzes acesas
+@road 25.10 | Beta 6 | Na sua mira | Painel de mira do Viewpoint e geladeira. | x1 | Na sua mira
+@road 25.10 | Beta 8 | Faça do seu jeito | Editor de itens direto no jogo e predefinições. | e1 | Faça do seu jeito
+@road - | Etapa 2 | Saúde | Ferimentos diretamente no corpo e tratamento com um clique.
+@road - | Etapa 3 | Habilidades e mapa | Habilidades e progresso, além de um mapa-múndi no estilo Knox.
+@road - | Etapa 4 | Toda a interface | Criação, construção e veículos - janela por janela.
+
+# | 25.10.2026 | update | Faça do seu jeito
+@banner e1_banner_en.png
+@art e1_art_en.png
+Uma mochila apertada, um machado grande demais, uma jaqueta com poucos bolsos? Agora você decide. Clique com o botão direito em qualquer item e escolha "Editor de itens" - ou abra-o antes mesmo de começar, no menu principal: na aba Knox, no alto, escolha "Editor de itens". Tamanho, compartimentos das bolsas, bolsos e pilhas - tudo direto no jogo, sem arquivos de texto.
+
+## Importante
+! Há uma nova parte Java: quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+! Suas linhas em knox_overrides.txt não serão perdidas: na primeira inicialização, elas serão transferidas para a predefinição "Minha predefinição", e o arquivo será mantido como cópia em knox_overrides_backup.txt.
+
+## Interior da bolsa
+@ e1_bags_en.png
++ O tamanho do item na grade - largura e comprimento, com o ícone exibido ao lado.
++ O interior da bolsa fica a seu critério: compartimentos (como em Tarkov), uma única grade ou célula por célula. Neste último modo, desenhe o formato com o mouse: clique esquerdo adiciona uma célula, clique direito remove, ou arraste.
++ Ao lado, veja quantas células você criou e quantas a capacidade do jogo permite.
+
+## Bolsos e pilhas
+@ e1_clothes_en.png
++ Bolsos das roupas: quantas células uma jaqueta ou calça oferece - para esta peça ou para todas as roupas usadas no mesmo local.
++ Pilhas: qualquer item, exceto bolsas, pode ser empilhado em uma célula. Só itens idênticos ficam juntos.
++ Categoria (a cor do ícone) e som - selecionados em uma lista.
+
+## Predefinições
+@ e1_presets_en.png
+Cada edição fica em uma predefinição. Ela pode ser geral, para uma aba (por exemplo, apenas bolsas) ou para um mod. No jogo, elas funcionam em camadas: a mais específica prevalece sobre a geral.
++ Crie, copie, renomeie e ative ou desative predefinições na aba "Predefinições".
++ Se outra predefinição substituir a sua para um item, o editor avisa e oferece a opção "Editar lá".
++ "Redefinir tudo" restaura os itens para os valores definidos pelo Knox. Mudou de ideia? Use "Desfazer" ou Ctrl+Z.
++ Pesquise por nome e ID; na aba "Alterados" ficam todos os itens que você modificou.
+
+## Compartilhar
+@ e1_share_en.png
++ Exporte para a área de transferência ou para um arquivo em Zomboid/Lua/knox_presets. Compartilhe uma predefinição, por exemplo, nas discussões do Steam.
++ Importe da área de transferência ou de um arquivo. O editor mostra cada linha e ignora as que estiverem com erro.
++ Na aba "Mods", veja os itens de outros mods, um mod por vez, e crie uma predefinição para o seu favorito.
++ No multijogador, o administrador edita as predefinições do servidor; depois de salvar, elas chegam a todos os jogadores.
+
+## Corrigido
+- O painel de mira do Viewpoint não desaparece mais sob o mouse na câmera aérea do OldPoint: nessa situação ele se oculta, assim como o próprio painel do OldPoint.
+
+Boa organização - e que sempre sobre espaço na sua mochila.
+
+# | 25.10.2026 | update | Na sua mira
+@banner x1_banner_en.png
+@art vp
+@back aim
+Aponte para uma geladeira e um painel se abre bem ao lado da mira: linguiça, dois bifes, um pepino. Gire a roda, pressione uma tecla - os bifes vão para sua bolsa e a linha deles se recolhe.
+
+Para quem joga com o Viewpoint: o painel junto à mira agora segue o estilo do Knox. A janela de configurações do Knox também foi reformulada.
+
+## Importante
+! Há uma nova parte Java: quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+! O painel de mira só funciona com o mod Viewpoint (e o OldPoint por cima dele). Sem esses mods, nada muda no jogo.
+
+## O painel de mira
+@vp
+Isto não é uma imagem, é o próprio painel. Gire a roda do mouse para percorrer as linhas. Clique em uma linha para selecioná-la e clique novamente para pegar o item. Os botões de tecla na parte inferior também podem ser pressionados. Clique na mira para desviar o olhar e recolher o painel.
++ O cabeçalho segue o menu do Knox no mundo: mostra a imagem e o nome do recipiente. Itens do mesmo tipo aparecem em uma única linha com a quantidade.
++ A linha selecionada aumenta por inteiro: o ícone, a imagem e o nome ficam maiores. Nomes longos deslizam pela tela.
++ Veja os itens sendo pegos: a linha se preenche da esquerda para a direita, o ícone ganha uma moldura cor de areia e a linha desaparece suavemente após a coleta.
++ A busca do Knox funciona diretamente no painel: enquanto você olha para um recipiente, seu personagem o vasculha e os itens encontrados aparecem na lista. Ao desviar o olhar, a busca é pausada.
++ Bolsas dentro de recipientes: toque em "Pegar" para abrir o conteúdo e toque novamente para recolhê-lo. Segure o botão para pegar a bolsa inteira.
++ As ações de portas, janelas e outras funções do Viewpoint também aparecem aqui; as perigosas (esmurrar, quebrar) ficam por último e em vermelho.
+* As teclas são as definidas nas opções do Viewpoint; a roda seleciona uma linha.
+
+## Geladeira e freezer
+@vp fridge
+Vários recipientes em um só objeto, cada um em sua própria seção com um título.
++ O painel ajusta largura e altura suavemente, sem saltos: a quantidade de itens gira como um tambor, e as dicas na parte inferior mudam de forma gradual.
++ Não gostou? Desative "Painel de mira próprio do Viewpoint" na página "Saque e bolsas" das configurações do Knox para restaurar o painel original do Viewpoint.
++ Se algo der errado no painel, o Knox registra uma linha em console.txt e restaura automaticamente o painel do Viewpoint.
+
+## Janela de configurações
+@open settings
+A janela de configurações não ultrapassa mais a tela em monitores pequenos.
+* As configurações estão organizadas em páginas: Módulos, Aparência, Saque e bolsas, Organização, Som, Controles e Menu principal.
++ Novas páginas: Som e Menu principal; dentro delas, as opções estão organizadas em seções com títulos.
++ Role com a roda do mouse, arrastando o controle deslizante ou clicando na barra; as bordas da lista desaparecem suavemente.
+
+Bom saque - e que sempre tenha um bife na geladeira!
+
+# | 22.10.2026 | update | Mantenha as luzes acesas
+@banner g1_banner_en.png
+@art gen
+@back power
+Acione o interruptor e puxe a corda - o gerador começa a funcionar, tremendo e fazendo os ponteiros saltarem. O horímetro começa a contar. As luzes estão acesas.
+
+O gerador não exibe mais uma simples caixa de informações. Agora tem sua própria janela: um gerador portátil que você opera com as mãos.
+
+## O gerador
+@gen
+Isto não é uma imagem, é o próprio gerador. Coloque o interruptor em RUN, segure a alça da corda de partida e puxe-a com força para baixo. Clique no galão ao lado do tanque para abastecer.
++ Um tanque com medidor de combustível, interruptor OFF / RUN, corda de partida, ponteiro de carga, horímetro, luzes RUN, OIL e CO GAS, tomadas e alavanca HOUSE.
++ Ele só liga com um puxão: puxe a corda até o fim e com rapidez. Se puxar devagar ou não o suficiente, o motor não pega.
++ As tomadas exibem os aparelhos que o gerador está alimentando: geladeira, luzes, fogão. Passe o mouse sobre uma tomada para ver o nome e o uso.
++ TIME LEFT mostra por quantas horas o combustível vai durar com essa carga. O tambor iluminado à direita indica décimos de hora.
++ Quando está funcionando, o corpo treme e os medidores acendem. Em ambientes fechados, a luz CO GAS pisca.
+
+## Gerador desgastado
+@gen worn
+Este já viu dias melhores: condição de 30%. Nem sempre liga na primeira puxada.
++ Quanto pior a condição, maior a chance de falha na partida: com 30%, uma puxada em cada duas falha; a partir de 60%, ele sempre liga de primeira. Abaixo de 40%, a luz OIL pisca.
+* A mesma regra vale para qualquer partida, inclusive pelo menu do botão direito.
+
+## Como operar
++ Clique com o botão esquerdo em um gerador: o personagem se aproxima e a janela abre.
++ Enquanto a janela estiver aberta, o personagem se agacha junto ao gerador, e todas as ações são executadas de uma vez - sem barra de ação a cada clique.
++ O abastecimento funciona como no jogo: o personagem despeja o combustível do galão em porções, e o ponteiro avança até F. Clique novamente no galão para parar. O galão precisa estar com você: nas mãos, em um bolso ou em uma bolsa.
++ Só alguém que entende de eletricidade (nível 3 da habilidade) ou leu a revista sobre geradores pode conectá-lo a uma casa. Qualquer pessoa pode desconectá-lo.
++ Feche a janela ou afaste-se para o personagem se levantar.
++ Não gostou? Desative o módulo Gerador nas configurações do Knox para voltar à janela original do jogo.
+
+## Menu do botão direito
+* Todas as ações do gerador ficam no grupo principal, não em "Outros". "Ligar" e "Desligar" foram removidos: agora você o liga pela janela.
+* "Pegar gerador" aparece primeiro quando ele pode ser recolhido (somente quando está desconectado).
++ Novos ícones: informações, conectar e desconectar, abastecer, consertar, pegar, jardinagem e indesejado.
+
+Tanque cheio e luzes acolhedoras nas janelas.
+
+# | 22.10.2026 | tech | Mais leve e estável
+Atualização técnica da beta: sem novidades de conteúdo, mas o inventário exige menos do computador e alguns problemas menores foram corrigidos.
+
+## Importante
+! Há uma nova parte Java: quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## Mais rápido
+* Mover muitos itens de uma vez não reduz mais tanto o FPS: trinta itens em movimento antes custavam quase 30 ms por quadro; agora, cerca de um.
+* O menu do botão direito, as dicas dos itens, Arredores, Equipamento, a TV e o rádio fazem menos trabalho a cada quadro.
+
+## Corrigido
+- Agora é possível retirar novamente a bateria de um rádio ou walkie-talkie que esteja dentro de uma bolsa.
+- No multijogador, os itens de porta-malas que ninguém abriu ficam espalhados, como nos móveis.
+- No multijogador, um item que não coube ao usar "Pegar" permanece na pilha também para os outros jogadores.
+- Examinar um item pela barra de atalhos com o inventário fechado não quebra mais a tela do Knox.
+- Um erro na dica do jogo é registrado em console.txt uma única vez, em vez de a cada quadro.
+- A aba Saúde, que está oculta, não calcula mais nada em segundo plano nem grava dados no save.
+
+## Pequenos detalhes
+* Grama empilha até 10 unidades por célula.
+* Novos tamanhos: chocolate, manteiga, faca de filetar, luva de forno, escova e pasta de dentes, lenços, cartas, folhetos, documentos e folhas de papel ocupam 1x1; escorredor, rolo de massa, faca de pão e kit de costura ocupam 1x2. Controle remoto da TV e pinças não empilham mais.
+* Novos ícones nos menus: lâmpada, regra de organização, layout e ordem das seções. As configurações do fogão ficam ao lado de "Desligar", em vez de em "Outros".
+* Grades altas em Arredores - como porta-malas e armários grandes - desaparecem suavemente nas bordas ao rolar, como a coluna do inventário.
+* Títulos longos nos cartões de notícias do menu principal deslizam pela tela em vez de serem cortados.
+* Chinês: o painel do carro está traduzido e seus números voltaram ao tamanho normal.
+
+# | 21.10.2026 | update | Ao volante
+@banner b3_banner_en.png
+@art b3_art_en.png
+A chave entra na ignição. Os ponteiros percorrem os mostradores até o fim e voltam, as luzes acendem uma a uma. Uma fita entra com um clique e os rolos começam a girar.
+
+Agora, no Knox, um carro parece um carro: tem painel próprio, rádio próprio - e a música não para quando você sai.
+
+## Importante
+! Há uma nova parte Java: quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## Painel
+@dash sedan
+Isto não é uma imagem, é o próprio painel. Gire a chave na ignição, acenda os faróis, coloque uma fita e use a roda do mouse sobre o velocímetro para acelerar.
++ Um painel como o de um carro real dos anos 90. Junto à porta ficam o botão das luzes e a trava; diante do motorista, o conta-giros, velocímetro com marcha e piloto automático, marcador de combustível com o lado do bocal, luzes de aviso atrás do vidro e a trava na coluna. No meio, o rádio e o aquecedor.
++ À noite, os mostradores são iluminados pelos faróis. Os ponteiros oscilam em molas, as luzes acendem uma a uma ao ligar a ignição e o painel treme em uma colisão.
++ A roda do mouse gira os controles: luzes, volume, estação e temperatura do aquecedor.
+* O painel é maior e nítido em 1440p e 4K.
+
+## Sedã e picape
+@dash pickup hot
+Esta picape está ligada por ligação direta: não precisa de chave, basta clicar nos fios para dar partida.
++ O painel varia conforme o veículo. Picapes, vans, SUVs e ônibus recebem um modelo robusto: botão de puxar para as luzes, uma faixa parafusada e uma fileira de marchas abaixo do marcador de combustível. Todos os outros carros, inclusive os de mods, usam o painel do sedã.
++ Sem chave, os fios saem da ignição e soltam faíscas enquanto o motor dá partida.
+
+## Rádio
+@ b3_radio_en.png
++ VOL, TUNE, visor, predefinições de 1 a 6, SEEK, FM e TAPE - tudo funciona como em um rádio de verdade.
++ Sua música é uma fita. Clique no compartimento para inseri-la; o botão de ejeção a remove, e os rolos giram durante a reprodução. Com uma fita inserida, os botões 1 a 4 voltam ou avançam a faixa, ativam a reprodução aleatória e a repetição.
++ Clique no visor para abrir o cartão do rádio; clique fora do painel para fechá-lo.
+
+## Música no carro
+@ b3_music_en.png
++ Saia do carro e a música continua tocando nele: fica mais baixa com a distância, abafada pela lataria e mais nítida com a porta ou janela aberta. Os zumbis também a ouvem.
++ Deixe a música tocando em um carro e dirija outro: os dois continuarão tocando. Ao voltar, a faixa continua de onde parou.
++ Multijogador (teste): os jogadores próximos ao carro ouvem sua música; os passageiros a ouvem como se estivessem dentro. Arquivos que eles não têm são enviados pelo servidor. Os nomes dos arquivos nunca são enviados. As configurações ficam na aba Jogo.
+* Para servidores: é possível desativar ou limitar o compartilhamento de músicas no arquivo Zomboid/Lua/knox_server.txt do servidor: music.share = 0 desativa; music.files = 0 impede o envio de arquivos; music.max_mb define o tamanho máximo do arquivo.
+- A transmissão não interrompe mais sua música, e o chiado do rádio só acontece enquanto uma faixa está tocando.
+- Sua música não fica mais em silêncio por um tempo quando há muitos sons ao redor.
+- Fora do carro, a próxima faixa começa quando uma termina, sem interromper a transmissão. Trocar de pasta não reinicia a faixa atual.
+
+## Correções
+- O painel não desaparece mais ao entrar em um carro com o inventário aberto e depois fechá-lo.
+- Uma geladeira ou outro móvel de 20 kg recolhido com "Pegar" vai para as duas mãos, em vez dos bolsos.
+- Bolsas de bicicleta (redchili) voltam a aceitar itens.
+- Agora é possível retirar e inserir a bateria de um rádio, walkie-talkie ou lanterna clicando no ícone.
+- A grade da mochila não se sobrepõe mais ao cabeçalho.
+- Nomes longos de recipientes não são mais cortados com reticências; eles deslizam suavemente.
+- As opções do menu do botão direito ficam centralizadas em suas linhas.
+
+Ligue o motor. A estrada está esperando, e a música ficará no carro esperando por você.
+# 1.0 BETA | 20.10.2026 | tech | 1.0 BETA: Viewpoint, OldPoint e correções
+A segunda atualização da beta: Knox com Viewpoint e OldPoint, além da barra de atalhos e do painel do carro restaurados.
+
+## Viewpoint e OldPoint
++ O cursor aparece imediatamente ao abrir qualquer janela ou diálogo do Knox (inclusive despertador, divisão de pilha e janelas de bolsas), e a visão volta ao fechar.
++ Selecione uma linha no painel de saque do Viewpoint com a roda; a tecla de saque abre aquele compartimento: a geladeira ou o freezer, o porta-malas ou o porta-luvas.
+* OldPoint: o botão do meio continua sendo do Knox dentro de suas janelas - o cursor não desaparece mais e a câmera não gira atrás da tela. Na câmera aérea, a opção "Auto" em Arredores mostra tudo ao redor, inclusive corpos.
+* Quando um controle assume (o Viewpoint muda para o controle ao detectar seu uso), a tela do Knox fecha e o controle passa a usar as janelas do jogo.
+* Se uma atualização do Viewpoint alterar algo usado pelo Knox, somente essa parte da integração é desativada, com uma linha em console.txt.
+* O Knox executa menos tarefas a cada quadro quando suas janelas estão fechadas.
+
+## Corrigido
+- A barra de atalhos e o painel do carro podiam desaparecer de vez: a dica do botão de móveis do jogo falhava quando a tecla "Alternar modo" não tinha nome (muitas vezes após atribuir Tab ao inventário), e o jogo parava de criá-los. O Knox agora evita isso.
+- A barra de atalhos e o painel do carro, ocultos enquanto o inventário está aberto, sempre voltam quando ele é fechado.
+- Agora você pode largar itens para fora do carro: com a porta ou a janela aberta, Arredores mostra o chão; arraste um item até lá e o personagem o joga pela porta.
+# 1.0 BETA | 20.10.2026 | tech | 1.0 BETA: multijogador e desempenho
+A primeira atualização da beta: Knox em servidores, recipientes grandes muito mais rápidos e correções.
+
+## Multijogador (teste)
+! O Knox agora funciona em servidores e partidas hospedadas. Isso é novidade e ainda não foi testado em um servidor real - conte como foi no tópico da beta, junto com o console.txt do servidor.
++ O servidor controla onde os itens ficam em armários, carros e bolsas, além da divisão das pilhas: todos os jogadores veem a mesma coisa, que permanece após reconectar.
++ Um item arrastado para outro recipiente fica onde foi solto.
++ Busca, trancas, ordem das bolsas e organização dos bolsos são individuais: cada jogador vasculha os armários por conta própria.
++ O tamanho das bolsas e dos bolsos é definido pelo servidor e igual para todos: grid.scale em knox_server.txt e o arquivo knox_overrides.txt do servidor, na pasta Zomboid/Lua. Nas configurações, o controle deslizante indica "Definido pelo servidor".
+* O servidor precisa ter ZombieBuddy e Knox Inventory 1.0 BETA na lista de mods.
+
+## Mais rápido
+* A grade de uma prateleira grande ou de uma pilha no chão com centenas de itens é montada cerca de dez vezes mais rápido.
+
+## Corrigido
+- As janelas do fogão, transferência de líquidos, informações do recipiente e despertador fecham quando o personagem morre.
+- O botão Fechar mostra a tecla configurada para o inventário, em vez de sempre exibir "Tab".
+- Agora é possível fechar o inventário mesmo quando o personagem não está disponível.
+- Alguns dados cresciam durante toda a sessão (marcas de itens novos e itens vasculhados); agora são limpos.
+
+; Publicação da 1.0 BETA. O conteúdo entre as marcas BETA-POST também é incluído nas notícias da
+; versão 0.9.8.7 lançada (o mesmo item do Workshop) por tools\prepare_workshop.ps1: assim, seus jogadores ficam sabendo da beta.
+; Não altere as marcas.
+; BETA-POST-BEGIN
+# 1.0 BETA | 20.10.2026 | update | Knox Inventory 1.0 BETA
+@banner tech_banner.png
+@art tech_art_en.png
+@frame #c9a24a
+Saiu a beta da versão 1.0. Ela reúne tudo o que fizemos desde a 0.9.8.7: coletes táticos, um novo menu do botão direito, painel de carro e dezenas de mudanças no inventário e no menu principal. Estamos lançando agora para que você experimente e conte o que funciona, o que não funciona e o que atrapalha.
+
+! Esta é uma versão de teste, não indicada para uma campanha completa. Ela pode ter bugs que ainda não encontramos, e algo pode parar de funcionar no meio do jogo. Não use a beta em um save importante, ou faça uma cópia antes.
+
+## Como experimentar
+A beta é um mod separado dentro do mesmo item do Workshop. Sua lista de mods agora tem duas entradas: "Knox Inventory" - a versão 0.9.8.7 lançada, sem alterações - e "Knox Inventory 1.0 BETA". Só é possível ativar uma delas: elas não funcionam juntas e o jogo não permite ativar ambas.
++ Novo jogo: no menu principal, abra Mods, desative "Knox Inventory", ative "Knox Inventory 1.0 BETA" e reinicie o jogo.
++ Save existente: abra Carregar, selecione o save e entre em Mods; substitua "Knox Inventory" por "Knox Inventory 1.0 BETA". Cada save mantém sua própria lista de mods, então trocar apenas no menu principal não basta.
++ Você pode voltar à versão 0.9.8.7 da mesma forma, quando quiser.
+! Na primeira inicialização da beta, o ZombieBuddy perguntará novamente sobre KnoxInventoryJava.jar - responda "Allow".
+* Na beta, o canto da tela do inventário mostra "1.0 BETA" em vez de "Stage 1". Se aparecer "Stage 1", você está usando a versão 0.9.8.7.
+
+## Ainda não está pronto
+! O painel do carro funciona, mas ainda não está finalizado: será reformulado, e sua aparência e organização vão mudar.
+! Nem todos os tamanhos dos itens foram revisados. Alguns ainda ocupam espaço demais ou de menos. Conte quais são, indicando o nome do item.
+! O balanceamento das bolsas pode mudar: tanto o número de células quanto a capacidade de cada uma.
+! As dicas das opções do menu e das receitas ainda precisam de ajustes.
+! As roupas têm duas opções "Examinar" no menu do botão direito. Sabemos disso e vamos corrigir.
+* Não haverá uma aba Saúde na versão 1.0: estamos reconstruindo-a do zero para a 2.0. A tecla de saúde abre a janela do jogo.
+* O controle e a tela dividida continuarão usando as janelas originais do jogo.
+
+## Coletes táticos: bolsas com compartimentos
++ As bolsas do jogo agora têm compartimentos, no estilo Tarkov: espaço principal, bolsos laterais e uma tampa superior. São 33 tipos de bolsas, cada uma com seu próprio formato, sempre simétrico.
++ Itens que cabem pelo tamanho podem ser colocados nos bolsos. Bolsas de mods continuam com uma única grade, mas você pode definir um formato próprio com uma linha parts em Zomboid/Lua/knox_overrides.txt.
++ Uma bolsa pode ser colocada dentro de outra. Vazia, ocupa pouco espaço; com itens, ocupa mais; cheia, ocupa tanto quanto sua própria grade. Carteiras, chaveiros e kits de primeiros socorros não aumentam de tamanho.
++ O controle "Tamanho das bolsas e bolsos" na aba Jogo das configurações vai de 50 a 200%. A característica Organizado adiciona células; Desorganizado remove algumas. Toda bolsa tem pelo menos 4 células.
+
+## Inventário
++ A tecla própria do Knox é Tab, mas você pode alterá-la na aba Controles das configurações. A tecla de inventário do jogo também funciona, e Esc fecha a janela.
++ O cabeçalho de cada bolsa mostra cubos: quantas células estão ocupadas e o peso. O peso fica verde, amarelo a partir de 80% do limite e vermelho quando ultrapassado.
++ Saque espalhado: itens encontrados em móveis, carros e corpos ficam espalhados, não organizados em fileiras. "Organizar" os arruma. Desative essa opção na aba Jogo das configurações.
++ Ctrl+S organiza a grade sob o mouse. Você pode alterar a tecla nas configurações.
++ Para mudar a ordem dos atalhos, segure Alt e arraste um espaço.
++ Shift+clique em uma chave a coloca no chaveiro, se você tiver um.
++ Um item que não cabe em nenhuma grade é carregado com as duas mãos.
++ Penas, sementes e grama empilham.
+* Calças, suéteres e moletons ocupam 1x2, como camisetas. Todas as jaquetas ocupam 2x2. Livros de bolso ocupam 1x2, como revistas. Amido de milho ocupa 2x2; botijão de propano da lâmpada, 1x2; barra de aço, 1x3; cartas de baralho, 1x1; quadro de Dr. Oid, 2x4; caixas de charutos, 1x2. Travesseiros não empilham mais.
+* As grades em que o item arrastado não cabe escurecem exatamente no formato de suas células e compartimentos.
+* A janela de uma bolsa não ultrapassa a largura da grade. Nomes longos deslizam suavemente em vez de serem cortados.
+* A dica de uma bolsa que você ainda não abriu não mostra seu conteúdo.
+* Comida congelada tem uma moldura azul-gelo.
+- O peso de itens com conteúdo era calculado sem incluir o que havia dentro - água na garrafa, munição no carregador, itens na bolsa. Agora o peso total é considerado.
+- Ao vasculhar um manequim, as roupas que ele veste são exibidas de uma vez.
+
+## Menu do botão direito
++ Menu próprio do Knox no lugar da versão redesenhada do menu do jogo: cabeçalho do item no alto, como na dica, opções em grupos identificados, ações perigosas em vermelho no final e "Outros" recolhido.
++ 81 ícones no estilo Knox para as opções do menu. As porções de Comer e Beber são quadradinhos na própria linha. Quando uma opção está indisponível, o motivo aparece logo abaixo.
++ Menu do mundo: cabeçalho com o local - o cômodo e o que está no chão - e objetos acima, cada qual em seu próprio grupo.
++ As receitas de um item ficam no submenu Interagir, com ícones e indicação dos ingredientes necessários.
++ Janelas do Knox para o despertador e as informações de recipiente de líquidos. As dicas do jogo aparecem no painel do Knox.
+
+## Carro
++ Painel do Knox: luzes de aviso, conta-giros, velocímetro com a marcha, combustível, chave na ignição e fios expostos quando ligado diretamente. Desative-o na página Módulos.
++ Rádio no carro: o mesmo cartão do rádio do acampamento - transmissão do rádio do carro ou suas músicas da pasta do Knox.
+
+## Menu principal e novo jogo
+* Modos: Sandbox, Apocalypse, Extinction, Outbreak, Rising e Challenges. A roda do mouse percorre os modos; ao trocar, a moldura desliza e o texto e o vídeo mudam suavemente.
+* Mapa: a roda do mouse seleciona a próxima cidade, o cartão dela aparece gradualmente e um nome de save vazio recebe uma moldura vermelha grossa.
+* Sandbox: a barra de rolagem percorre a lista toda, o final da lista desaparece gradualmente, listas suspensas têm uma seta própria, Excluir fica em vermelho e as páginas mudam com animação.
+* Os números das etapas no cabeçalho e os indicadores de fase ficam perfeitamente centralizados.
++ Uma opção "Notícias no menu principal" na aba Aparência das configurações.
++ Ao carregar um save sem Knox, o Knox pergunta se você quer adicioná-lo ou jogar sem ele. A resposta é lembrada.
+* Um save excluído desaparece da fogueira imediatamente. Características e habilidades na criação do personagem podem ser percorridas com a roda.
+- No carregamento, os espaços entre as letras das frases são uniformes.
+- A música de mods de trilha sonora, como The Walking Dead, é silenciada no menu sem estalos ao trocar de faixa.
+- A música do menu não fica mais tocando indefinidamente no jogo depois que um save carrega.
+
+## Como relatar um bug
+Publique nas Discussões da página do mod, no tópico "1.0 BETA". Precisamos de três coisas:
++ o que você fez e o que aconteceu, de preferência com uma captura de tela;
++ o arquivo Zomboid\console.txt logo após o bug;
++ sua lista de mods.
+Não conseguimos investigar relatos sem console.txt e sem a lista de mods. Obrigado por testar!
+; BETA-POST-END
+
+; Diário da versão 1.0 ("O caminho até a 1.0"): uma publicação que cresce com o tempo. A cada dia, novas seções
+; "## Mês dd - assunto" são adicionadas no TOPO, abaixo da introdução; as antigas permanecem. A data da publicação é
+; a data da seção mais recente: alterá-la faz a publicação aparecer como nova novamente para os jogadores.
+; Imagens: tools\make_news_road10.ps1 (r10_*).
+; Remova a linha "! Tudo abaixo vem com a versão 1.0..." quando a versão 1.0 for lançada.
+# | 18.10.2026 | news | O caminho até a 1.0
+@banner r10_banner_en.png
+@art r10_art_en.png
+Este é o diário da versão 1.0. Aqui mostramos no que estamos trabalhando enquanto ela não chega: sempre que algo fica pronto, adicionamos uma nova seção com data. A mais recente fica no topo.
+
+* Tudo abaixo já está no Knox Inventory 1.0 BETA.
+
+O coração da versão 1.0 são os coletes táticos: bolsas com compartimentos, no estilo Tarkov. Em torno deles, reunimos tudo o que torna o inventário completo e bem-acabado.
+
+## 18 de outubro - O painel
+@ r10_dash_en.png
+O painel do carro agora é próprio do Knox. Fica centralizado na parte inferior, como o do jogo, mas é mais baixo e largo, cobrindo pouco da estrada.
++ À esquerda, em uma grade, ficam as luzes: motor, bateria, faróis, portas, aquecedor, rádio, piloto automático e porta-malas. As cores são as do jogo e clicar em uma luz executa a mesma ação: dar partida, acender os faróis, trancar as portas ou o porta-malas.
++ Ao lado do piloto automático aparecem os números: a velocidade que ele mantém fica visível sem precisar de uma dica.
++ Conta-giros; velocímetro com arco cor de areia, velocidade em números e marcha; marcador de combustível com bomba e seta indicando o lado do bocal. Pouco combustível acende a bomba em amarelo; quase vazio, em vermelho piscante.
++ Os ponteiros oscilam em molas. Ligue a ignição e eles vão até o fim e voltam, enquanto as luzes acendem uma após a outra, como em um carro real.
++ A chave entra na ignição e gira até ON e até START enquanto o motor dá partida, depois volta. Em uma ligação direta, os fios pendem da ignição e soltam faíscas durante a partida.
+* A dica de cada luz mostra apenas o que o painel não exibe: condição do motor, carga da bateria, combustível restante exato, rotação e motivo de algo não funcionar.
+* Quando o carro bate em algo, o painel pisca e treme. É possível desativá-lo na página Módulos para restaurar o painel original do jogo.
+
+## 18 de outubro - O rádio do carro
+@ r10_carradio_en.png
++ Passe o mouse sobre a luz do rádio para abrir o mesmo cartão do rádio do acampamento no menu principal.
++ Transmissão - o rádio original do carro: o botão liga e desliga, as estações aparecem em uma lista e são percorridas pelos botões, e o volume é controlado pelo botão giratório. Clique no quadrado do rádio para abrir sua janela.
++ Minha música - suas músicas da pasta do Knox: listas de reprodução, aleatório, repetição e busca na faixa. Ela toca pelo alto-falante do carro, então é preciso haver energia e o rádio estar ligado. A transmissão é silenciada enquanto isso, e os zumbis ouvem a música como ouvem um rádio.
+* Com o rádio ligado, a música do jogo fica muda - inclusive a de mods de trilha sonora, como The Walking Dead. Se o jogo for pausado, a faixa também para.
+
+## 18 de outubro - O menu do botão direito
+@ r10_menu_en.png
+Até agora, o menu do botão direito era o menu do jogo, apenas repintado nas cores do Knox. Agora o Knox tem seu próprio menu, que dá continuidade à dica do item.
++ No alto fica o mesmo cabeçalho colorido da dica: ícone, nome, categoria, tamanho e peso. Clique com o botão direito enquanto a dica está aberta e ela se transforma no menu, sem mover o cabeçalho. Nomes longos de livros quebram a linha em vez de alargar o menu.
++ No topo, sem título, ficam as opções mais usadas. Examinar sempre aparece primeiro. Depois vem a ação principal do item - a que ocorre com duplo clique: Comer, Beber, Vestir, Ler. Para armas, aparece Acoplar. Em seguida, as ações próprias do item, como Rasgar e Desmontar.
++ As demais opções ficam em grupos com título: Usar, Vestir e segurar, Mover, Criar. Soltar e Despejar no chão ficam no fim, em vermelho e após uma linha, para evitar cliques acidentais.
++ "Outros" fica recolhido. Passe o mouse sobre o título para abrir; leve-o de volta para cima para recolher. Clique no título para abrir ou fechar manualmente.
++ As porções de Comer e Beber não ficam mais escondidas em um submenu: quadrados cor de areia aparecem na própria linha - um quarto, metade ou tudo. Clique na linha para selecionar tudo.
++ Quando uma opção não pode ser executada naquele momento, o motivo aparece em cinza logo abaixo, por exemplo, "Escuro demais". Não é preciso procurar essa informação em uma dica.
+* O destaque desliza entre as opções, os submenus se abrem e o menu e seus submenus usam a mesma moldura cor de areia do ícone do item.
+* "Colocar no recipiente" foi removido: use Shift e arraste. "Remover taco de beisebol das costas" agora se chama apenas "Desequipar".
+- O menu de um espaço de atalho (Costas, por exemplo) voltou a ter cabeçalho e grupos, como os demais.
+
+## 18 de outubro - Ícones
+@ r10_icons_en.png
++ Todas as opções dos menus do jogo agora têm ícones próprios no estilo Knox - são 47, desenhados em uma linha: comida, bebida, mãos, roupas, movimentação, líquidos, receitas, despertador e muito mais.
+* Os ícones ficam cinza normalmente, cor de areia sob o mouse e vermelhos nas opções perigosas. As imagens coloridas de itens e receitas do jogo não atrapalham mais a leitura do menu.
+* O Knox não reconhece opções adicionadas por outros mods, que mantêm suas próprias imagens. As buscas de receitas do Neat Crafting e de construções do Neat Building já têm ícones.
+
+## 18 de outubro - Receitas
+@ r10_recipes_en.png
++ O submenu de receitas, antes chamado pelo nome do próprio item ("Lençol"), agora se chama Interagir. Cada receita tem um ícone indicando sua função: amarrar uma corda, rasgar, costurar uma bolsa, abrir uma lata, desmontar.
++ Os outros itens exigidos pela receita aparecem logo abaixo: ícone de caixa de ferramentas e "Martelo de unha".
+* As dicas das opções foram removidas do menu: apenas repetiam o que já estava visível. "Substituir: Martelo de unha" não aparece mais ao lado de Acoplar.
+
+## 18 de outubro - O despertador
+@ r10_alarm_en.png
++ "Definir despertador" abre uma janela do Knox com a aparência do próprio relógio: um relógio de pulso com pulseira e coroa ou um despertador de mesa apoiado nos pés. Dígitos âmbar em um visor escuro mostram a hora.
++ Altere horas e minutos pelas setas pequenas acima e abaixo dos dígitos ou pela roda do mouse.
++ O despertador é ligado por um botão no próprio relógio: na lateral do de pulso e no alto do despertador de mesa. Quando está ligado, o botão fica pressionado e iluminado, e AL brilha no visor.
+* Não há botão Concluir: feche a janela pelo X ou com Esc para definir a hora. Enquanto ela estiver aberta, um fio aparece ligado ao relógio, que fica iluminado.
+
+## 18 de outubro - Recipientes e dicas
+@ r10_fluid_en.png
++ As informações do recipiente agora aparecem em uma janela do Knox: um tanque na cor do líquido, nome do recipiente, capacidade total, quantidade armazenada e espaço livre.
+* As demais dicas do jogo - de botões, objetos no mundo e receitas - aparecem no painel do Knox, com a fonte do Knox.
+
+## 18 de outubro - Peso e pequenos detalhes
+@ r10_weight_en.png
+- Itens com conteúdo tinham o peso calculado incorretamente. A dica, a janela de inspeção, a organização por peso e o cálculo de diferença ao mover consideravam o item vazio - sem água na garrafa, munição no carregador ou objetos na bolsa. Agora o peso total é considerado. O peso total do personagem já estava correto.
+* Comida congelada tem uma moldura azul, cor de gelo.
+- Os rótulos de sintonia e volume dos botões do rádio e do walkie-talkie não se sobrepõem mais.
+* Os indicadores das etapas abaixo das abas ficam alinhados às bordas dos painéis.
+
+## 17 de outubro - Bolsas táticas
+@ r10_rigs_en.png
++ Foram adicionados compartimentos a 33 famílias de bolsas: espaço principal, tampa, bolsos e bolsos laterais. Mochilas ALICE, escolares e de trilha, bolsas esportivas, militares e médicas, coletes táticos, caixas de ferramentas, malas e kits de primeiros socorros - cada um com sua própria organização.
++ Os compartimentos são sempre simétricos: nada fica saliente de um lado, e há uma pequena separação entre eles.
++ Cada bolso aceita qualquer item que caiba nele. O item fica inteiro em um compartimento, nunca dividido entre dois.
+* A bolsa continua tendo o dobro de células de sua capacidade - agora elas apenas estão divididas em compartimentos.
++ "Organizar" preenche os compartimentos, começando pelo espaço principal. Um item novo sem lugar reservado também vai primeiro para lá.
++ O que não couber em lugar nenhum - um rifle em um colete tático, por exemplo - fica nas linhas vermelhas abaixo dos compartimentos.
+* O tamanho no cabeçalho da bolsa mostra o espaço principal + o restante: 4x5+10.
++ A bolsa do herói junto à fogueira exibe os mesmos compartimentos.
+* Bolsas de mods continuam com uma grade única. Você pode adicionar compartimentos com uma linha em Zomboid/Lua/knox_overrides.txt, por exemplo: Mod.Bag = parts 4x2 / 1x2 5x6 1x2.
+
+## 17 de outubro - Coluna do inventário
+@ r10_column_en.png
++ As seções se recolhem e se expandem suavemente: a grade desliza sob o cabeçalho e as seções abaixo acompanham o movimento.
++ Grades que ultrapassam a borda da coluna desaparecem suavemente, em vez de serem cortadas.
+* A barra de rolagem começa alinhada ao primeiro cabeçalho e não fica mais grudada na borda.
+* A grade de uma bolsa com nome longo continua centralizada na janela.
+- As colunas não ficam mais escondidas atrás da barra inferior de dicas.
+
+## 17 de outubro - Módulos
+@ r10_modules_en.png
++ A única opção "Interface durante o jogo" agora foi dividida em sete: inventário, barra de atalhos, TV e rádio, fogão e micro-ondas, transferência de líquidos, dicas de itens, menus e diálogos. Quer usar o inventário do jogo (ou de outro mod), mas as janelas de TV e fogão do Knox? Agora é possível, e vice-versa.
+* Se "Interface durante o jogo" estiver desativada, as sete opções continuarão desativadas na versão 1.0 - nada muda sozinho.
+
+## 17 de outubro - Walkie-talkie
+@ r10_walkie_en.png
++ Um walkie-talkie nas mãos abre uma janela do Knox, como os rádios no chão e nos carros. Frequência, volume, estações, microfone e bateria - tudo ali. O aparelho tem seu próprio modelo, de plástico escuro.
+- Girar a roda sobre o seletor de canais da TV não faz mais o personagem clicar em vários canais: o canal muda de uma vez quando a roda para.
+
+A próxima seção aparecerá aqui. O que você gostaria de ver na versão 1.0? Conte para nós nas discussões da página do mod no Steam.
+
+# 0.9.8.7 | 17.10.2026 | update | Atualização 0.9.8.7: Pelo ouvido
+@banner u0987_banner_en.png
+@art u0987_art_en.png
+No escuro, você não consegue ver o que há na caixa. Mas consegue ouvir: uma lata tilinta, uma tampa bate, o tecido farfalha. Suas mãos encontram um item antes dos seus olhos.
+
+Agora o Knox também funciona assim. Cada item soa de acordo com o material de que é feito, e todos os sons têm o mesmo volume.
+
+## Importante
+! Se você não atualiza o mod desde 16 de outubro, reinicie o jogo completamente após esta atualização. Quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## Sons
+@ u0987_sound_en.png
++ Ao vasculhar, você ouve as mãos mexendo no recipiente, e cada item emite seu som no momento em que é encontrado.
++ Pegue um item com o mouse, coloque-o em outro lugar da mesma bolsa ou gire-o com R - ele emitirá um som. A janela da bolsa abre e fecha com o ruído do zíper dela.
++ O som depende do material. O Knox identifica o material de todos os itens do jogo e reconhece itens de mods pelos mesmos sinais: lata, vidro, cerâmica, tecido, couro, papel, livros, plástico, madeira e outros.
+* Todos os sons foram medidos e ajustados para o mesmo nível: nenhum sussurra ou estoura em comparação aos demais. As armas não fazem mais um estrondo como se caíssem no chão.
++ Você pode definir um som próprio para um item em Zomboid/Lua/knox_overrides.txt, por exemplo: Base.ToiletPaper = sound softpaper.
+
+## Configurações
+@ u0987_settings_en.png
++ Dois novos controles deslizantes na aba Jogo: Sons de busca e Sons da interface. 0% é silêncio; 200% é o dobro do volume.
+
+## Saves
++ Se o Steam atualizasse o mod enquanto o jogo estivesse aberto, o Knox podia desaparecer de um save: por um momento o jogo não encontrava o mod e salvava sem ele. Agora o Knox identifica esses saves no menu principal e oferece restaurá-lo com um botão.
+
+## Carregadores
+@ u0987_mags_en.png
+* Carregadores cheios e vazios não empilham mais juntos: você pode carregar cada um sem separar a pilha manualmente.
+
+## Correções
+- Com o poder administrativo "Carregar sem limite", agora é possível pegar novamente o quanto quiser: o que não couber na grade vai para a linha "Não cabe".
+- O chiado do rádio do menu não continua no jogo depois que você cria um novo personagem.
+- Geladeira e freezer: no modo "Somente o compartimento aberto", os dois compartimentos são exibidos.
+- Em uma coluna de inventário rolada, os cliques são registrados no lugar certo e o menu do botão direito abre junto ao mouse.
+- Itens ocultos de mods (punhos e luvas de mods de combate desarmado) não aparecem mais como ícones.
+- A música de menu dos mods musicais toca pelo rádio junto à fogueira.
+- Jogadores que usam o inventário original voltam a ver a bolsa junto à fogueira.
+- O Knox pesa menos no desempenho do jogo: faz menos trabalho a cada quadro, especialmente no menu principal.
+
+Escute. Uma caixa contará o que há dentro antes que você consiga enxergar direito.
+
+# 0.9.8.6 | 16.10.2026 | update | Atualização 0.9.8.6: Pertences
+@banner u0986_banner_en.png
+@art u0986_art_en.png
+Ninguém junto à fogueira pergunta o que há na mochila dos outros. Mesmo assim, todos tiram as mochilas e as deixam por perto. Quando a fogueira está quase apagando, alguém tira algo seu - um taco velho, um cantil, as chaves de uma casa que já não existe - coloca no chão e fica olhando por muito tempo.
+
+Agora, isso também acontece junto à sua fogueira.
+
+## Importante
+! A parte Java do mod foi atualizada. Reinicie o jogo completamente e, quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## A bolsa junto à fogueira
+@ u0986_bag_en.png
++ Os heróis junto à fogueira tiram as mochilas e as deixam ao lado. Clique em uma delas para abrir tudo o que aquele herói carrega: os bolsos e cada bolsa vestida, com os itens em seus lugares, como no inventário.
++ Os itens no cartão se comportam como no inventário: levantam sob o mouse, e o item pego acompanha o cursor balançando - quanto mais pesado, maior o balanço.
++ Cada bolsa tem seu próprio som: a mochila abre o zíper, uma bolsa feita de lençol ou um saco farfalha.
+* O Knox se lembra do conteúdo das bolsas enquanto você joga. Em saves antigos, a bolsa aparece junto à fogueira depois que você jogar com ela pelo menos uma vez.
+
+## Lembranças
+@ u0986_keep_en.png
++ Segure um item no cartão da bolsa e arraste-o para o acampamento: ele fica no chão. Enquanto o carrega, pressione R para girá-lo.
++ É apenas uma lembrança: o item continua na bolsa do herói e o save não é alterado.
++ Arraste a lembrança para movê-la; clique com o botão direito nela ou solte-a sobre qualquer bolsa para removê-la. Passe o mouse para ver de quem era.
++ O acampamento comporta até 30 itens. Para removê-los todos de uma vez, use "Restaurar o acampamento" nas configurações do Knox, na aba Módulos.
+
+## O acampamento ganha vida
++ Passe o mouse sobre um herói junto à fogueira e ele olhará para você.
++ Os mortos atrás da cerca não balançam mais todos juntos. Cada um tem seu ritmo e seu jeito de andar: vagueiam ao longo da cerca e olham ao redor, com passos que se ouvem no tempo certo.
+* Os gemidos atrás da cerca estão mais baixos e são menos frequentes; cada morto tem uma voz própria - masculina ou feminina, como o herói tinha em vida.
++ Os itens do menu principal entram um após o outro; sob o mouse, o painel se desenrola e o item se move um pouco.
+
+## Correções
+- Um erro no menu principal ocorria quando um dos heróis mortos vinha de um save que nunca havia sido jogado com o Knox.
+- Um herói podia aparecer de roupa íntima junto à fogueira quando o jogo ainda não tinha carregado suas roupas ou com mods como Transmog. Agora aparece com suas roupas de verdade.
+- Com alguns mods de inventário, todos os recipientes ao redor, até o chão, apareciam trancados.
+
+Chegue mais perto. E mostre o que tem na sua mochila.
+# 0.9.8.5 | 16.10.2026 | update | Atualização 0.9.8.5: Sinal
+@banner u0985_banner_en.png
+@art u0985_art_en.png
+A terceira noite no acampamento, e ninguém tinha dormido direito. A fogueira estalava, algo gemia atrás da cerca - alguém que já não podíamos ajudar - e um de nós insistia em mexer com uma chave de fenda em um velho rádio vermelho encontrado na garagem de um desconhecido. "Deixa isso pra lá", alguém disse. Ele não deixou.
+
+O interruptor estalou. Um chiado saiu do alto-falante, um assobio percorreu o dial - e, por entre os estalos, veio a música. Fraca e distante, como se viesse de um mundo onde as luzes ainda estão acesas e alguém ainda se importa com canções. Todos junto à fogueira ficaram em silêncio. Até o grilo na grama parou por um instante.
+
+Foi assim que nosso acampamento ganhou um rádio.
+
+## Importante
+! A parte Java do mod foi atualizada. Reinicie o jogo completamente e, quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## O rádio junto à fogueira
+@ u0985_radio_en.png
++ Há um rádio junto à fogueira, com uma chave de fenda e uma bateria ao lado - alguém acabou de consertá-lo. Passe o mouse sobre ele para abrir seu cartão.
++ Ele toca a música do jogo ou a sua: coloque arquivos .ogg, .mp3, .wav ou .flac em Zomboid/knox_music - o botão de pasta abre esse local. Cada subpasta funciona como uma lista de reprodução.
++ Avançar e pausar, próxima e faixa anterior, repetir (lista, uma faixa ou nenhuma), aleatório, volume e lista de faixas. Use a roda do mouse sobre o cartão para ajustar o volume.
++ Aperte o botão do rádio e a música sairá pelo alto-falante pequeno: abafada, um pouco áspera e com chiado. O sinal oscila e, de vez em quando, some por um instante antes de voltar. Uma luz brilha no dial enquanto o rádio toca.
++ O interruptor estala, a estação sintoniza com um assobio e os botões respondem como os de um toca-fitas antigo.
+* Tudo é lembrado: o que está tocando, o volume, a repetição, o aleatório e o rádio.
+
+## O acampamento ganha vida
++ A câmera respira um pouco e gira levemente acompanhando o mouse. As árvores balançam ao vento.
++ Agora o acampamento tem sons: a fogueira estala, a floresta noturna farfalha, o vento sopra e um grilo canta de vez em quando. Às vezes, uma coruja pia, um lobo uiva ao longe e, atrás da cerca, gemem aqueles que nunca mais se sentarão junto à fogueira.
+* Os trovões e a TV do menu original do jogo não tocam mais por cima do acampamento.
+
+## Noite adentro
++ Escolha um herói e o menu desaparece junto com a música. Ele se levanta e se afasta sozinho da fogueira, com os passos no ritmo da caminhada.
++ Quando a tela escurece, ele dá mais alguns passos noite adentro, enquanto o acampamento desaparece atrás dele: primeiro a fogueira, depois a floresta e, por último, o vento.
+* Sua música continua tocando durante a tela de carregamento e desaparece no jogo após "Clique para começar". Em seguida, a música do jogo entra suavemente, em vez de começar de uma vez.
+
+## Inventário
+* Um item novo fica ao lado de outro igual que já esteja na bolsa: uma segunda barra de chocolate vai junto da primeira, onde quer que ela esteja, em vez de ir para a fileira superior de comida.
+
+## Correções
+- Agora é possível voltar pelos canais da TV a partir do primeiro e alternar as camadas de roupa para trás corretamente.
+
+Ligue o rádio. Alguém precisa estar ouvindo.
+# 0.9.8 | 15.10.2026 | update | Atualização 0.9.8: Organização
+@banner u098_banner_en.png
+@art u098_art_en.png
+Gosta de tudo organizado, mas detesta perder tempo com isso? Agora sua mochila se organiza com um botão, e o jeito como você a arruma manualmente fica salvo: os itens encontrados vão direto para seus lugares.
+
+## Importante
+! A parte Java do mod foi atualizada. Reinicie o jogo completamente e, quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## Organizar por categoria
+@ u098_sort_en.png
++ O botão Organizar arruma um recipiente por categoria: armas com armas, remédios com remédios, cada categoria em seu próprio bloco. Itens iguais ficam lado a lado, pilhas parciais são reunidas e a comida que estraga primeiro vem antes.
++ Seus bolsos e bolsas também têm o botão Organizar no cabeçalho.
++ Clique com o botão direito no cabeçalho de uma bolsa, recipiente ou janela de bolsa para ver outras regras: Compacto, Por nome, Por peso.
+* Itens trancados permanecem no lugar. Reorganizar um recipiente não consome tempo do jogo.
+
+## Layouts
+@ u098_layout_en.png
++ Organize uma bolsa como preferir e escolha Salvar layout no menu do cabeçalho. Organizar recoloca os itens nesses lugares, qualquer que seja a regra.
++ O espaço de um item ausente aparece como uma silhueta clara, para você ver o que está faltando. Outros itens não ocupam esses espaços enquanto houver outro lugar disponível.
++ Um item sem espaço reservado ocupa um espaço livre de sua categoria: um machado vai para onde ficava o taco. Se não houver espaço, fica o mais perto possível de sua categoria.
++ O ícone de olho ao lado do botão Organizar mostra ou oculta as silhuetas.
+* O layout fica salvo na própria bolsa e continua nela quando você a tira ou larga. Seus bolsos também têm um layout, assim como armários e porta-malas.
+
+## Pilhas
+@ u098_stacks_en.png
++ Passe o mouse sobre um item por perto e suas pilhas do mesmo tipo acenderão: verde se ainda houver espaço e vermelho se estiverem cheias.
+* Shift+clique e Pegar tudo completam primeiro suas pilhas, em qualquer bolsa que estejam, e só depois procuram um espaço livre. Se não couber tudo, o restante ocupa um ícone separado.
+* Itens recebidos sem um espaço selecionado vão para perto de sua categoria, não para a primeira célula livre.
+* Cigarros, cigarros enrolados e charutos empilham até 20 por célula. Um maço aberto não ocupa mais vinte células.
+
+## Configurações
+@ u098_settings_en.png
++ Nova aba Organização: regra de organização, destino de itens novos e ordem das categorias. Arraste a linha de uma categoria ou mova-a uma posição com as setas à esquerda.
++ Em Zomboid/Lua/knox_overrides.txt, você pode definir a categoria de qualquer item, por exemplo: Base.Bleach = category mat.
+
+## Janela de itens encontrados
++ Selecione itens com um quadro de seleção ou Ctrl+clique, como nas grades, e mova todos de uma vez.
+* Seus bolsos e bolsas ficam marcados em cor de areia nessa janela.
+
+## Temas (beta)
+@ u098_skins_en.png
++ Configurações - Aparência - Tema: sete temas prontos (Areia, Sangue, Pinheiro, Gelo, Visão noturna, Carvão e Mansão) ou um tema próprio, definido pelos controles de matiz, saturação e brilho.
++ Um tema altera de uma vez, sem recarregar, a cor principal das molduras, botões e seleções, o tom das janelas e grades, além do cursor, dicas dos itens e tela de carregamento.
+* Os ícones mantêm as cores das categorias, que ajudam a distinguir os itens rapidamente.
+! Isto é uma versão beta: se algo continuar cor de areia em algum lugar, conte para nós nos comentários.
+
+## Pequenos detalhes
++ Um item arrastado com o mouse fica um pouco atrás do cursor e balança ao parar. Quanto mais pesado, maior o balanço.
++ O ícone sob o mouse se ergue um pouco, dando um pequeno salto.
+* Um item em movimento ganha uma moldura cor de areia, treme um pouco e tem uma barra de preenchimento mais grossa.
++ Um item na mão pode ser arrastado diretamente para fora da barra de atalhos, na parte inferior da tela, e solto no mundo para cair no chão.
++ Um gerador e outros itens muito pesados tremem enquanto são arrastados: é difícil mantê-los erguidos.
++ Itens quentes brilham em vermelho e frios em azul, como nas linhas do inventário original do jogo. Agora uma panela no fogão mostra a temperatura da água: quanto mais intenso o vermelho, mais quente.
+
+## Desempenho
+* Uma pilha grande no chão não reduz mais o FPS: os ícones simples agora são desenhados de uma vez pela parte Java.
+
+## Correções
+- O acampamento do menu principal não quebra mais quando um sobrevivente carrega uma arma de mod sem modelo 3D.
+- "Pegar" (no menu do botão direito, no chão ou no painel de saque do Viewpoint) não tenta mais colocar itens em bolsos cheios. O item vai para onde Shift+clique o colocaria: em uma pilha correspondente ou na primeira bolsa com espaço. Se não houver espaço, permanece onde está.
+- Um gerador e outros itens pesados vão das mãos para o porta-malas, em vez de caírem no chão.
+- Cópias esmaecidas de itens em movimento não aparecem mais em outro recipiente do mesmo tipo no mesmo quadrado, como o próximo corpo de uma pilha.
+- Uma garrafa de água e outros itens com líquido não ficam mais como ícones vazios quando o movimento termina: desaparecem junto com o ícone.
+- O Viewpoint não revela mais o conteúdo de recipientes não vasculhados: o painel de saque mostra apenas o que você encontrou; o restante fica atrás da linha "Ainda não vasculhado".
+
+# 0.9.7 | 14.10.2026 | update | Atualização 0.9.7: Etapas e busca
+@banner u097_banner_en.png
+@art u097_art_en.png
+Agora as abas mostram em que etapa está cada parte da interface. E a busca é completa: uma bolsa aberta com duplo clique e uma mochila recolhida também precisam ser vasculhadas; o que você ainda não encontrou não pode ser espiado em lugar nenhum.
+
+## Importante
+! Se o ZombieBuddy perguntar novamente se deve carregar KnoxInventoryJava.jar, responda "Allow".
+
+## Etapas abaixo das abas
+@ u097_stages_en.png
++ Abaixo de cada aba da barra superior há uma placa com sua etapa. A placa cor de areia indica a etapa em que estamos trabalhando.
+* A aba Diário foi removida; o mapa não tem etapa.
+
+## Busca
+@ u097_search_en.png
++ Uma janela de bolsa aberta com duplo clique também é vasculhada: os itens são encontrados um a um, e o cabeçalho mostra "Vasculhando N / M".
++ Uma mochila que você pegou e vestiu sem olhar é vasculhada diretamente na coluna do inventário. Seus próprios itens, o kit inicial e o que você mesmo guardou não precisam de busca.
+* A busca acontece em um lugar por vez: primeiro a janela da bolsa, depois as bolsas vestidas e, por fim, o recipiente em Arredores. Os demais aguardam e mostram apenas o que já foi encontrado.
+- Itens ainda não encontrados não aparecem mais na janela de itens encontrados, nas contagens da busca por nome, na seleção rápida de um espaço vazio nem entre os recipientes e fitas das janelas de líquidos, rádio e TV.
+- O quadro de seleção, a organização e os movimentos rápidos não selecionam mais itens ainda não encontrados.
+
+## Multijogador
+- Em servidores dedicados, todos os veículos ficavam azul-esverdeados: a iluminação do acampamento do menu principal continuava ativa após entrar no servidor.
+
+## Criação de personagem
+- Com o NeatUI Hairstyler, o botão do penteado ficava escondido sob a amostra da cor do cabelo. Agora os dois aparecem lado a lado.
+
+## Notícias
+* As imagens de todas as publicações anteriores foram refeitas no novo estilo: partes da própria interface do Knox, com os ícones originais do jogo.
+
+## Correções
+* A moldura do contador de um recipiente parcialmente vasculhado agora tem a mesma espessura da moldura do ícone.
+* As grades fazem menos trabalho desnecessário a cada quadro.
+
+# 0.9.6 | 14.10.2026 | update | Atualização 0.9.6: Busca
+@banner u096_banner_en.png
+@art u096_art_en.png
+Digite algumas letras e o Knox mostra onde está o item: nos seus bolsos, bolsas ou armários ao redor. Agora é possível pegar bolsas diretamente de Arredores; a busca lembra onde você parou, e grandes pilhas de saque não deixam mais o jogo lento.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+! Após cada atualização, o ZombieBuddy pergunta novamente se deve carregar KnoxInventoryJava.jar. Responda "Allow", ou o mod e o menu do acampamento permanecerão desativados.
+
+## Busca por nome
+@ u096_search_en.png
++ Um campo de busca na barra superior. Digite algumas letras: tudo o que corresponder fica destacado com uma moldura cor de areia, e o restante desaparece - nos bolsos, nas bolsas, nas janelas delas e na grade de Arredores.
++ As placas das linhas em Arredores mostram quantos resultados há em cada recipiente, incluindo as bolsas dentro dele.
+* A busca considera apenas o que você já viu; ela não revela itens ainda não vasculhados.
+* Maiúsculas e minúsculas não fazem diferença. Esc ou o X limpa o campo; fechar a tela também.
+
+## Janela de itens encontrados
+@ u096_found_en.png
++ O botão Encontrados ao lado do campo abre todos os resultados de uma vez, organizados por recipiente: primeiro o que está ao redor, depois suas próprias bolsas.
++ "Pegar tudo" move para o inventário todos os itens encontrados ao redor.
++ Arraste os itens diretamente para fora da janela - para qualquer grade ou para o cartão de outro recipiente na mesma janela. Shift, botão direito, duplo clique e botão do meio funcionam como em uma grade.
+* Enquanto um item é movido, ele permanece esmaecido na janela, com uma barra de progresso. O que sai desaparece gradualmente; o que chega aparece aos poucos.
+
+## Bolsas em Arredores
+@ u096_bags_en.png
++ Uma mochila, bolsa ou saco de lixo no chão ou em um armário pode ser pega pela linha em Arredores ou pelo cabeçalho da grade e colocada nas costas, na mão, em um espaço de atalho ou na sua grade.
+* Móveis, corpos e peças de carro não podem ser pegos dessa forma.
+
+## Vasculhar recipientes
+@ u096_rummage_en.png
++ Um recipiente parcialmente vasculhado não parece mais intocado: sua placa vira um quadrado escuro com moldura cor de areia e o número de itens encontrados. Encontre tudo e a placa ficará preenchida com areia.
+* "Vasculhando N / M" no cabeçalho conta os itens encontrados em relação ao total, incluindo os que você já havia encontrado antes.
++ A busca se lembra do que você conhece: tudo o que carregou ou já encontrou. Se você largar uma mochila e abri-la novamente, só os itens novos serão vasculhados.
+- Ao trocar de recipiente no meio de uma busca, os itens ainda não encontrados apareciam por um instante.
+
+## Desempenho
+@ u096_speed_en.png
++ Com uma montanha de itens por perto - centenas de objetos no chão ou um depósito lotado - o jogo ficava muito lento com o inventário aberto, chegando a 5 quadros por segundo. Quatro vezes por segundo, o Knox reorganizava toda a pilha na grade, e cada organização levava meio segundo.
+* Agora a organização é 7 vezes mais rápida e só ocorre quando algo na pilha muda: um item é pego, solto ou movido. O Knox também não desenha mais o que está fora da área visível da coluna.
+
+## Menu principal e notícias
+* Os cartões de notícias e o passaporte do herói têm molduras da mesma espessura em todos os lados; a barra de saúde não invade mais a moldura.
+* A imagem grande de uma publicação aberta aparece inteira em qualquer tela.
+
+## Correções
+- Se o mod fosse atualizado enquanto o jogo estava aberto, surgiam erros e o menu do acampamento desaparecia. Agora o jogo apenas pede para reiniciar.
+- Se a tela do inventário não abrir por causa de um erro, Tab não fica mais sem resposta: o inventário original do jogo abre até a próxima reinicialização, e o motivo é registrado em console.txt.
+- Os X de fechar de todas as janelas do Knox acendem sob o mouse, como os botões ao lado.
+
+# 0.9.5 | 14.10.2026 | update | Atualização 0.9.5: Viewpoint
+@banner u095_banner_en.png
+@art u095_art_en.png
+O inventário agora funciona bem com a visão em primeira pessoa do Viewpoint. Esta publicação também reúne tudo o que veio após Saqueador em pequenas atualizações sem publicação: pilhas mistas, busca, rotação de itens com o mouse e várias correções.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+
+## Viewpoint
+@ u095_viewpoint_en.png
++ Abra o inventário, a TV, o rádio ou outra janela do Knox e o cursor aparece imediatamente; feche-a para voltar a mover a visão com o mouse. O botão do meio examina itens sem perder o cursor.
++ A tecla da janela de saque do Viewpoint abre o Knox no recipiente para o qual você está olhando; pressione novamente para fechar a tela e olhar ao redor.
++ Com a câmera do Viewpoint, a coluna Arredores lista apenas o recipiente aberto e o chão ao seu lado. Em Configurações, aba Jogo, opção "Arredores", você pode continuar mostrando tudo ao redor. Dentro de um carro, tudo é exibido.
++ O Project Viewpoint QOL não retoma o controle do cursor enquanto o Knox está aberto.
+
+## Pilhas
+@ u095_stacks_en.png
++ Itens do mesmo tipo, mas que não são idênticos, agora compartilham uma pilha: chaves de portas diferentes, fitas distintas, baterias com cargas diferentes. A quantidade dessas pilhas aparece em cor de areia.
++ Passe o mouse sobre a pilha para ver os itens um a um; arraste um para fora ou clique nele para colocá-lo em um ícone próprio. Shift, botão direito e os demais gestos também funcionam.
+* O menu da pilha voltou a ser o do jogo: "Juntar tudo" para linhas e fitas, renomear chaves e outras opções de item único.
+* Carteiras e chaveiros têm uma faixa interna de 4 células; por fora, continuam ocupando uma célula.
+
+## Busca
+@ u095_search_en.png
++ Uma nova aba Jogo nas configurações: ative a busca em recipientes (itens em recipientes novos são encontrados um a um) e defina a velocidade.
+* Itens maiores levam mais tempo para serem encontrados.
+* As roupas vestidas por um cadáver são vistas imediatamente, sem busca.
+
+## Controles
+@ u095_controls_en.png
++ A rotação do item carregado pode ser atribuída ao botão direito ou do meio do mouse (Configurações, aba Controles).
+* Enquanto um item estiver sendo carregado, o botão direito não abre menus - nem nas grades, nos espaços ou nas janelas da TV e do rádio.
+
+## Menu principal
++ As chamas da fogueira são 3D, e o acampamento surge da escuridão iluminado por elas.
++ O acampamento não espera mais por todos: a luz da fogueira se espalha imediatamente, e cada herói se senta assim que fica pronto. Mesmo sem PZ Optimization, todos aparecem em poucos segundos após iniciar.
+- Ao voltar de uma partida para o menu, os heróis não desaparecem mais por até meio minuto: voltam à fogueira em menos de um segundo.
+- Após iniciar o jogo do zero, os heróis não aparecem mais sem roupa junto à fogueira, e os zumbis não ficam congelados.
+
+## Correções
+- O menu do botão direito não permanece mais na tela quando o inventário é fechado sem selecionar nada.
+- O painel de uma pilha mostrava apenas 16 itens diferentes; agora mostra até 36, então um chaveiro grande comporta todas as chaves.
+- Um item retirado de uma pilha podia cair exatamente sobre ela.
+- As janelas do Knox se recolhem suavemente ao fechar; botões e cursor respondem de forma mais visível ao clique.
+
+# 0.9.0 | 13.10.2026 | update | Atualização 0.9.0: Saqueador
+@banner u090_banner_en.png
+@art u090_art_en.png
+Agora cada item ocupa na grade um espaço mais próximo do que ocuparia na vida real. Bolsas, pilhas e bolsos foram recalculados como um único sistema: as células representam volume, e o peso continua sendo calculado pelo próprio jogo.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+! Saves antigos: os tamanhos dos itens e das grades mudaram, então talvez alguns objetos não caibam mais onde estavam. O que não couber ficará nas linhas vermelhas abaixo da grade. Nada foi perdido, mas você precisará reorganizar tudo.
+! Os bolsos são menores e as pilhas não são mais infinitas. Você precisará de uma bolsa mais cedo.
+
+## Tamanhos dos itens
+@ u090_sizes_en.png
+* O tamanho é baseado no modelo 3D real do item: um taco ocupa 1x4, um rifle 1x6, uma pistola 1x2, uma lata de comida 1x1 e um gerador 4x6. Antes, o tamanho dependia quase só do peso.
+* As roupas são dimensionadas conforme o local em que são vestidas: camiseta 1x2, calças 2x2, jaqueta 2x2, jaqueta acolchoada e colete à prova de balas 2x3, botas 2x2, tênis 1x2, capacete 2x2, boné 1x1.
+* O peso mantém o tamanho dentro de limites: um item leve não ocupa metade de uma bolsa só porque seu modelo é grande, e um pesado não cabe em uma única célula.
+
+## Bolsas
+@ u090_bags_en.png
+* A bolsa continua tendo duas células por unidade de capacidade, mas cada tipo tem seu próprio formato: mochilas são altas, bolsas esportivas são largas, capas de rifle são compridas e estreitas, pochetes ocupam duas células.
+* Armários, prateleiras e porta-malas são mais espaçosos que bolsas: três células por unidade de capacidade. Neles, como no jogo, o peso importa, não o espaço.
+* Uma sacola de plástico ou papel vazia fica dobrada e ocupa uma célula.
+! Uma bolsa com itens dentro não pode ser colocada em outra bolsa, e nada pode ser colocado em uma bolsa que esteja dentro de outra. Organizadores pequenos - kit de primeiros socorros, carteira, chaveiro e estojo de pistola - continuam podendo.
+
+## Pilhas
+@ u090_stacks_en.png
+* Uma célula comporta cerca de dois quilos de itens pequenos: até 40 pregos e parafusos, 100 munições de 9 mm, 30 cartuchos de espingarda, 20 baterias e bandagens ou 10 comprimidos. O que não couber na pilha ocupa a célula seguinte.
++ A dica de um item mostra quantas unidades cabem em uma pilha.
+
+## Bolsos
+@ u090_pockets_en.png
+* Os bolsos dependem das roupas. Sem nenhuma, você tem 4 células: mãos e cintura. Calças adicionam 4, jaqueta 4, jaqueta acolchoada 6, colete 4, e shorts, saia e moletom adicionam 2 cada.
++ Passe o mouse sobre o cabeçalho "Bolsos" para ver quantas células cada peça de roupa oferece.
+
+## Itens de outros mods
++ Itens de outros mods são dimensionados pelas mesmas regras: o mod mede seus modelos quando os encontra pela primeira vez e guarda o resultado.
+
+## Arredores
+@ u090_loot_en.png
+* Cada recipiente da lista tem um ícone com moldura e um contador de itens. Uma placa cinza vazia significa que você ainda não olhou dentro dele.
++ As ações próprias do recipiente (ligar o fogão, configurações, remover tudo e outras) aparecem como ícones separados no cabeçalho. Um aparelho ligado fica iluminado.
++ Um item pode ser solto na linha do recipiente na lista ou no cabeçalho.
++ A roda do mouse sobre a lista percorre os recipientes.
++ O peso do recipiente selecionado aparece no título "Arredores", como no inventário.
+
+## Tempo
++ A barra superior do inventário tem um relógio com a data e quatro botões de velocidade: pausa, normal e dois níveis de avanço rápido.
+
+## Comida e eletrodomésticos
+@ u090_cook_en.png
++ O ícone de comida mostra o cozimento: vai se preenchendo enquanto cozinha e muda de cor quando está pronta, queimando ou congelada.
++ O fogão e o micro-ondas têm janelas próprias: temperatura, temporizador, ligar e desligar.
+
+## Praticidade
+@ u090_convenience_en.png
++ Trave um item (T): um item trancado não se move com "Pegar tudo", organização ou movimento rápido.
++ Um item gira automaticamente se essa for a única maneira de caber no local onde você o está carregando.
++ Enquanto carrega um item, as bolsas em que ele não cabe ficam esmaecidas.
++ O botão do meio do mouse abre a janela de inspeção do item.
++ Itens adicionados desde a última vez que você abriu o inventário são marcados com um ponto.
++ Ao carregar um item sobre um recipiente, a linha de peso mostra quanto ele acrescentaria (vermelho) ou reduziria (verde).
+* Espaços de mão vazios mostram ícones de palma em vez de legendas.
+
+## Fluidez
++ Os itens se acomodam nas células e desaparecem gradualmente; as grades se desenrolam e recolhem, as janelas se abrem a partir de seus ícones, e as barras de peso e os dígitos do relógio mudam sem saltos.
++ Uma opção nas configurações desativa as animações.
+
+## Busca em recipientes
+@ u090_search_en.png
++ Uma nova função opcional, desativada por padrão: em recipientes que o personagem ainda não examinou, os itens são encontrados um a um. Depois de vasculhado, o recipiente abre imediatamente. Ative-a na aba "Jogo" das configurações e ajuste a velocidade no mesmo lugar.
+
+## Configurações
+@ u090_settings_en.png
++ A janela de configurações tem três abas: "Módulos", "Aparência do inventário" e "Controles do inventário". Abra-a pelo botão de engrenagem na barra superior do inventário ou pela placa no menu principal.
++ "Controles do inventário": movimento rápido, seleção, abrir, menu, examinar, girar e trancar podem ser atribuídos a uma tecla, clique ou combinação.
++ "Aparência do inventário": seis controles deslizantes - opacidade geral, fundo, grades, espessura das linhas, espaços e personagem 3D - e dois botões: animações e busca.
+
+## Correções
+- A tela de carregamento em idiomas sem suporte à fonte do Knox (chinês e outros) não mostra mais "???": esses idiomas continuam usando a fonte do jogo.
+- Às vezes, Tab não fechava o inventário no primeiro pressionamento.
+- A janela de inspeção mostra as roupas em suas cores próprias, não em branco.
+- O modelo do personagem não sai mais de sua moldura quando você se senta em um carro.
+- O painel do carro não é mais desenhado sobre o inventário aberto.
+- O menu do botão de móveis na barra lateral não abre mais longe do cursor nem fecha imediatamente.
+- Itens vindos de outro recipiente para se juntar a uma pilha não a empurram mais para o lado.
+
+# 0.8.2 | 12.10.2026 | update | Atualização 0.8.2: Módulos
+@banner u082_banner_en.png
+@art u082_art_en.png
+O mod pode ser usado por partes: se quiser apenas o acampamento no menu ou somente o inventário, mantenha apenas esses módulos.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+
+## Módulos
+@ u082_modules_en.png
++ No alto do menu principal há uma placa "Knox Inventory | Módulos". Ela abre uma janela com três opções.
++ "Interface durante o jogo": tela do inventário, barra de atalhos, dicas dos itens, menus de ações e janelas da TV e do rádio.
++ "Menu principal": acampamento com seus heróis, itens do menu no estilo Knox e notícias.
++ "Telas de novo jogo": modo de jogo, local de início, opções do Sandbox, criação de personagem, tela de carregamento e aparência das telas Carregar, Opções e Mods.
++ Desativar uma parte restaura as telas originais do jogo. Depois de clicar em "Aplicar", o jogo recarrega a interface automaticamente - sem precisar reiniciar.
+* A placa permanece no lugar, independentemente do que for desativado: tudo pode ser reativado.
+
+## Corrigido
+- O cartão de um herói não fica mais escondido sob o logotipo do jogo: enquanto o cartão aparece sobre ele, o logotipo desaparece gradualmente.
+
+# 0.8.1 | 12.10.2026 | update | Atualização 0.8.1: Novo jogo
+@banner u081_banner_en.png
+@art u081_art_en.png
+Todo o processo para iniciar um novo jogo agora segue o estilo do Knox: modo de jogo, local de início, opções do Sandbox, criação do personagem e tela de carregamento.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+! Também é preciso reiniciar o jogo depois de ativar o mod na lista. O menu principal agora lembra você disso.
+
+## Modo de jogo
+@ u081_mode_en.png
++ Os modos ficam em uma lista à esquerda; à direita aparecem o vídeo do modo selecionado, seu nome e sua descrição.
++ O cabeçalho mostra as etapas de um novo jogo: modo, local de início, mundo e personagem.
+* Sandbox é o primeiro da lista.
+
+## Local de início
+@ u081_spawn_en.png
++ Três colunas: cidades, mapa-múndi e informações da cidade.
++ O mapa é o original do jogo: arraste-o com o mouse e ajuste o zoom com a roda; ao selecionar uma cidade, o mapa se move até ela.
++ As informações mostram a descrição e o vídeo da cidade e, abaixo, o nome do save e a semente do mundo.
+* A opção "Aleatório" foi removida.
+
+## Opções do Sandbox
+@ u081_sandbox_en.png
++ As páginas à esquerda são divididas entre "Jogo" e "Mods"; nomes longos quebram para uma segunda linha.
++ Cada configuração ocupa uma linha: nome à esquerda, valor à direita. As alterações são marcadas em cor de areia, tanto no nome quanto no valor.
++ À direita fica a ajuda: o que faz a opção sob o mouse e qual é seu valor padrão.
++ Páginas e configurações de mods aparecem automaticamente: a tela é montada a partir da mesma lista usada pelo jogo.
+
+## Criação de personagem
+@ u081_character_en.png
++ As duas telas do jogo - profissão com características e aparência - agora estão unidas, com abas: Profissão, Características, Aparência e Roupas.
++ O resumo à esquerda fica sempre visível: nome, profissão, pontos disponíveis, características escolhidas e habilidades iniciais. Clique em uma característica no resumo para removê-la.
++ As características aparecem em uma lista com os filtros Todas / Positivas / Negativas. Clique para adicionar ou remover uma.
++ Características incompatíveis continuam na lista, esmaecidas e com o motivo: qual característica escolhida é incompatível.
++ Aparência e roupas ficam organizadas em duas colunas. Seletores de cor e controles deslizantes seguem o estilo do Knox.
++ Profissões, características e roupas de mods continuam funcionando como antes.
+
+## Tela de carregamento
+@ u081_loading_en.png
++ Os textos são os mesmos, mas a aparência mudou: frases centralizadas em nossa fonte, dicas em uma placa na parte inferior e "Iniciar" como indicação de tecla.
++ Uma barra cor de areia ocupa a borda inferior no lugar da figura caminhando. Quando estiver cheia, você pode começar.
+
+## Menu principal
+@ u081_menu_en.png
++ Clique com o botão direito em um herói junto à fogueira para abrir um menu: continuar, abrir a pasta do save ou excluir o save.
++ Clique na barraca para iniciar um novo jogo. Ela brilha discretamente para chamar atenção.
++ As telas Carregar, Opções e Mods foram redesenhadas nas cores do Knox.
++ Caixas de confirmação ("Sair?", "Excluir este save?") e os botões nos cantos do menu seguem o estilo do Knox.
+* Os cartões dos heróis e das notícias, além do menu do herói, têm molduras cor de areia em todos os lados.
+* O logotipo do jogo não aparece atrás de nenhuma tela de menu aberta.
+
+## Corrigido
+- Clicar em um cartão de notícia não conta mais como clique em um herói.
+- As rodas do carro do acampamento não afundam mais no chão.
+- Em telas 16:9, o espaço livre junto à fogueira não fica mais escondido sob os cartões de notícias: a barraca inicia um novo jogo.
+
+## Ainda não disponível
+* As novas telas ainda não oferecem suporte a controle: com um controle, as telas originais do jogo aparecem apenas após a morte e na tela dividida.
+* Ainda não é possível pesquisar na lista de características.
+
+# 0.8.0 | 11.10.2026 | update | Atualização 0.8.0: O acampamento junto à fogueira
+@banner menu_banner.png
+@art menu_art.png
+O menu principal agora é um acampamento à noite: os heróis dos seus saves mais recentes se sentam junto à fogueira, e os que não sobreviveram ficam atrás da cerca.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+! Um herói só aparece junto à fogueira como você o deixou depois que o save for carregado ao menos uma vez nesta versão. Até lá, uma silhueta escura fica em seu lugar.
+
+## Heróis junto à fogueira
+@ menu_heroes.png
++ Seus três heróis vivos mais recentes se sentam junto à fogueira: o mais recente no meio, o anterior à esquerda e o terceiro à direita. A morte de um não desloca os outros.
++ Eles aparecem como no jogo: rosto, cabelo, barba e cada peça de roupa. O mod memoriza a aparência do herói enquanto você joga: ao entrar no mundo, a cada dez minutos de jogo, ao salvar e no momento da morte.
++ Eles estão vivos: aquecem e esfregam as mãos diante da fogueira, cuja luz tremula em seus rostos.
++ A arma que o herói segurava fica ao lado dele.
+
+## Passaporte do sobrevivente
+@ menu_card.png
++ Aponte para um herói para ver seu cartão: retrato, nome e profissão, modo de jogo e cidade onde parou.
++ Três números principais: dias sobrevividos, zumbis mortos e saúde.
++ Estado descrito em palavras: bem, ferido, sangrando, mordido, doente, com frio, com fome, com sede ou cansado.
++ Na parte inferior, veja quando você jogou esse save pela última vez.
+
+## Carregar com um clique
+@ menu_click.png
++ Clique em um herói: ele se levanta e sai do acampamento - o do meio vem na sua direção, o da esquerda vai para a esquerda e o da direita para a direita. Os outros ficam junto à fogueira.
++ A tela escurece e o save carrega como de costume.
++ Ao voltar ao menu principal, a animação é reproduzida ao contrário: o herói surge da escuridão, caminha até seu lugar e se senta junto à fogueira.
+
+## Foi assim que você morreu
+@ menu_dead.png
++ Um herói morto não volta à fogueira. Os três que morreram mais recentemente vagam como zumbis atrás da cerca, com as roupas em que morreram.
++ Os que morreram antes ficam sob cruzes junto à cerca, com uma lanterna de túmulo acesa ao lado. Cada morto recebe um dos dois destinos: zumbi ou cruz.
++ Aponte para um zumbi ou uma cruz para descobrir quem era e quanto tempo sobreviveu. Clique em um zumbi para recomeçar no mesmo mundo.
+! Heróis que morreram antes desta atualização aparecem sem roupa atrás da cerca: sua aparência foi registrada depois da morte. Os novos não terão esse problema.
+
+## O acampamento
+@ menu_camp.png
++ Tudo é 3D: a paliçada, a torre de vigia, fileiras de pinheiros até o horizonte, o céu estrelado e a lua.
++ Uma barraca, sacos de dormir e colchonetes, uma lanterna em um poste, pilha de lenha, cepo com machado, varal, barris e caixotes.
++ Uma chaleira no fogo, panela, canecas, latas e garrafas - itens reais do jogo. Uma van está estacionada junto à cerca.
++ Três fontes de luz: o calor da fogueira e das lanternas e a luz fria da lua. Os objetos têm sombras, faíscas sobem e a chama está viva.
+
+## Notícias no menu
+@ menu_news.png
++ No canto inferior direito ficam cartões com as notícias do mod: tipo de publicação, título e primeira linha. As não lidas recebem uma placa "Nova".
++ Clique em um cartão para abrir a publicação em tela cheia: texto à esquerda, imagem à direita e capturas do conteúdo entre as seções. A roda do mouse percorre o texto.
++ Para fechar, pressione Esc, clique com o botão direito ou clique fora da publicação.
++ Com mais de duas publicações, percorra as páginas com a roda do mouse sobre os cartões ou pelos pontos à direita.
+
+## Itens do menu
+* Os itens do menu principal são desenhados no estilo Knox: nossa fonte, letras maiúsculas e uma placa cor de areia sob o mouse. Continuam funcionando como antes, e os itens de outros mods permanecem onde estavam.
+
+## Ainda não disponível
+* A cena ainda não oferece suporte a controle: o herói é escolhido com o mouse. Os itens do menu continuam funcionando com controle como antes.
+* Os itens no cinto e nas costas do herói ainda não aparecem no acampamento.
+
+# 0.7.0 | 10.10.2026 | update | Atualização 0.7.0: TV e rádio
+@banner u070_banner_en.png
+@art u070_art_en.png
+A TV e o rádio agora têm janelas próprias no estilo Knox, e as mãos foram para a barra de atalhos.
+
+## Importante
+! Reinicie o jogo completamente: a parte Java do mod foi atualizada.
+
+## TV
+@ u070_tv_en.png
++ A janela é a própria TV: tubo de imagem, gabinete, controles e botões de canal.
++ As falas dos programas aparecem como legendas na tela. Enquanto a janela está aberta, as falas não aparecem sobre a TV no mundo.
++ Exibição na tela: número e nome do canal, horário e volume. Habilidades e humores alterados pelo programa também aparecem.
++ Estática ao trocar de canal e "Sem sinal" quando o canal está sem transmissão.
++ Reprodutor de vídeo: compartimento para fita, reprodução e ejeção. As fitas que você carrega são oferecidas ao passar o mouse sobre o compartimento.
+
+## Rádio
+@ u070_radio_en.png
++ Janela do receptor: dial de frequência com ponteiro (arraste-o ou use a roda), estações salvas marcadas em verde e intensidade do sinal.
++ Fita de registro: o que foi dito e em que horário, mudanças de frequência e habilidades aprendidas. A gravação continua mesmo com a janela fechada.
++ Controles de sintonia e volume, botões de estação: "+" salva uma estação; clique com o botão direito para removê-la.
++ Compartimentos da bateria, dos fones e dos discos; microfone de rádio amador.
++ Funciona com rádios em casas, carros e nas mãos. Walkie-talkies continuam usando a janela do jogo por enquanto.
+
+## Novidades
+@ u070_hands_en.png
++ Mãos na barra de atalhos: direita, esquerda e armas de duas mãos atravessadas nos dois espaços. Condição e munição aparecem como "12/30". Clique para retirar o item da mão; clique com o botão direito para abrir o menu.
++ As imagens das mãos do jogo no canto superior esquerdo foram removidas; os botões da barra lateral subiram para ocupar seu lugar.
++ Ações de recipientes no cabeçalho: "Remover tudo" em lixeiras; "Ligar" e configurações em fogões e micro-ondas; além de lavadoras, churrasqueiras, lareiras, porta-malas e outros.
++ Recipientes que você ainda não examinou recebem uma faixa cor de areia na lista Arredores; os já examinados ficam mais apagados.
++ Baterias, fitas, linhas e outros itens consumidos aos poucos empilham até 10 unidades.
++ Dicas na barra de atalhos, mesmo fora do inventário.
+
+## Alterações
+* A descrição de um item em sua dica recebe o mesmo marcador usado nas notas do jogo.
+* A quantidade "Restante" de bandagens e trapos do Casualties Undead aparece na dica do Knox.
+* A seleção rápida de fitas de vídeo abre acima do espaço correspondente.
+
+## Correções
+- Agora é possível colocar na mão um item do espaço das costas e de outros espaços de atalho.
+- A dica do primeiro item após abrir a tela não desaparece mais, e as dicas não somem ao passar de um espaço de atalho para outro.
+- Os espaços de mão e costas não piscam mais ao passar o mouse sobre um item na bolsa.
+- O modelo do personagem não fica mais baixo demais dentro de um carro.
+- Um item de serviço oculto do mod Over The Shoulder não aparece mais no espaço Diversos.
+
+# 0.6.0 | 10.10.2026 | update | Atualização 0.6.0
+@banner u060_banner_en.png
+@art u060_art_en.png
+O Knox Inventory agora funciona somente com o ZombieBuddy: as fontes, dicas, cursor e personagem animado são partes necessárias do mod.
+
+## Importante
+! O ZombieBuddy é obrigatório. Sem ele, o mod permanece desativado, o inventário original do jogo é usado e uma mensagem explica o que fazer.
+! Não existe mais um mod separado "Knox Inventory: Java" - ele foi incorporado ao mod principal.
+
+## Novidades
+@ u060_fluid_en.png
++ Janela de transferência de líquidos no estilo Knox: tanques na cor do líquido com prévia, recipientes arrastados das grades e botões 25 / 50 / 75% / Tudo.
+@ u060_split_en.png
++ Notícias e listas de alterações - disponíveis aqui com um clique em "Knox Inventory · Etapa 1".
++ A janela de divisão ganhou um fio até a pilha, moldura como as outras janelas e um botão para fechar.
++ O nome e a etapa do mod aparecem na barra superior.
+
+## Alterações
+* O espaço "Acessórios" agora se chama "Diversos" e não colide mais com o contador de camadas.
+* Botões principais, como OK, acendem sob o mouse.
+* Canetas, lápis, colheres e outros itens pequenos não são mais oferecidos para as mãos.
+
+## Corrigido
+- R no inventário gira o item, em vez de recarregar a arma nas mãos.
+- Ctrl+clique para selecionar não faz mais o personagem mirar.
+- O nome de um espaço não se sobrepõe mais ao contador "1/2".
+
+# | 10.10.2026 | news | Etapa 1: Teste público
+@banner s1_banner_en.png
+@art s1_art_en.png
+O Knox Inventory reformula toda a interface de Project Zomboid no estilo de Escape From Tarkov - uma etapa de cada vez. A primeira chegou: o inventário.
+
+Cada etapa é testada publicamente antes do início da próxima. Até que uma etapa seja lançada, sua aba abre a janela original do jogo.
+@ s1_tabs_en.png
+
+## Como ajudar
++ Conte nos comentários da página do mod o que parece estranho e o que está faltando.
++ Encontrou um bug? Descreva o que fez e anexe Zomboid/console.txt.
+
+Obrigado por testar!
+
+# | | plans | O que vem a seguir?
+@banner plans_banner_en.png
+@art plans_art_en.png
+## Etapa 2 - Saúde
+* Seus ferimentos aparecem no corpo do personagem; trate-os com um clique ou soltando um item sobre a ferida.
+
+## Etapa 3 - Habilidades e mapa
+* Habilidades, progresso e mapa-múndi no estilo Knox.
+
+## Etapa 4 - Toda a interface
+* Criação, construção, veículos e menus - as demais janelas do jogo, uma a uma.
+
+Seu feedback decide o que vem primeiro.
