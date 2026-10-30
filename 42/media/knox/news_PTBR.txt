@@ -19,15 +19,56 @@
 ;   @art vp                              - o próprio painel de mira à direita no lugar de uma imagem (ao vivo)
 ;   @back aim                            - fundo ilustrado da publicação: grade e mira que brilham enquanto um painel da publicação está em uso
 ;   @open settings                       - botão "Abrir configurações do Knox" no texto da publicação
-;   # | data | pinned | título           - publicação fixada (roteiro e Boosty): sempre o primeiro cartão. Só recebe "Novo" quando uma linha @road é adicionada.
+;   # | data | pinned | título           - publicação fixada (mapa de atualizações e Boosty): sempre o primeiro cartão. Só recebe "Novo" quando uma linha @road é adicionada.
 ;   @lead texto                          - segunda linha do cartão (quando não é o primeiro parágrafo)
 ;   @boosty                              - bloco de apoio com o botão do Boosty
 ;   @road data | versão | título | texto | prévia | publicação
-;                                         - uma linha do roteiro: prévia - road_<nome>_en.png de media/knox/news/road, publicação - o título de uma publicação deste arquivo
+;                                         - uma linha do mapa de atualizações: prévia - road_<nome>_en.png de media/knox/news/road, publicação - o título de uma publicação deste arquivo
 ;                                           aberta ao clicar no cartão. Data "-" - etapa futura. A última linha com data é "Agora".
 ;   texto simples                        - um parágrafo; uma linha vazia inicia outro
 ;   ; ...                                - comentário, não exibido no jogo
 ; Uma publicação é considerada lida pela versão, data e título: altere-os e ela aparecerá como nova novamente.
+
+# | 30.10.2026 | tech | Mais rápido e nítido
+Uma atualização técnica da beta: correções dos relatos enviados pelo Steam, um inventário aberto bem mais leve para o computador e um painel de mira do Viewpoint mais claro e seguro.
+
+## Importante
+! Há uma nova parte Java: quando o ZombieBuddy perguntar sobre KnoxInventoryJava.jar, responda "Allow".
+
+## Mais rápido
+* A tela aberta do Knox consome bem menos a cada quadro: o cabeçalho, os espaços, Arredores e as grades agora são desenhados pela parte Java a partir de listas prontas.
+* Mover 500 balas ou olhar para um chão com 300 itens não causa mais engasgos na imagem.
+
+## Corrigido
+- O editor de itens não gera mais centenas de erros ao abrir; as mochilas voltaram ao próprio grupo.
+- Desmontar no menu do mundo voltou a mostrar a dica do jogo.
+- Não é mais possível pegar itens de um recipiente ou colocá-los nele quando não se consegue mais alcançá-lo — "Muito longe".
+- Quando não é possível colocar um item em algum lugar, o motivo aparece perto do cursor ("Sem espaço" e outros).
+- Painel do carro: botão do porta-malas para vans, SUVs e caminhões; carros sem porta-malas agora mostram o painel inteiro em vez de um espaço vazio.
+- As opções de Sandbox voltaram a mostrar os valores mínimo e máximo (chinês).
+- A cor branca de destaque não fica mais preta após clicar em Aplicar.
+- Dois pequenos vazamentos de memória foram corrigidos.
+
+## Painel de mira do Viewpoint
+* Ações agrupadas como no menu do botão direito: Usar, Ações, Mover, Construir; Outros fica recolhido, e submenus como Lavar podem ser expandidos.
+* A ação principal fica sempre no topo e selecionada: uma porta trancada não deixa Desmontar selecionado. Uma porta trancada mostra um cadeado vermelho e TRANCADA.
+* Carros: Entrar aparece primeiro; em um carro trancado, Quebrar janela fica logo abaixo.
+* Desmontar mostra o que é necessário; o que estiver faltando aparece em vermelho.
+* Um rádio ou uma TV mostra Opções do dispositivo primeiro.
+* O painel mostra imediatamente o resultado da ação: Ligar muda para Desligar.
+* Os itens pegos pelo painel vão para a bolsa escolhida, e essa escolha é mantida no save.
+* As teclas do painel podem ser alteradas nas configurações do Knox.
+- Com o painel aberto, agora é possível escalar uma cerca mantendo a tecla pressionada.
+- A janela do gerador e o editor de tamanho dos itens agora liberam o mouse.
+- O cartão do rádio sobre o painel do carro se recolhe quando o modo de cursor do Viewpoint é desativado.
+
+## Pequenos detalhes
+* Tamanhos próprios do mod para 52 itens (suas predefinições e edições continuam tendo prioridade).
+* Baterias podem ser retiradas e colocadas como na B42; escolha qual das que você carrega quer usar.
+* Troque itens entre espaços rápidos e entre as mãos arrastando um sobre o outro.
+* Uma lanterna com pose própria aparece na mão do personagem no modelo da tela.
+* Lixeiras e caçambas levam o dobro do tempo para serem vasculhadas.
+* Derramar no chão agora tem um ícone.
 
 # | 25.10.2026 | pinned | O caminho do Knox Inventory
 @lead O que já saiu, o que vem por aí - e como apoiar o mod
