@@ -605,8 +605,9 @@ local DASH_PICS = {"disc", "hub", "soft", "needle", "glow", "bar", "grad", "shad
                    "lamp_trunk", "lamp_fuel", "lamp_lockc", "lamp_locko", "lamp_mix", "lamp_rpt", "lamp_rpt1"}
 
 --- A pretend car with a script of this name (for which body it gets).
-local function carNamed(name)
-    return {getScript = function() return {getName = function() return name end} end}
+local function carNamed(name, bed)
+    return {getScript = function() return {getName = function() return name end} end,
+            getPartById = function(_, id) return (bed and id == "TruckBed") and {} or nil end}
 end
 
 --- Is r = {x, y, w, h} inside {X, Y, W, H}?
@@ -625,14 +626,15 @@ steps[#steps + 1] = function(p)
     local KD = KnoxDashboard
     if KD and KD.bodyFor then
         local wrong = {}
-        for name, want in pairs({CarNormal = KD.SEDAN, CarLuxury = KD.SEDAN, SportsCar = KD.SEDAN, PickUpTruck = KD.TRUCK,
+        -- (with a trunk the pickup's body is the wide one with its button, 2026-10-28)
+        for name, want in pairs({CarNormal = KD.SEDAN, CarLuxury = KD.SEDAN, SportsCar = KD.SEDAN, PickUpTruck = KD.PICKUP,
             PickUpVanLightsFire = KD.TRUCK, VanAmbulance = KD.TRUCK, StepVan_Mail = KD.TRUCK, SUV = KD.TRUCK, OffRoad = KD.TRUCK}) do
-            if KD.bodyFor(carNamed(name)) ~= want then table.insert(wrong, name) end
+            if KD.bodyFor(carNamed(name, want ~= KD.PICKUP)) ~= want then table.insert(wrong, name) end
         end
         check("dashboard: sedans and pickups by the car's script", #wrong == 0, table.concat(wrong, ","))
         -- every plate inside the panel; the radio and the heater inside the centre stack
         local out = {}
-        for _, b in ipairs({KD.SEDAN, KD.TRUCK}) do
+        for _, b in ipairs({KD.SEDAN, KD.TRUCK, KD.PICKUP}) do
             local panel = {0, 0, b.W, b.H}
             for i, pl in ipairs(b.plates) do
                 if not inside(pl, panel) then table.insert(out, b.kind .. " plate " .. i) end

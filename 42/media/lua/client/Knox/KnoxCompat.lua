@@ -112,7 +112,10 @@ end
 -- cursor (KnoxMain). By the name of their table; `instance` or a `list`.
 local WINDOWS = {"KnoxTVWindow", "KnoxRadioWindow", "KnoxFluidWindow", "KnoxFluidInfo", "KnoxStoveWindow",
                  "KnoxSettings", "KnoxSplitDialog", "KnoxAlarmWindow", "KnoxFoundWindow", "KnoxSlotPicker",
-                 "KnoxDevPanel", "KnoxTestBench", "KnoxStudio"}
+                 "KnoxDevPanel", "KnoxTestBench", "KnoxStudio",
+                 -- (the author, 2026-10-29: the generator's window came up without a cursor; the
+                 -- item size editor the same)
+                 "KnoxGeneratorWindow", "KnoxEditor"}
 local LISTS = {"KnoxInspectWindow", "KnoxContainerWindow"}
 
 --- Is anything of Knox open that is worked with the mouse? (and which, for the log)

@@ -139,6 +139,11 @@ local function makeSrc(w, demo)
     function src.actionLabel() return "" end
     function src.actionOn() return false end
     function src.actionsTitle() return "" end
+    function src.actionsVersion() return 0 end
+    function src.actionFn() return nil end
+    function src.actionItem() return nil end
+    function src.actionFirst() return false end
+    function src.actionGroup() return nil end
     function src.actionProgress() return 0 end
     function src.run() end
     function src.wheel()

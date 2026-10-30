@@ -22,15 +22,44 @@ end
 -- Active container: the pockets or one worn bag, chosen by a click on its
 -- header in the inventory column (like picking a bag in the game's own
 -- inventory). Quick moves and "Take all" fill it first; the game's own
--- "Grab" options use it too.
+-- "Grab" options use it too. Kept in the save (the author, 2026-10-29: after a
+-- load it was the pockets again): its container key, as the sections' order -
+-- in the character's modData, in a game with others by the server (KnoxNet).
 A.active = nil
+
+local AGAIN_MS = 1000   -- a bag remembered and not worn (yet): looked for again after this
+
+local function savedKey(player)
+    if KnoxNet and KnoxNet.mp() then return KnoxNet.activeKey() end
+    return player:getModData().knoxActive
+end
+
+--- The active container of this character (the one remembered, once it is worn), or nil.
+local function activeOf(player)
+    if not player then return A.active end
+    local now = getTimestampMs()
+    if A.activeFor ~= player or (A.active == nil and A.activeRetry and now >= A.activeRetry) then
+        -- (in a game with others the server's answer comes after the start: asked again then)
+        if KnoxNet and KnoxNet.mp() and not KnoxNet.ready then return nil end
+        A.activeFor, A.active, A.activeRetry = player, nil, nil
+        local key = savedKey(player)
+        if key then
+            for _, c in ipairs(KnoxInventoryPanel.collectContainers({player = function() return player end})) do
+                if c.key == key and not c.pockets then A.active = c.container break end
+            end
+            if not A.active then A.activeRetry = now + AGAIN_MS end
+        end
+    end
+    return A.active
+end
 
 --- The active container if it is still on the character, else the pockets.
 function A.activeContainer(player)
     local s = screen()
-    if A.active and s and s.inventory then
+    local active = activeOf(player)
+    if active and s and s.inventory then
         for _, sec in ipairs(s.inventory.sections) do
-            if sec.view.container == A.active then return A.active end
+            if sec.view.container == active then return active end
         end
     end
     return player:getInventory()
@@ -38,6 +67,12 @@ end
 
 function A.setActive(container, playerNum)
     A.active = container
+    local player = getSpecificPlayer(playerNum)
+    if player then
+        A.activeFor, A.activeRetry = player, nil
+        local key = (container and container ~= player:getInventory()) and KnoxGrid.containerKey(container, player) or nil
+        if KnoxNet and KnoxNet.mp() then KnoxNet.setActiveKey(key) else player:getModData().knoxActive = key end
+    end
     -- the game's inventory window follows, silently
     local page = getPlayerInventory(playerNum)
     if page and container then
@@ -412,14 +447,17 @@ end
 -- is not taken.
 
 --- The character's own grids: the screen's when it is open (unless `fresh`),
---- else built here.
+--- else built here - the active container first, as with the screen open (the
+--- author, 2026-10-29: with the screen closed Knox's crosshair panel put things
+--- into the pockets, past the backpack chosen).
 local function ownViews(player, fresh)
     local s = screen()
     if not fresh and s and s.inventory then return A.playerViews() end
     local out = {}
     local list = KnoxInventoryPanel.collectContainers({player = function() return player end})
     for _, c in ipairs(list) do
-        table.insert(out, {layout = KnoxGrid.build(c.container, player)})
+        local v = {layout = KnoxGrid.build(c.container, player)}
+        if c.container == activeOf(player) then table.insert(out, 1, v) else table.insert(out, v) end
     end
     return out
 end

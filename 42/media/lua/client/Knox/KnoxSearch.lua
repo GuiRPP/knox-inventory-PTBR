@@ -24,6 +24,10 @@ local T = KnoxTheme
 -- generator the limit. (At first 320 + 45 a cell: a jacket took 0.46 s against 0.32
 -- for a can - the size was counted but could not be felt; a player's remark 2026-10-13.)
 local BASE_MS, CELL_MS, MAX_MS = 220, 110, 1400
+-- Rummaging through rubbish takes longer (the author, 2026-10-29): a garbage can's,
+-- a dumpster's things are found this many times slower (the limit too).
+local TRASH = {bin = true, dumpster = true}
+local TRASH_PACE = 2
 
 S.container = nil   -- the container being searched
 S.queue = {}        -- {items = {..}, ms = time it takes}: what is still to be found, in order
@@ -282,6 +286,9 @@ function S.begin(container, layout)
         return a.x < b.x
     end)
     S.container = container
+    -- (the player's own pace: the settings' "search time", 25..400 %)
+    local pace = T.look("search.time") / 100
+    if TRASH[container:getType()] then pace = pace * TRASH_PACE end
     for _, e in ipairs(tiles) do
         local w, h = KnoxGrid.dims(e, e.r)
         local items = {}
@@ -289,8 +296,6 @@ function S.begin(container, layout)
             table.insert(items, it)
             S.hidden[it] = true
         end
-        -- (the player's own pace: the settings' "search time", 25..400 %)
-        local pace = T.look("search.time") / 100
         table.insert(S.queue, {items = items, ms = math.max(40, math.min(MAX_MS, BASE_MS + CELL_MS * (w * h - 1)) * pace)})
     end
     S.total, S.done, S.spent = #S.queue, 0, 0

@@ -30,6 +30,10 @@ local KIND_COLS, KIND_ROWS = 6, 6
 -- tiles settle in one after another, as tiles do in the grids.
 local OPEN_MS, CLOSE_MS = 150, 110
 local TILE_WAIT_MS, TILE_STEP_MS, TILE_MS = 40, 25, 130
+-- The battery panel (the author, 2026-10-29; the mockup .claude/mockups/battery_v1.html):
+-- the one in it, a line, then the character's - 4 a row, 12 cells at most (the
+-- 12th says how many more there are).
+local BATTERY_COLS, BATTERY_CELLS, BATTERY_SEP = 4, 12, 6
 
 P.instance = nil
 P.offerColor = nil   -- the offered tiles' frame: sand, or green (batteries for an empty battery slot)
@@ -62,9 +66,11 @@ function P.wantStack(owner, title, groups, act, playerNum)
 end
 
 --- A thing with a battery under the mouse (a radio, a flashlight - the author,
---- 2026-10-19): one slot shows whether its battery is in and its charge
---- (`battery` = {has, power 0..1, spares = the character's batteries}); with
---- the slot empty, the mouse on it lights the batteries in the grids up green.
+--- 2026-10-19): one slot shows whether its battery is in and its charge, the
+--- character's batteries stand next to it to pick from (`battery` = {has,
+--- power 0..1, spares = the character's batteries fullest first, charges = theirs,
+--- act(what, battery)}); with the slot empty, the mouse on it lights the
+--- batteries in the grids up green.
 function P.wantBattery(owner, title, battery, playerNum)
     P.request = {owner = owner, title = title, items = {owner.item}, battery = battery, side = "right",
                  playerNum = playerNum, float = true}
@@ -175,10 +181,12 @@ function P:setItems(items)
     self.items = {}
     local max = self.groups and KIND_COLS * KIND_ROWS or MAX_COLS * MAX_ROWS
     for i = 1, math.min(#items, max) do self.items[i] = items[i] end
-    P.offered = {}
-    P.offerColor = nil
     -- (a stack's kinds lie in the hovered tile itself: nothing to point at; the
-    -- battery slot points at batteries only while the mouse is on it - prerender)
+    -- battery panel points at batteries only while the mouse is on them - drawBattery)
+    if not self.battery then
+        P.offered = {}
+        P.offerColor = nil
+    end
     if not self.groups and not self.battery then
         for _, it in ipairs(items) do P.offered[it] = true end
     end
@@ -186,7 +194,10 @@ function P:setItems(items)
     if self.battery then
         -- the header's right: the charge, or that there is none in it
         local b = self.battery
-        self.total = b.has and (math.floor((b.power or 0) * 100 + 0.5) .. "%") or getText("IGUI_Knox_BatteryNone")
+        self.total = b.has and P.percent(b.power) or getText("IGUI_Knox_BatteryNone")
+        local n = b.spares and #b.spares or 0
+        self.shown = n > BATTERY_CELLS and BATTERY_CELLS - 1 or n
+        self.more = n - self.shown
     end
     if self.groups then
         self.total = 0
@@ -200,13 +211,28 @@ function P:layout()
     local n = #self.items
     local cs, gap, pad = T.cell, 4, math.max(6, math.floor(T.pad / 2) + 2)
     self.cs, self.gap, self.pad = cs, gap, pad
-    self.cols = math.max(1, math.min(self.groups and KIND_COLS or MAX_COLS, n))
-    self.rows = math.max(1, math.ceil(n / self.cols))
+    local bodyW
+    if self.battery then
+        -- (the character's batteries from sx on, past the line)
+        local cells = self.shown + (self.more > 0 and 1 or 0)
+        self.cols = math.max(1, math.min(BATTERY_COLS, cells))
+        self.rows = math.max(1, math.ceil(cells / BATTERY_COLS))
+        self.sx = pad + cs + (cells > 0 and BATTERY_SEP * 2 + 1 or 0)
+        bodyW = cells > 0 and self.sx + self.cols * cs + (self.cols - 1) * gap + pad or pad * 2 + cs
+        -- (a charge's number: the tops of its digits 6 px under the tile's top)
+        local _, top = T.inkBox(T.fontTile, "H")
+        self.percentDy = 6 - top
+    else
+        self.cols = math.max(1, math.min(self.groups and KIND_COLS or MAX_COLS, n))
+        self.rows = math.max(1, math.ceil(n / self.cols))
+        bodyW = pad * 2 + self.cols * cs + (self.cols - 1) * gap
+    end
     self.headH = T.sectionH
     local countW = T.measure(T.fontCaps, tostring(self.total or n))
-    if self.battery then countW = math.max(countW, T.measure(T.fontCaps, self:batteryHint() or "")) end
+    -- (as wide as the widest the header may say, so it doesn't jump under the mouse)
+    if self.battery then countW = math.max(countW, P.batteryWords().width) end
     local titleW = T.measure(T.fontCaps, T.upper(self.title)) + countW + pad * 3
-    local w = math.max(pad * 2 + self.cols * cs + (self.cols - 1) * gap, titleW)
+    local w = math.max(bodyW, titleW)
     local h = self.headH + pad + self.rows * cs + (self.rows - 1) * gap + pad
     self:setWidth(w)
     self:setHeight(h)
@@ -244,6 +270,18 @@ function P:indexAt(mx, my)
     local cs, gap, pad = self.cs, self.gap, self.pad
     local lx, ly = mx - pad, my - self.headH - pad
     if lx < 0 or ly < 0 then return nil end
+    if self.battery then
+        -- 1: the one in it; k + 1: the character's k-th (not the "+N" cell)
+        if lx < cs and ly < cs then return 1 end
+        local sl = mx - self.sx
+        if sl < 0 then return nil end
+        local c, r = math.floor(sl / (cs + gap)), math.floor(ly / (cs + gap))
+        if c >= self.cols or r >= self.rows then return nil end
+        if sl - c * (cs + gap) >= cs or ly - r * (cs + gap) >= cs then return nil end
+        local k = r * self.cols + c + 1
+        if k > self.shown then return nil end
+        return k + 1
+    end
     local c, r = math.floor(lx / (cs + gap)), math.floor(ly / (cs + gap))
     if c >= self.cols or r >= self.rows then return nil end
     if lx - c * (cs + gap) >= cs or ly - r * (cs + gap) >= cs then return nil end   -- in a gap
@@ -280,16 +318,16 @@ function P:prerender()
     -- the author, 2026-10-19: "В СТОПКЕ 2" crooked)
     T.inkLeft(self, T.upper(self.title), ox + pad, oy, self.headH, T.color.text, T.fontCaps, a)
     local count = tostring(self.total or #self.items)
-    -- (the battery slot under the mouse: what a click does, in place of the charge)
-    local hint = self.battery and not self.closeMs and self:isMouseOver()
-        and self:indexAt(self:getMouseX(), self:getMouseY()) and self:batteryHint()
+    local over = not self.closeMs and self:isMouseOver()
+    -- (a battery under the mouse: what a click does, in place of the charge)
+    local hi = self.battery and over and self:indexAt(self:getMouseX(), self:getMouseY())
+    local hint = hi and self:batteryHint(hi)
     if hint then count = hint end
     local cw = T.measure(T.fontCaps, count)
     local _, cy = T.inkOrigin(count, 0, oy, cw, self.headH, T.fontCaps)
     T.textRight(self, count, ox + w - pad, cy, T.color.dim, T.fontCaps, a)
 
-    local over = not self.closeMs and self:isMouseOver()
-    if self.battery then return self:drawBattery(ox, oy, a, over) end
+    if self.battery then return self:drawBattery(ox, oy, a, hi, since) end
     local hovered = over and self:cellAt(self:getMouseX(), self:getMouseY())
     for i, it in ipairs(self.items) do
         local c, r = (i - 1) % self.cols, math.floor((i - 1) / self.cols)
@@ -321,63 +359,146 @@ function P:prerender()
     if hovered then KnoxTooltip.want(hovered, self.playerNum) end
 end
 
---- The battery slot (P.wantBattery): the battery with its charge, or an empty
---- slot with a faint battery in it; the mouse on the empty slot lights the
---- character's batteries in the grids green (red frame: there are none).
+--- A charge as the panel writes it ("23%"), made once for each number: it is
+--- written every frame.
+local percents = {}
+function P.percent(p)
+    local n = math.floor(math.max(0, math.min(1, p or 0)) * 100 + 0.5)
+    local s = percents[n]
+    if not s then
+        s = n .. "%"
+        percents[n] = s
+    end
+    return s
+end
+
+local mores = {}   -- "+N", made once each
+local NONE = {}
+local words = nil
+--- What the battery panel's header says under the mouse, in capitals, and the
+--- widest of it with a full charge (measured again when the font changes).
+function P.batteryWords()
+    if not words or words.font ~= T.fontCaps then
+        words = {font = T.fontCaps, take = T.upper(getText("IGUI_Knox_BatteryTake")),
+                 put = T.upper(getText("IGUI_Knox_BatteryPut")), swap = T.upper(getText("IGUI_Knox_BatterySwap"))}
+        words.width = math.max(T.measure(T.fontCaps, words.take), T.measure(T.fontCaps, words.put),
+            T.measure(T.fontCaps, words.swap), T.measure(T.fontCaps, "100%"))
+    end
+    return words
+end
+
+--- The battery panel (P.wantBattery): the battery in the thing with its charge,
+--- or an empty slot with a faint battery in it; past a line, the character's
+--- batteries. The mouse on one of them points at it in the grids; on the empty
+--- slot it lights all of them up green (red frame: there are none).
 local batteryTex = nil
-function P:drawBattery(ox, oy, a, over)
-    local cs, pad = self.cs, self.pad
+function P:batteryTile(x, y, p, hot, a)
+    local cs = self.cs
+    local side = math.floor(cs * 0.8)
+    T.rect(self, x, y, cs, cs, T.category.tool or T.color.cell, a)
+    if hot then self:drawRect(x, y, cs, cs, 0.08 * a, 1, 1, 1) end
+    if batteryTex then
+        self:drawTextureScaledAspect(batteryTex, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), side, side, a, 1, 1, 1)
+    end
+    p = math.max(0, math.min(1, p or 0))
+    T.tileMeter(self, x, y, cs, cs, p, p > 0.25 and T.color.accent or T.color.bad, a, 0)
+    T.outlinedRight(self, P.percent(p), x + cs - 5, y + self.percentDy, T.color.bright, T.fontTile, a)
+    T.tileFrame(self, x, y, cs, cs, hot and T.color.accent or T.color.tileFrame, a)
+end
+
+function P:drawBattery(ox, oy, a, hi, since)
+    local cs, gap, pad = self.cs, self.gap, self.pad
     local x, y = ox + pad, oy + self.headH + pad
     local b = self.battery
+    local spares = b.spares or NONE
     if batteryTex == nil then batteryTex = getTexture("Item_Battery") or false end
     local side = math.floor(cs * 0.8)
-    local ix, iy = x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2)
-    local hot = over and self:indexAt(self:getMouseX(), self:getMouseY()) ~= nil
-    if b.has then
+    local inHot = hi == 1
+    -- what the grids point at: the battery hovered here (sand), or, the empty
+    -- slot hovered, every one that may go in (green) - set again only on a change
+    local want = (inHot and not b.has and "all") or (hi and hi > 1 and spares[hi - 1]) or nil
+    if P.instance == self and (want ~= self.offeredFor or spares ~= self.offeredList) then
+        self.offeredFor, self.offeredList = want, spares
         P.offered, P.offerColor = {}, nil
-        T.rect(self, x, y, cs, cs, T.category.tool or T.color.cell, a)
-        if batteryTex then self:drawTextureScaledAspect(batteryTex, ix, iy, side, side, a, 1, 1, 1) end
-        local p = math.max(0, math.min(1, b.power or 0))
-        T.tileMeter(self, x, y, cs, cs, p, p > 0.25 and T.color.accent or T.color.bad, a, 0)
-        T.tileFrame(self, x, y, cs, cs, hot and T.color.accent or T.color.tileFrame, a)
-        return
+        if want == "all" then
+            for _, it in ipairs(spares) do P.offered[it] = true end
+            P.offerColor = T.color.ok
+        elseif want then
+            P.offered[want] = true
+        end
     end
-    T.rect(self, x, y, cs, cs, T.color.cell, a)
-    if batteryTex then self:drawTextureScaledAspect(batteryTex, ix, iy, side, side, 0.22 * a, 1, 1, 1) end
-    local spares = b.spares or {}
-    if hot then
-        P.offered = {}
-        for _, it in ipairs(spares) do P.offered[it] = true end
-        P.offerColor = T.color.ok
-        local c = #spares > 0 and T.color.ok or T.color.bad
-        self:drawRect(x, y, cs, cs, 0.2 * a, c.r, c.g, c.b)
-        T.border(self, x, y, cs, cs, c, a)
+    if b.has then
+        self:batteryTile(x, y, b.power, inHot, a)
     else
-        P.offered, P.offerColor = {}, nil
-        T.border(self, x, y, cs, cs, T.color.tileEdge, a)
+        T.rect(self, x, y, cs, cs, T.color.cell, a)
+        if batteryTex then
+            self:drawTextureScaledAspect(batteryTex, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), side, side, 0.22 * a, 1, 1, 1)
+        end
+        if inHot then
+            local c = #spares > 0 and T.color.ok or T.color.bad
+            self:drawRect(x, y, cs, cs, 0.2 * a, c.r, c.g, c.b)
+            T.border(self, x, y, cs, cs, c, a)
+        else
+            T.border(self, x, y, cs, cs, T.color.tileEdge, a)
+        end
+    end
+    local cells = self.shown + (self.more > 0 and 1 or 0)
+    if cells == 0 then return end
+    T.rect(self, ox + pad + cs + BATTERY_SEP, y, 1, self.rows * cs + (self.rows - 1) * gap, T.color.tileEdge, a)
+    local charges = b.charges or NONE
+    for k = 1, cells do
+        local c, r = (k - 1) % self.cols, math.floor((k - 1) / self.cols)
+        local tx, ty = ox + self.sx + c * (cs + gap), y + r * (cs + gap)
+        -- each tile drops into its place a little after the one before it (as the panel's other tiles)
+        local tt = T.anim(math.max(0, math.min(1, (since - TILE_WAIT_MS - k * TILE_STEP_MS) / TILE_MS)))
+        local ta = a * tt
+        if ta > 0.01 then
+            ty = ty - math.floor(cs * 0.22 * (1 - tt) * (1 - tt) + 0.5)
+            if k <= self.shown then
+                self:batteryTile(tx, ty, charges[k], hi == k + 1, ta)
+                -- (the empty slot hovered: the one a click puts in, framed green
+                -- as the grids' batteries light up)
+                if k == 1 and inHot and not b.has then T.tileFrame(self, tx, ty, cs, cs, T.color.ok, ta) end
+            else
+                local m = mores[self.more]
+                if not m then
+                    m = "+" .. self.more
+                    mores[self.more] = m
+                end
+                T.rect(self, tx, ty, cs, cs, T.color.cell, ta)
+                T.border(self, tx, ty, cs, cs, T.color.tileEdge, ta)
+                local d = T.color.dim
+                T.inkCentre(self, m, tx, ty, cs, cs, d.r, d.g, d.b, ta, T.fontCaps)
+            end
+        end
     end
 end
 
 local DRAG_START_PX = 5
 
---- What a click on the battery slot does, or nil (empty, no battery to put in).
-function P:batteryHint()
+--- What a click on the battery panel's cell `i` (indexAt) does, or nil (the
+--- empty slot, no battery to put in).
+function P:batteryHint(i)
     local b = self.battery
-    if not b or not b.act then return nil end
-    if b.has then return T.upper(getText("IGUI_Knox_BatteryTake")) end
-    if b.spares and #b.spares > 0 then return T.upper(getText("IGUI_Knox_BatteryPut")) end
+    if not b or not b.act or not i then return nil end
+    local s = P.batteryWords()
+    if i > 1 then return b.has and s.swap or s.put end
+    if b.has then return s.take end
+    if b.spares and #b.spares > 0 then return s.put end
     return nil
 end
 
---- The battery slot clicked or dragged: its battery taken out, or (empty) the
---- fullest of the character's put in (KnoxGridView.batteryAct).
-function P:useBattery()
+--- The battery panel's cell `i` clicked (or the one in it dragged out): the
+--- battery in it taken out; one of the character's put in (the one in it out
+--- first); the empty slot - the fullest put in (KnoxGridView.batteryAct).
+function P:useBattery(i)
     local b = self.battery
-    if not b or not b.act then return end
-    local what = b.has and "take" or ((b.spares and #b.spares > 0) and "put" or nil)
+    if not b or not b.act or not i then return end
+    local spare = i > 1 and b.spares and b.spares[i - 1] or nil
+    local what = (spare and "put") or (b.has and "take") or ((b.spares and #b.spares > 0) and "put" or nil)
     if not what then return end
     P.close()
-    b.act(what)
+    b.act(what, spare)
 end
 
 function P:onMouseDown(x, y)
@@ -396,9 +517,9 @@ function P:onMouseMove(dx, dy)
     end
     if math.abs(getMouseX() - p.x) + math.abs(getMouseY() - p.y) < DRAG_START_PX then return end
     self.press = nil
-    -- (the battery dragged out of its slot: taken out, into the main inventory)
+    -- (the battery in it dragged out of its slot: taken out, into the main inventory)
     if self.battery then
-        if self.battery.has then self:useBattery() end
+        if p.i == 1 and self.battery.has then self:useBattery(1) end
         return
     end
     local act, g = self.act, self.groups[p.i]
@@ -421,7 +542,7 @@ function P:onMouseUp(x, y)
     if self.battery then
         local p = self.press
         self.press = nil
-        if p and self:indexAt(x, y) == p.i then self:useBattery() end
+        if p and self:indexAt(x, y) == p.i then self:useBattery(p.i) end
         return true
     end
     if self.act then
@@ -446,7 +567,7 @@ end
 
 function P:onRightMouseUp(x, y)
     if self.battery then
-        if not self.closeMs and self:indexAt(x, y) then self:useBattery() end
+        if not self.closeMs then self:useBattery(self:indexAt(x, y)) end
         return true
     end
     local i = self.act and not self.closeMs and self:indexAt(x, y)

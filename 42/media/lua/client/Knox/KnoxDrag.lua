@@ -210,12 +210,100 @@ function D.intoBag(bag, player)
     return ok, layout, x, y, rr, why
 end
 
+--- Has the character walked away, the tile in hand, from where it lay or from
+--- `dest`? Then it is not dropped: carried with the screen open, things went
+--- between containers at any distance (Hókuszpókusz Kókuszpókusz, 2026-10-21).
+--- Only with the Knox screen up: its surroundings list is what is in reach.
+-- (a thing lying on the ground: the game's floor list is refilled as the
+-- character walks, and the thing has no container of its own then - its square
+-- is what counts: by the character or next to it. The bench, 2026-10-28.)
+local function farOnGround(item, player)
+    local wi = item.getWorldItem and item:getWorldItem()
+    if not wi then return false end
+    local sq, at = wi:getSquare(), player:getCurrentSquare()
+    if not sq or not at then return true end
+    return sq:getZ() ~= at:getZ() or math.abs(sq:getX() - at:getX()) > 1 or math.abs(sq:getY() - at:getY()) > 1
+end
+
+local function tooFar(player, e, dest)
+    local s = KnoxScreen and KnoxScreen.instance
+    if not (s and s.loot and KnoxActions and KnoxActions.isReachable) then return false end
+    local from = e.item:getContainer()
+    return farOnGround(e.item, player)
+        or (from and not KnoxActions.isReachable(from, player))
+        or (dest and not KnoxActions.isReachable(dest, player)) or false
+end
+
+local farCache = {ms = 0}   -- the preview's answer, for a few frames (isReachable builds a table)
+
+--- For the drop preview: is the dragged tile too far from its place or from
+--- `dest`? Red then, as the drop is refused (the bench, 2026-10-28).
+function D.tooFarFor(player, dest)
+    local e = D.entity
+    if not e then return false end
+    local now = getTimestampMs()
+    local c = farCache
+    if c.item ~= e.item or c.dest ~= dest or now - c.ms >= 250 then
+        c.item, c.dest, c.ms = e.item, dest, now
+        c.far = tooFar(player, e, dest)
+    end
+    return c.far
+end
+
+-- The reason a drop here would be refused, for the plate by the cursor
+-- (KnoxDragLayer:drawReason; option A, the author 2026-10-28): set each frame
+-- by the grid view the held tile is over - the footprint's rect on the screen
+-- and its grid's edges - and good for that frame only (`frame`, counted by the
+-- drag layer).
+D.frame = 0
+D.hint = {frame = -1, why = nil, left = 0, right = 0}
+
+function D.setHint(why, left, right)
+    local k = D.hint
+    k.frame, k.why = D.frame, why
+    k.left, k.right = left, right
+end
+
+local placeCache = {ms = 0}   -- the last answer, for a few frames: a full scan of the grid
+
+--- Is there no free place at all in this grid for the held tile, either way
+--- turned? (the cells under it are taken: the plate says "no room" only when
+--- that is so - a full backpack showed no words, the author 2026-10-28)
+function D.noPlaceIn(layout)
+    local e = D.entity
+    if not e or not layout then return false end
+    local now = getTimestampMs()
+    local c = placeCache
+    if c.layout ~= layout or c.item ~= e.item or now - c.ms >= 200 then
+        c.layout, c.item, c.ms = layout, e.item, now
+        c.none = layout:findFree(e) == nil
+    end
+    return c.none
+end
+
+local function outOfReach(player, e, dest)
+    local far = tooFar(player, e, dest)
+    local from = e.item:getContainer()
+    -- (one line when it happens: the bench showed nothing moved but no words over the head)
+    if far then
+        print("[Knox] drop refused, too far: from " .. tostring(from and from:getType() or (e.item:getWorldItem() and "ground")) .. " to " .. tostring(dest and dest:getType()))
+    end
+    return far
+end
+
 --- Drop the dragged tile (and the selection with it) into a bag.
 local function dropIntoBag(bag, player, source, extras)
     local e = D.entity
+    if outOfReach(player, e, bag.item and bag.item:getInventory()) then
+        D.cancel()
+        D.explain(player, "IGUI_Knox_TooFar")
+        return false
+    end
     local ok, layout, _, _, _, why = D.intoBag(bag, player)
     D.cancel()
     bagCache = {}
+    -- (it may go in but there is no place in it: said, as on the plate - it was silent)
+    if not ok and not why and layout then why = "IGUI_Knox_NoRoom" end
     if not ok then
         D.explain(player, why)
         return false
@@ -259,6 +347,7 @@ function D.dropInto(container, player)
     local e = D.entity
     if not e then return false end
     local ok, why = D.canDropInto(container, player)
+    if ok and outOfReach(player, e, container) then ok, why = false, "IGUI_Knox_TooFar" end
     local source, extras = D.sourceInfo(), D.extras
     D.cancel()
     if not ok then
@@ -389,6 +478,7 @@ function D.drop(view, x, y, player)
             D.rotate()
         end
     end
+    if ok and outOfReach(player, e, layout and layout.container) then ok, why = false, "IGUI_Knox_TooFar" end
     local fromGrid = sourceContainer()
     local fromView = D.source
     local source = D.sourceInfo()
@@ -496,7 +586,24 @@ function D.handOff()
     end
     ISMouseDrag.dragging = items
     ISMouseDrag.draggingFocus = D   -- not any game window: none treats it as its own drag
-    D.handed = {items = items, item = D.entity.item, upFrames = 0}
+    -- (the drag as it was, to take back when the screen opens again with the
+    -- button still held: the bench, 2026-10-28 - no highlight, no "too far")
+    D.handed = {items = items, item = D.entity.item, upFrames = 0,
+                entity = D.entity, source = D.source, extras = D.extras, r = D.r, grabX = D.grabX, grabY = D.grabY}
+end
+
+--- The Knox screen opened again while the handed-off items are still held:
+--- they are Knox's drag again (lit where they would land, refused when far).
+function D.takeBack()
+    local h = D.handed
+    if not h or ISMouseDrag.dragging ~= h.items or not isMouseButtonDown(0) then return end
+    D.entity, D.source, D.extras = h.entity, h.source, h.extras
+    D.r, D.grabX, D.grabY = h.r, h.grabX, h.grabY
+    D.upFrames = 0
+    ISMouseDrag.dragging = nil
+    ISMouseDrag.draggingFocus = nil
+    if h.layer then h.layer:removeFromUIManager() end
+    D.handed = nil
 end
 
 -- Kept up to date before the UI is drawn (top-level elements may be added or

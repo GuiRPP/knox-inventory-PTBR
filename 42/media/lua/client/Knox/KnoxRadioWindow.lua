@@ -26,6 +26,8 @@ local TV = KnoxTVWindow
 W.instance = nil
 W.lastX, W.lastY = nil, nil
 W.halos = {}   -- line number (of the Java part) -> skills and moods it changed
+W.haloSeqs = {}   -- those line numbers, oldest first
+local HALO_LINES = 1000   -- (the Java part keeps 200 lines a set)
 
 local inRect = T.inRect
 
@@ -1127,7 +1129,13 @@ function W.noteHalo(str, amount, inverse)
         dir = amount > 0 and "up" or "down"
         if inverse then good = amount > 0 else good = amount < 0 end
     end
-    W.halos[seq] = W.halos[seq] or {}
+    if not W.halos[seq] then
+        -- (the oldest lines' notes go: the table no longer grows for the whole
+        -- game - SΞNSΞI's report, 2026-10-28)
+        table.insert(W.haloSeqs, seq)
+        if #W.haloSeqs > HALO_LINES then W.halos[table.remove(W.haloSeqs, 1)] = nil end
+        W.halos[seq] = {}
+    end
     table.insert(W.halos[seq], {text = str, dir = dir, good = good})
     local w = W.instance
     if w then w.rowsDirty = true end

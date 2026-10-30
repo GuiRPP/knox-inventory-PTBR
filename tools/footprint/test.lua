@@ -450,6 +450,7 @@ do
         G.pending[it] = rec
         it.md.knoxP = {k = L.key, x = 2, y = 1, r = 0}
     end
+    G.pendingEpoch = G.pendingEpoch + 1   -- (as KnoxGrid.track does: the list of moves is made anew)
     local during = G.build(bag.inv, naked)
     local t2
     for _, e in ipairs(during.placed) do
@@ -482,9 +483,50 @@ do
     local rec = {source = {kind = "grid", key = "x", x = 0, y = 0, r = 0}, steps = steps, total = 300,
                  player = naked, items = moving, t = getTimestampMs()}
     for _, it in ipairs(moving) do G.pending[it] = rec end
+    G.pendingEpoch = G.pendingEpoch + 1
     local near = function(a, b) return a ~= nil and b ~= nil and math.abs(a - b) < 1e-6 end
     local list = G.pendingList()
     check("moves: all thirty listed", #list == 30, #list)
+    -- (progress once a move, entries kept, slots apart - 500 bullets, 2026-10-28)
+    local same = true
+    for _, g in ipairs(list) do if not near(g.progress, list[1].progress) then same = false end end
+    check("moves: one progress for all items of a move", same)
+    check("moves: in the list", G.inList(moving[7], list) and not G.inList(from:add(item("Base.Pen")), list))
+    check("moves: none from or to a slot", #list.slots == 0 and G.leavingSlot(list, "hands") == nil, #list.slots)
+    -- (one list a frame for all who ask - the screen, the slots, each grid's build:
+    -- 300 us a frame with 500 bullets moved, the author's bench 2026-10-28)
+    check("moves: the same list for all who ask in a frame", G.pendingList() == list)
+    -- (a frame takes several milliseconds: by the clock it was made anew 2 times a
+    -- frame all the same - the author's bench 2026-10-28)
+    clock = clock + 5
+    check("moves: the same list in a frame while the clock goes on", G.pendingList() == list)
+    -- (kept from frame to frame while the moves and the queue are as they were, only the
+    -- progress brought up to date: made anew every frame, 260 bullets cost up to 4.5 ms -
+    -- the author's detailed bench 2026-10-29)
+    clock = clock + 11
+    G.frame = G.frame + 1
+    function transfer:getJobDelta() return 0.8 end
+    local kept = G.pendingList()
+    check("moves: the same list the next frame", kept == list and G.inList(moving[7], kept))
+    check("moves: ...its progress up to date", near(kept[1].progress, 1 - (300 - 10 * 0.8) / 300)
+        and near(kept[30].progress, kept[1].progress), kept[1].progress)
+    function transfer:getJobDelta() return 0.5 end
+    check("moves: ...and once a frame (the game's tick moves it, not the drawing)", near(G.pendingList()[1].progress, kept[1].progress))
+    G.frame = G.frame + 1
+    check("moves: the next frame again up to date", near(G.pendingList()[1].progress, 1 - 295 / 300), G.pendingList()[1].progress)
+    -- a move over (its record gone from the queue's look by its age): made anew
+    G.pendingEpoch = G.pendingEpoch + 1
+    local again = G.pendingList()
+    check("moves: a new list in the same frame when a move starts or ends", again ~= list)
+    check("moves: an item's entry kept from list to list", again[1] == list[1] and G.inList(moving[7], again))
+    check("moves: an older list no longer counts", not G.inList(moving[7], list))
+    G.pendingEpoch = G.pendingEpoch + 1
+    local third = G.pendingList()
+    check("moves: made anew again on the next start or end", third ~= again and G.inList(moving[7], third))
+    table.insert(transfer.queueList, {items = {}})
+    local fourth = G.pendingList()
+    check("moves: a new list in the same frame when the queue changes", fourth ~= third)
+    table.remove(transfer.queueList)
     local _, p1 = G.pendingOf(moving[30])
     check("moves: progress of the first entry only (half of one of thirty)", near(p1, 1 - 295 / 300), p1)
     -- the first thing is over (its entry gone) in the same millisecond: asked anew
@@ -509,6 +551,172 @@ do
     ISTimedActionQueue.queues[naked].queue = {}
     check("moves: over at once when the queue empties", G.pendingOf(moving[5]) == nil and G.pendingOf(lone) == nil)
     check("moves: none left", #G.pendingList() == 0, #G.pendingList())
+    G.pending = {}
+    ISTimedActionQueue = nil
+end
+
+-- a swap of two quick slots: taken off, hung on - two steps the game ends on their
+-- animation's event (maxTime -1, no time of their own): filled by the time, not half
+-- at once and standing there (the author, 2026-10-29)
+do
+    local near = function(a, b) return a ~= nil and b ~= nil and math.abs(a - b) < 1e-6 end
+    local off = {action = {}, maxTime = -1, Type = "ISDetachItemHotbar"}
+    local on = {maxTime = -1, Type = "ISAttachItemHotbar"}
+    function off:getJobDelta() return 0 end
+    function on:getJobDelta() return 0 end
+    local q = {}
+    ISTimedActionQueue = {queues = {[naked] = {queue = q}}}
+    local knife = container("belt", 4):add(item("Base.HuntingKnife"))
+    local function swap()
+        G.track(naked, {knife}, {kind = "slot", id = "quick:1"}, {kind = "slot", id = "quick:2"}, function()
+            table.insert(q, off)
+            table.insert(q, on)
+        end)
+    end
+    local function at(ms)
+        clock = clock + ms
+        G.frame = G.frame + 1
+        local _, p = G.pendingOf(knife)
+        return p
+    end
+    swap()
+    check("swap: starts empty", near(at(0), 0), at(0))
+    check("swap: taking off fills by the time", near(at(250), 0.25), at(0))
+    check("swap: ...never to its end before done", near(at(500), 0.475), at(0))
+    -- taken off (850 ms): hanging on under way
+    table.remove(q, 1)
+    on.action = {}
+    check("swap: half when taken off", near(at(100), 0.5), at(0))
+    check("swap: hanging on fills by the time", near(at(250), 0.75), at(0))
+    check("swap: not full until hung on", near(at(5000), 0.975), at(0))
+    table.remove(q, 1)
+    check("swap: over when done", at(16) == nil)
+    -- the next swap: each step weighs as long as it took (850 ms; hanging on at most 3 s)
+    off.knoxStartMs, on.knoxStartMs, on.action = nil, nil, nil
+    swap()
+    local rec = G.pending[knife]
+    check("swap: a step weighs the time it took", rec ~= nil and near(rec.steps[1].weight, 42.5) and near(rec.steps[2].weight, 150),
+        rec and (rec.steps[1].weight .. "," .. rec.steps[2].weight))
+    q[1], q[2] = nil, nil
+    G.pending = {}
+    ISTimedActionQueue = nil
+end
+
+-- what stacks: a type's kind looked at once (its class and tags), the rest each time -
+-- (ten looks at Java a thing: 500 bullets, a build up to 9 ms - the author's bench 2026-10-28)
+do
+    local function food(ft)
+        local it = item(ft, {class = "Food"})
+        it.rotten = false
+        function it:getOffAgeMax() return 1000000000 end
+        function it:isCookable() return false end
+        function it:isCooked() return false end
+        function it:isBurnt() return false end
+        function it:isRotten() return self.rotten end
+        function it:getPoisonPower() return 0 end
+        function it:isTainted() return false end
+        function it:isFrozen() return false end
+        function it:getHungChange() return 0 end
+        function it:getBaseHunger() return 0 end
+        return it
+    end
+    local S = G.isStackable
+    check("stacks: bullets", S(item("Base.Bullets9mm")) and S(item("Base.Bullets9mm")))
+    check("stacks: not a shirt, a gun, a bag",
+        not S(item("Mod.KnoxShirt2", {class = "Clothing"})) and not S(item("Mod.KnoxGun2", {class = "HandWeapon"}))
+        and not S(item("Mod.KnoxBag2", {capacity = 5})))
+    local feather = food("Mod.KnoxFeather")
+    check("stacks: a feather (asked for)", S(feather) and S(food("Mod.KnoxFeather")))
+    feather.rotten = true
+    check("stacks: ...not one that is not like the others, its type known", not S(feather) and S(food("Mod.KnoxFeather")))
+    check("stacks: not food nobody asked for", not S(food("Mod.KnoxApple")) and not S(food("Mod.KnoxApple")))
+    local full = item("Mod.KnoxCan", {fluid = {isEmpty = function() return false end}})
+    check("stacks: not a thing with a fluid in it, a type known as plain", S(item("Mod.KnoxCan")) and not S(full))
+    -- (whether a type wears down and holds rounds is the type's, asked once; the wear
+    -- and the rounds stay each thing's own - the author's detailed bench 2026-10-29)
+    local function pipe(cond)
+        local it = item("Mod.KnoxPipe")
+        function it:getConditionMax() return 10 end
+        function it:getCondition() return cond end
+        return it
+    end
+    check("stacks: a whole thing of a type that wears", S(pipe(10)))
+    check("stacks: ...not a worn one, its type known", not S(pipe(4)) and S(pipe(10)))
+    local K = G.stackKey
+    local m1, m2, m3 = item("Mod.KnoxMag", {maxAmmo = 15, ammo = 3}), item("Mod.KnoxMag", {maxAmmo = 15, ammo = 15}),
+        item("Mod.KnoxMag", {maxAmmo = 15, ammo = 3})
+    check("stacks: magazines apart by their rounds, the type known", K(m1) ~= K(m2) and K(m1) == K(m3), K(m1) .. " / " .. K(m2))
+    check("stacks: no rounds in the key of a type that holds none", not string.find(K(item("Base.Bullets9mm")), "|r", 1, true))
+    F.overrides["Mod.KnoxCan"] = {stack = 1}
+    check("stacks: the player's \"stack 1\" after it was known", not S(item("Mod.KnoxCan")))
+    F.overrides["Mod.KnoxCan"] = nil
+end
+
+-- a bag's meter counts its cells by the grid's build, as KnoxGrid.usedCells does -----
+-- (counted on their own four times a second, a bag of 500 bullets took up to 6 ms a
+-- count - the author's bench 2026-10-28): stacks over their limit, what is hidden,
+-- what is in a hand or on the hotbar, what is on its way
+do
+    local function same(name, L, c)
+        local a, b = G.cellsOf(L), G.usedCells(c)
+        check(name, a == b, tostring(a) .. " by the build, " .. tostring(b) .. " counted")
+    end
+    local bag = item("Base.Bag_Schoolbag", {capacity = 15})
+    for _ = 1, 50 do bag.inv:add(item("Base.Nails")) end             -- 40 a tile: two tiles
+    bag.inv:add(item("Base.9mmClip", {maxAmmo = 15, ammo = 15}))
+    bag.inv:add(item("Base.9mmClip", {maxAmmo = 15, ammo = 15}))
+    bag.inv:add(item("Base.9mmClip", {maxAmmo = 15, ammo = 0}))
+    bag.inv:add(item("Base.BaseballBat"))
+    bag.inv:add(item("Mod.Fists", {hidden = true}))
+    local L = G.build(bag.inv, naked)
+    same("cells: stacks, a bat, a hidden thing", L, bag.inv)
+    check("cells: kept on the build", G.cellsOf(L) == L.used and L.used ~= nil)
+
+    -- the player's own: a hammer in the hand, a knife on the hotbar in a bag on the back
+    local p = player({})
+    local hammer = p.inv:add(item("Base.Hammer"))
+    function p:getPrimaryHandItem() return hammer end
+    for _ = 1, 3 do p.inv:add(item("Base.Nails")) end
+    local pack = p.inv:add(item("Base.Bag_Schoolbag", {capacity = 15}))
+    local knife = pack.inv:add(item("Base.HuntingKnife"))
+    function knife:getAttachedSlot() return 2 end
+    pack.inv:add(item("Base.Pen"))
+    local PL = G.build(p.inv, p)
+    local inHand = false
+    for _, e in ipairs(PL.placed) do if e.item == hammer then inHand = true end end
+    check("cells: the hammer in the hand has no tile", not inHand)
+    same("cells: what is in the hand counted all the same", PL, p.inv)
+    local BL = G.build(pack.inv, p)
+    check("cells: the knife on the hotbar has no tile", #BL.placed == 1, #BL.placed .. " tiles")
+    same("cells: in a bag on the player, what is on the hotbar counted", BL, pack.inv)
+    -- (a dead one's knife on its belt is loot: a tile, as before)
+    local body = container("corpse", 30)
+    local loot = body:add(item("Base.HuntingKnife"))
+    function loot:getAttachedSlot() return 2 end
+    local CL = G.build(body, p)
+    check("cells: a dead one's things are loot", #CL.placed == 1 and CL.placed[1].item == loot, #CL.placed)
+    same("cells: a dead one's things counted", CL, body)
+
+    -- 25 of 60 nails on their way
+    local from = item("Base.Bag_Schoolbag", {capacity = 15})
+    local nails = {}
+    for _ = 1, 60 do table.insert(nails, from.inv:add(item("Base.Nails"))) end
+    local part = {}
+    for i = 36, 60 do table.insert(part, nails[i]) end
+    local action = {action = {}}
+    function action:getJobDelta() return 0 end
+    ISTimedActionQueue = {queues = {[naked] = {queue = {action}}}}
+    local rec = {steps = {{action = action, weight = 1}}, total = 1, player = naked, items = part, t = getTimestampMs()}
+    for _, it in ipairs(part) do G.pending[it] = rec end
+    G.pendingEpoch = G.pendingEpoch + 1
+    local ML = G.build(from.inv, naked)
+    local shown = 0
+    for _, e in ipairs(ML.placed) do shown = shown + #e.items end
+    check("cells: what is on its way has no tile", shown == 35, shown)
+    same("cells: what is on its way counted all the same", ML, from.inv)
+    clock = clock + 16
+    G.frame = G.frame + 1
+    same("cells: and the next frame's build too", G.build(from.inv, naked), from.inv)
     G.pending = {}
     ISTimedActionQueue = nil
 end
@@ -720,6 +928,147 @@ do
         LA.cols .. "x" .. LA.rows)
     F.overrides["Base.Bag_ALICEpack"] = nil
     F.overrides["Mod.Pack"] = nil
+end
+
+-- the counter's detailed mode inside a build (the grids' long builds, 2026-10-29):
+-- its parts are counted, and the grid comes out the same as with it off --------
+do
+    local function shape(L)
+        local out = {}
+        for _, e in ipairs(L.placed) do
+            table.insert(out, e.x .. "," .. e.y .. "," .. (e.r or 0) .. ":" .. #e.items .. (e.ghost and "g" or ""))
+        end
+        table.sort(out)
+        return table.concat(out, " ") .. " | " .. #L.overflow .. " | " .. G.cellsOf(L)
+    end
+    local function scene()
+        local outer = item("Base.Bag_DuffelBag", {capacity = 18})
+        local inner = outer.inv:add(item("Base.Bag_Schoolbag", {capacity = 15}))
+        local bullets = {}
+        for _ = 1, 250 do table.insert(bullets, inner.inv:add(item("Base.Bullets9mm"))) end
+        for _ = 1, 4 do outer.inv:add(item("Base.Hammer")) end
+        -- ten bullets on their way out of the inner bag
+        local transfer = {action = {}, queueList = {}}
+        function transfer:getJobDelta() return 0.25 end
+        local moving, steps = {}, {}
+        for i = 1, 10 do
+            table.insert(moving, bullets[i])
+            table.insert(transfer.queueList, {items = {bullets[i]}})
+            table.insert(steps, {action = transfer, weight = 1, item = bullets[i]})
+        end
+        ISTimedActionQueue = {queues = {[naked] = {queue = {transfer}}}}
+        G.pending = {}
+        local rec = {source = {kind = "grid", key = G.containerKey(inner.inv, naked), x = 0, y = 0, r = 0},
+                     steps = steps, total = 10, player = naked, items = moving, t = getTimestampMs()}
+        for _, it in ipairs(moving) do G.pending[it] = rec end
+        G.pendingEpoch = G.pendingEpoch + 1
+        G.frame = G.frame + 1
+        return outer, inner
+    end
+    local o1, i1 = scene()
+    local offOuter, offInner = shape(G.build(o1.inv, naked)), shape(G.build(i1.inv, naked))
+    local offNest = G.nestRefusal(item("Base.Nails"), i1.inv, naked)
+    local recs = {}
+    KnoxPerf = {detail = true, now = function() return 0 end}
+    function KnoxPerf.addPart(name, us, n)
+        local r = recs[name] or {calls = 0, n = 0}
+        recs[name] = r
+        r.calls = r.calls + 1
+        r.n = r.n + (n or 0)
+    end
+    function KnoxPerf.part(name, t0, n)
+        KnoxPerf.addPart(name, 0, n)
+        return 0
+    end
+    local o2, i2 = scene()
+    local onOuter, onInner = shape(G.build(o2.inv, naked)), shape(G.build(i2.inv, naked))
+    local onNest = G.nestRefusal(item("Base.Nails"), i2.inv, naked)
+    KnoxPerf = nil
+    check("detail: the bag's grid the same", onInner == offInner, offInner .. " / " .. onInner)
+    check("detail: the outer grid the same", onOuter == offOuter, offOuter .. " / " .. onOuter)
+    check("detail: bag in a bag the same", onNest == offNest, tostring(offNest) .. " / " .. tostring(onNest))
+    local function has(name, calls, n)
+        local r = recs[name]
+        check("detail: part " .. name, r ~= nil and (calls == nil or r.calls == calls) and (n == nil or r.n == n),
+            r and (r.calls .. " calls, n=" .. r.n) or "missing")
+    end
+    has("part: grid build 0 size, shape")
+    has("part: grid build 1 moves")
+    has("part: grid build 2 things")
+    has("part: grid build 2a worn / in hand")
+    has("part: grid build 2b stacks")
+    has("part: grid build 2c sizes")
+    has("part: grid build 3 saved places")
+    has("part: grid build 4 found in the world")
+    has("part: grid build 5 new places")
+    has("part: grid build 6 not fitting")
+    has("part: bag growth, counted anew", nil, 250)
+    has("part: bag in a bag, checked")
+    has("part: moves list, made", 1, 10)
+    has("part: moves list, kept")
+    has("part: moves list, progress of moves", 1)
+    has("part: moves list, queue looked over", nil, 10)
+    G.pending = {}
+    ISTimedActionQueue = nil
+end
+
+-- a bag's cells from its own grid on the screen, the tile around it a frame later
+-- (500 bullets moved: their bag counted anew up to 4.4 ms ~7 times a second, the
+-- author's bench 2026-10-29; the author: "давай попробуем") -------------------------
+do
+    local outer = item("Base.Bag_DuffelBag", {capacity = 18})
+    local inner = outer.inv:add(item("Base.Bag_Schoolbag", {capacity = 15}))
+    inner.inv:add(item("Base.Hammer"))
+    local function tileOf(L)
+        for _, e in ipairs(L.placed) do
+            if e.item == inner then return e.w .. "x" .. e.h end
+        end
+        return "none"
+    end
+    local view = {prerenderMs = clock}
+    local function innerBuilt()
+        view.layout = G.build(inner.inv, naked, false, true)
+        view.prerenderMs = clock
+        G.liveGrids[inner.inv] = view
+    end
+    innerBuilt()
+    check("bag's grid: its count is the counted one", G.cellsOf(view.layout) == G.usedCells(inner.inv),
+        G.cellsOf(view.layout) .. " / " .. G.usedCells(inner.inv))
+    local old = tileOf(G.build(outer.inv, naked, false, true))
+    -- the bag filled; its grid not built again yet
+    for _ = 1, 8 do inner.inv:add(item("Base.Hammer")) end
+    local exact = tileOf(G.build(outer.inv, naked))
+    check("bag's grid: (the bag grows when filled - the case is real)", exact ~= old, old .. " / " .. exact)
+    -- (`exact` was asked of a build that doesn't wait: the bag's size is known now; a new
+    -- one for the waiting builds)
+    local inner2 = outer.inv:add(item("Base.Bag_Schoolbag", {capacity = 15}))
+    inner2.inv:add(item("Base.Hammer"))
+    inner = inner2
+    innerBuilt()
+    old = tileOf(G.build(outer.inv, naked, false, true))
+    for _ = 1, 8 do inner.inv:add(item("Base.Hammer")) end
+    local L1 = G.build(outer.inv, naked, false, true)
+    check("bag's grid: a grid on the screen waits a frame - the tile as it was", tileOf(L1) == old and L1.bagWait == true,
+        tileOf(L1) .. " " .. tostring(L1.bagWait))
+    G.frame = G.frame + 1
+    innerBuilt()
+    local L2 = G.build(outer.inv, naked, false, true)
+    check("bag's grid: the next frame, from the bag's grid - grown", tileOf(L2) == exact and not L2.bagWait,
+        tileOf(L2) .. " " .. tostring(L2.bagWait))
+    -- its grid not built again: three frames of waiting, then counted
+    for _ = 1, 8 do inner.inv:add(item("Base.Hammer")) end
+    local waited = 0
+    for _ = 1, 5 do
+        G.frame = G.frame + 1
+        if G.build(outer.inv, naked, false, true).bagWait then waited = waited + 1 end
+    end
+    check("bag's grid: no more than three frames of waiting", waited == 3, waited)
+    -- the bag's grid gone from the screen: counted at once
+    for _ = 1, 8 do inner.inv:add(item("Base.Hammer")) end
+    view.prerenderMs = clock - 1000
+    G.frame = G.frame + 1
+    check("bag's grid: not on the screen - no waiting", not G.build(outer.inv, naked, false, true).bagWait)
+    G.liveGrids[inner.inv] = nil
 end
 
 print("pass " .. pass .. ", fail " .. fail)

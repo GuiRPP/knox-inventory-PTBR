@@ -135,7 +135,8 @@ end
 local SCREENS = {{1920, 1080, 48}, {2560, 1440, 64}, {3840, 2160, 96}, {1280, 1024, 37}}
 for _, scr in ipairs(SCREENS) do
     screenW, screenH, T.cell = scr[1], scr[2], scr[3]
-    for _, carName in ipairs({"CarNormal", "PickUpTruck"}) do
+    -- (a van: the pickup's body with a lockable trunk - its button, linlin 2026-10-25)
+    for _, carName in ipairs({"CarNormal", "PickUpTruck", "Van"}) do
         for _, st in ipairs(STATES) do
             local tag = scr[1] .. "x" .. scr[2] .. " " .. carName .. " " .. st[1]
             radioReset()
@@ -152,7 +153,12 @@ for _, scr in ipairs(SCREENS) do
             frames(d, 90)
             ok(tag .. ": drawn, no error", d.shownAt ~= nil and draws > 200, draws)
             ok(tag .. ": no draw with a broken number", #bad == 0, table.concat(bad, ","))
-            ok(tag .. ": the body", d.body == (carName == "PickUpTruck" and D.TRUCK or D.SEDAN))
+            ok(tag .. ": the body", d.body == (carName == "CarNormal" and D.SEDAN or carName == "Van" and D.TRUCK or D.PICKUP))
+            if carName == "Van" then
+                local has = false
+                for _, h in ipairs(d.hits) do if h.id == "trunk" then has = true end end
+                ok(tag .. ": the trunk's button", has)
+            end
             ok(tag .. ": fits the screen", d.W <= screenW and d.H <= screenH * 0.16, d.W .. "x" .. d.H)
             labels = {}
             frames(d, 1)
@@ -297,6 +303,13 @@ if snap then
         -- (the radio's close-up at 4K: drawn pixel for pixel, not blown up from 1440p)
         {"news_tape_2160", "CarNormal", 7, nil, 3},
         {"news_hot_1440", "PickUpTruck", 5, nil, 2, 700},
+        -- (the pickup's body with its trunk's button: a van, 2026-10-28)
+        {"van_night_1080", "Van", 3, nil, 1},
+        {"van_trunk_1080", "Van", 6, "trunk", 1},
+        {"van_night_1440", "Van", 3, nil, 2},
+        {"van_night_2160", "Van", 3, nil, 3},
+        {"van_fm_1280", "Van", 6, nil, 4},
+        {"pickup_night_1440", "PickUpTruck", 3, nil, 2},
     }
     for _, sn in ipairs(SNAPS) do
         local scr = SCREENS[sn[5]]

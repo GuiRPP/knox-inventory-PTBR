@@ -7,6 +7,7 @@ require "ISUI/ISInventoryPaneContextMenu"
 require "Knox/KnoxTheme"
 require "Knox/KnoxGrid"
 require "Knox/KnoxDrag"
+require "Knox/KnoxReasonIcons"
 require "Knox/KnoxTooltip"
 require "Knox/KnoxSelect"
 require "Knox/KnoxActions"
@@ -17,6 +18,11 @@ KnoxGridView = ISUIElement:derive("KnoxGridView")
 local T = KnoxTheme
 local DRAG_START_PX = 5
 local DOUBLE_CLICK_MS = 350
+-- (counted up when a tile's look changes in a way its own grid can't see - a thing
+-- settles into a new place or flashes, the mouse lifts a tile, a thing's window opens
+-- or shuts: the grids' ready lists of quiet tiles are written anew - renderGrid,
+-- the inventory's FPS stage 3, 2026-10-29)
+local tilesEpoch = 0
 
 function KnoxGridView:new(x, y, container, playerNum)
     local o = ISUIElement:new(x, y, 1, 1)
@@ -54,29 +60,49 @@ end
 
 function KnoxGridView:rebuild()
     local before = self.layout
-    self.layout = KnoxGrid.build(self.container, self:player())
+    self.layout = KnoxGrid.build(self.container, self:player(), false, true)
     self.dirty = false
+    -- (the grid of a bag is up: the grid around the bag takes its cells from this build -
+    -- KnoxGrid.bagFootprint, 2026-10-29)
+    KnoxGrid.liveGrids[self.container] = self
+    -- (the detailed counter: what a rebuild costs past the build - the grids' long
+    -- rebuilds, a floor of 300 things up to 6.8 ms, the author's bench 2026-10-29)
+    local Pf = KnoxPerf
+    local pt = Pf and Pf.detail and Pf.now()
     -- a tile that has come to a new place (dropped, arrived, re-packed) settles
     -- into it for a moment instead of just being there: see drawTile
+    -- (a place as a number, not a string - a floor of 300 things looked over four times
+    -- a second made one for each tile: the author's detailed bench 2026-10-29)
     local was = self.places
     local places = {}
     local now = getTimestampMs()
     pruneSettle(now)
     for _, e in ipairs(self.layout.placed) do
         if not e.ghost and not e.reserved then
-            local key = e.x .. "," .. e.y .. "," .. (e.r or 0)
+            local key = (e.y * 4096 + e.x) * 2 + (e.r == 1 and 1 or 0)
             places[e.item] = key
-            if was and before and was[e.item] ~= key then KnoxGridView.settle[e.item] = now end
+            if was and before and was[e.item] ~= key then
+                KnoxGridView.settle[e.item] = now
+                tilesEpoch = tilesEpoch + 1   -- (the same thing in another grid settles too)
+            end
         end
     end
     self.places = places
     -- ...and one that is gone from the grid (taken, used up; the faded copy of
     -- a thing whose move has ended) doesn't just vanish: it fades out where it was
-    local shown = {}
+    -- (the copy of a thing still there kept and brought up to date, not made anew -
+    -- only a gone one's goes to `leaving`, as it was)
+    local shown, oldShown = {}, self.shown
     for _, e in ipairs(self.layout.placed) do
         if not e.reserved then
-            shown[e.item] = {item = e.item, items = {e.item}, x = e.x, y = e.y, r = e.r, w = e.w, h = e.h,
-                             ghost = true, from = e.ghost and 0.4 or 1}
+            local c = oldShown and oldShown[e.item]
+            if c then
+                c.x, c.y, c.r, c.w, c.h, c.from = e.x, e.y, e.r, e.w, e.h, e.ghost and 0.4 or 1
+            else
+                c = {item = e.item, items = {e.item}, x = e.x, y = e.y, r = e.r, w = e.w, h = e.h,
+                     ghost = true, from = e.ghost and 0.4 or 1}
+            end
+            shown[e.item] = c
         end
     end
     if self.shown and before then
@@ -89,6 +115,8 @@ function KnoxGridView:rebuild()
         end
     end
     self.shown = shown
+    if pt then pt = Pf.part("part: grid rebuild 1 settling, leaving", pt, #self.layout.placed) end
+    local aged = 0
     -- Things lying in a cupboard, a fridge or an oven don't age, thaw or cook
     -- on their own in the game's data: the game brings them up to date when
     -- its own inventory list looks at them (ISInventoryPane: updateAge,
@@ -99,11 +127,14 @@ function KnoxGridView:rebuild()
             local first = e.item
             if instanceof(first, "Food") then
                 for _, it in ipairs(e.items) do it:updateAge() end
+                aged = aged + #e.items
             elseif instanceof(first, "Clothing") then
                 first:updateWetness()
+                aged = aged + 1
             end
         end
     end
+    if pt then pt = Pf.part("part: grid rebuild 2 food age, clothes wet", pt, aged) end
     -- What the character has in its pockets, or sees in a container already
     -- looked into, is known: put down and opened again, it is not searched for
     -- (KnoxSearch). A bag on the character is not looked into by being on it:
@@ -115,21 +146,33 @@ function KnoxGridView:rebuild()
         if player and c == player:getInventory() then
             KnoxSearch.markIn(c)   -- (these things only, not what is in a bag among them)
         elseif c:getType() == "floor" or (KnoxLootPanel and KnoxLootPanel.isSeen(c)) then
+            -- (a tile whose things are all known has nothing to mark: its look-up whether
+            -- it is hidden - a few looks at the game - spared; a floor of 300 things, up
+            -- to 1.3 ms a rebuild: the author's detailed bench 2026-10-29)
             for _, e in ipairs(self.layout.placed) do
-                if not e.ghost and not e.reserved and not KnoxSearch.isHidden(e.item) then
+                if not e.ghost and not e.reserved then
+                    local all = true
                     for _, it in ipairs(e.items) do
-                        if not KnoxSearch.known[it] then KnoxSearch.markKnown(it) end
+                        if not KnoxSearch.known[it] then all = false break end
+                    end
+                    if not all and not KnoxSearch.isHidden(e.item) then
+                        for _, it in ipairs(e.items) do
+                            if not KnoxSearch.known[it] then KnoxSearch.markKnown(it) end
+                        end
                     end
                 end
             end
         end
     end
+    if pt then pt = Pf.part("part: grid rebuild 3 searched, known", pt) end
     -- the places of the player's layout waiting for their things (KnoxOrder)
     local okS, silh = pcall(KnoxOrder.silhouettes, self.layout)
     self.silhouettes = okS and silh or nil
+    if pt then pt = Pf.part("part: grid rebuild 4 layout's places", pt) end
     local W, H = self:pxSize()
     self:setWidth(W + 1)
     self:setHeight(H + 1)
+    if pt then Pf.part("part: grid rebuild 5 size", pt) end
 end
 
 -- Cells and pixels ------------------------------------------------------------
@@ -305,6 +348,7 @@ local REBUILD_MS = 250
 
 function KnoxGridView:prerender()
     local now = getTimestampMs()
+    self.prerenderMs = now   -- (the grid is up and built: its bag's meter counts by it, KnoxInventoryPanel)
     -- the middle button has no event of its own: its press is looked for
     local mmb = isMouseButtonDown(2)
     if mmb and not self.mmbWas and self:isMouseOver() and not KnoxDrag.isActive() then
@@ -319,9 +363,16 @@ function KnoxGridView:prerender()
     -- it cost, such grids took the game down to a few frames a second.
     local since = now - (self.builtMs or 0)
     local cost = self.buildCost or 0
+    -- (`bagWait`: a bag's tile in it waited for the bag's own grid - built again at once)
     local changed = self.dirty or self.container:getItems():size() ~= self.layout.itemCount
-        or self.epoch ~= KnoxGrid.pendingEpoch
+        or self.epoch ~= KnoxGrid.pendingEpoch or self.layout.bagWait == true
     if (changed and since >= cost * 4) or since > math.max(REBUILD_MS, cost * 40) then
+        -- (the detailed counter: why - a change, or the look-over every REBUILD_MS; n= cells)
+        local Pf = KnoxPerf
+        if Pf and Pf.detail then
+            Pf.addPart(changed and "part: grid rebuild, a change" or "part: grid rebuild, look-over", 0,
+                self.layout and self.layout.itemCount or 0)
+        end
         self:rebuild()
         local done = getTimestampMs()
         self.buildCost = done - now
@@ -452,6 +503,7 @@ function KnoxGridView.flashItems(items)
         if stop <= now then KnoxGridView.flash[it] = nil end   -- ones never drawn again
     end
     for _, it in ipairs(items) do KnoxGridView.flash[it] = untilMs end
+    tilesEpoch = tilesEpoch + 1
 end
 
 local function drawFlash(ui, e, x, y, w, h)
@@ -628,6 +680,7 @@ function KnoxGridView:updateLift()
         if not st then
             st = {k = 0, ms = now, view = self}
             lifts[hov] = st
+            tilesEpoch = tilesEpoch + 1   -- (a grid showing the same container lifts it too)
         end
         if st.want ~= 1 then
             st.want = 1
@@ -943,6 +996,120 @@ function KnoxGridView:drawNoRoomMask()
     if L.rows > base then dim(g.ovX - 2, g.ovY - 2, g.ovW + 5, (L.rows - base) * cs + 5) end
 end
 
+-- Ready lists of the grids (the inventory's FPS, stage 3 - the author, 2026-10-29): a
+-- grid's cells and its quiet tiles are drawn by Java from a list (T.listDraw). Grids
+-- come and go - a bag window, the loot panel's grid made anew for each container -
+-- and Java keeps every list it is given: they come from a pool, a grid keeping its
+-- own and taking the one left longest ago when it has none.
+local LIST_POOL = 64
+local listPool = {}
+
+local function gridList(self, field)
+    local L = self[field]
+    local f = KnoxGrid.frame
+    if L and L.owner == self then
+        L.used = f
+        return L
+    end
+    local best = nil
+    if #listPool < LIST_POOL then
+        best = T.newList()
+        listPool[#listPool + 1] = best
+    else
+        for i = 1, LIST_POOL do
+            local c = listPool[i]
+            if c.used < f - 1 and (not best or c.used < best.used) then best = c end
+        end
+        -- (more grids on the screen than lists: this one is drawn by Lua)
+        if not best then return nil end
+    end
+    best.owner, best.used = self, f
+    self[field] = best
+    return best
+end
+
+-- The things whose bag or inspect window is open (their tiles get a sand frame):
+-- when they change, the lists of quiet tiles are written anew.
+local winSeen, winN = {}, 0
+
+local function seeWindows(list, n)
+    for i = 1, #list do
+        n = n + 1
+        local it = list[i].item
+        if winSeen[n] ~= it then
+            winSeen[n] = it
+            tilesEpoch = tilesEpoch + 1
+        end
+    end
+    return n
+end
+
+local function checkWindows()
+    local n = 0
+    if KnoxContainerWindow and KnoxContainerWindow.list then n = seeWindows(KnoxContainerWindow.list, n) end
+    if KnoxInspectWindow and KnoxInspectWindow.list then n = seeWindows(KnoxInspectWindow.list, n) end
+    if n ~= winN then
+        for i = n + 1, winN do winSeen[i] = nil end
+        winN = n
+        tilesEpoch = tilesEpoch + 1
+    end
+end
+
+--- Nothing is going on that a tile's own check (isQuiet) sees only tile by tile:
+--- nothing held, no search by name, no container being searched, no menu, pick
+--- panel, split, fluid or alarm window up, nothing in use, no selection frame being
+--- drawn - and the lists are on. Then a tile found quiet stays so until the grid is
+--- built again, the mouse goes to another tile, a thing's window opens or shuts, or
+--- the selection or the new things' marks change (renderGrid's key).
+local function calmNow(self)
+    if not T.listsOn() or not knoxDrawTiles or (KnoxTestBench and KnoxTestBench.luaTiles) then return false end
+    if KnoxDrag.entity or KnoxGridView.query() or (KnoxSearch and KnoxSearch.container) then return false end
+    if self.band and self.band.active then return false end
+    -- (no `next` in the game's Lua)
+    for _ in pairs(KnoxGrid.useNow) do return false end
+    local t = KnoxContextMenu and KnoxContextMenu.target
+    if t then
+        local menu = getPlayerContextMenu(t.playerNum)
+        if menu and menu:isAnyVisible() then return false end
+    end
+    if (KnoxSlotPicker and KnoxSlotPicker.instance) or (KnoxSplitDialog and KnoxSplitDialog.instance)
+            or (KnoxFluidWindow and KnoxFluidWindow.instance) or (KnoxFluidInfo and KnoxFluidInfo.instance)
+            or (KnoxAlarmWindow and KnoxAlarmWindow.instance) then
+        return false
+    end
+    checkWindows()
+    return true
+end
+
+--- One tile of the grid's loop (renderGrid) drawn as it is now - or "quiet" (the
+--- Java part draws it with the others: `quietOk`) or "raised" (lifted: drawn after
+--- the others, or the tile above would cover its top).
+local function drawEntry(self, e, quietOk)
+    if e.reserved then
+        -- cells an item is coming to: only a breathing frame, no item yet
+        local rx, ry, rw, rh = self:tileRect(e)
+        if rx then
+            T.target(self, rx, ry, rw, rh)
+            -- several moves at once: this one's turn in a sand square
+            local rec = KnoxGrid.pending[e.item]
+            local turn = rec and KnoxGrid.orderOf(rec)
+            if turn then T.turnBadge(self, rx, ry, turn) end
+        end
+    elseif e.ghost then
+        self:drawTile(e, 0.4)
+        local _, p = KnoxGrid.pendingOf(e.item)
+        local rx, ry, rw, rh = self:tileRect(e)
+        if p and rx then T.progress(self, rx, ry, rw, rh, p) end
+    elseif quietOk and self:isQuiet(e) then
+        return "quiet"
+    elseif lifts[e.item] then
+        return "raised"
+    else
+        self:drawTile(e, KnoxGridView.isDragged(e) and 0.3 or 1)
+    end
+    return nil
+end
+
 function KnoxGridView:render()
     local p0 = getTimestampMs()
     self:renderGrid()
@@ -958,52 +1125,58 @@ function KnoxGridView:renderGrid()
     local W, H = L.cols * cs, L.rows * cs
 
     local base = L.baseRows or L.rows
-    local line = T.color.line
-    -- (the lines' thickness and strength are the player's: see KnoxTheme.LOOK)
-    local lw, la = T.gridLine(), T.gridLineAlpha()
-    local lo = math.floor((lw - 1) / 2)
-    local function vline(i, y0, y1) self:drawRect(i * cs - lo, y0, lw, y1 - y0 + 1, la, line.r, line.g, line.b) end
-    local function hline(j, x1) self:drawRect(0, j * cs - lo, x1 + 1, lw, la, line.r, line.g, line.b) end
     local g = self:geo()
-    if g then
-        -- a bag with compartments: each its own little grid in a frame, a gap
-        -- between them (KnoxBagShapes); the rows of what doesn't fit under them all
-        KnoxGridView.drawShape(self, 0, 0, L.shape, cs, nil, 1)
-        if L.rows > base then
-            local ox, ow, oh = g.ovX, g.ovW, (L.rows - base) * cs
-            T.rect(self, ox, g.ovY, ow, oh, T.color.cell, T.gridAlpha())
-            for i = 0, L.shape.ovCols do self:drawRect(ox + i * cs - lo, g.ovY, lw, oh + 1, la, line.r, line.g, line.b) end
-            for j = 0, L.rows - base do self:drawRect(ox - lo, g.ovY + j * cs - lo, ow + lw, lw, la, line.r, line.g, line.b) end
-            KnoxGridView.drawOverflow(self, ox, g.ovY, ow, oh, 1)
-        end
-    elseif not L.limit then
-        T.rect(self, 0, 0, W, H, T.color.cell, T.gridAlpha())
-        for i = 0, L.cols do vline(i, 0, H) end
-        for j = 0, L.rows do hline(j, W) end
-    else
-        -- the last row of the grid is not whole (the pockets: as many cells as
-        -- the clothes give): `part` cells after `whole` rows; the rest of that
-        -- row is no part of the grid and is left empty
-        local whole = math.floor(L.limit / L.cols)
-        local part = L.limit - whole * L.cols
-        local wholeH = whole * cs
-        T.rect(self, 0, 0, W, wholeH, T.color.cell, T.gridAlpha())
-        T.rect(self, 0, wholeH, part * cs, cs, T.color.cell, T.gridAlpha())
-        if L.rows > base then T.rect(self, 0, base * cs, W, (L.rows - base) * cs, T.color.cell, T.gridAlpha()) end
-        for i = 0, L.cols do
-            vline(i, 0, i <= part and wholeH + cs or wholeH)
-            if L.rows > base then vline(i, base * cs, H) end
-        end
-        for j = 0, whole do hline(j, W) end
-        if L.rows > base then
-            for j = base, L.rows do hline(j, W) end
+    -- (the cells, their lines and the rows of what doesn't fit look the same as long
+    -- as the grid's size does: drawn once into a ready list, then by Java - stage 3)
+    local CL = gridList(self, "cellsList")
+    if not (CL and T.listDraw(self, CL, L.cols, L.rows, base, L.limit or false, L.shape or false)) then
+        local line = T.color.line
+        -- (the lines' thickness and strength are the player's: see KnoxTheme.LOOK)
+        local lw, la = T.gridLine(), T.gridLineAlpha()
+        local lo = math.floor((lw - 1) / 2)
+        local function vline(i, y0, y1) self:drawRect(i * cs - lo, y0, lw, y1 - y0 + 1, la, line.r, line.g, line.b) end
+        local function hline(j, x1) self:drawRect(0, j * cs - lo, x1 + 1, lw, la, line.r, line.g, line.b) end
+        if g then
+            -- a bag with compartments: each its own little grid in a frame, a gap
+            -- between them (KnoxBagShapes); the rows of what doesn't fit under them all
+            KnoxGridView.drawShape(self, 0, 0, L.shape, cs, nil, 1)
+            if L.rows > base then
+                local ox, ow, oh = g.ovX, g.ovW, (L.rows - base) * cs
+                T.rect(self, ox, g.ovY, ow, oh, T.color.cell, T.gridAlpha())
+                for i = 0, L.shape.ovCols do self:drawRect(ox + i * cs - lo, g.ovY, lw, oh + 1, la, line.r, line.g, line.b) end
+                for j = 0, L.rows - base do self:drawRect(ox - lo, g.ovY + j * cs - lo, ow + lw, lw, la, line.r, line.g, line.b) end
+                KnoxGridView.drawOverflow(self, ox, g.ovY, ow, oh, 1)
+            end
+        elseif not L.limit then
+            T.rect(self, 0, 0, W, H, T.color.cell, T.gridAlpha())
+            for i = 0, L.cols do vline(i, 0, H) end
+            for j = 0, L.rows do hline(j, W) end
         else
-            hline(base, part * cs)
+            -- the last row of the grid is not whole (the pockets: as many cells as
+            -- the clothes give): `part` cells after `whole` rows; the rest of that
+            -- row is no part of the grid and is left empty
+            local whole = math.floor(L.limit / L.cols)
+            local part = L.limit - whole * L.cols
+            local wholeH = whole * cs
+            T.rect(self, 0, 0, W, wholeH, T.color.cell, T.gridAlpha())
+            T.rect(self, 0, wholeH, part * cs, cs, T.color.cell, T.gridAlpha())
+            if L.rows > base then T.rect(self, 0, base * cs, W, (L.rows - base) * cs, T.color.cell, T.gridAlpha()) end
+            for i = 0, L.cols do
+                vline(i, 0, i <= part and wholeH + cs or wholeH)
+                if L.rows > base then vline(i, base * cs, H) end
+            end
+            for j = 0, whole do hline(j, W) end
+            if L.rows > base then
+                for j = base, L.rows do hline(j, W) end
+            else
+                hline(base, part * cs)
+            end
         end
-    end
-    -- overflow rows (items the grid had no room for): red tint, a red line on top
-    if L.rows > base and not g then
-        KnoxGridView.drawOverflow(self, 0, base * cs, W, (L.rows - base) * cs, 1)
+        -- overflow rows (items the grid had no room for): red tint, a red line on top
+        if L.rows > base and not g then
+            KnoxGridView.drawOverflow(self, 0, base * cs, W, (L.rows - base) * cs, 1)
+        end
+        if CL then T.listEnd(CL) end
     end
 
     self.hovered = (self:entityUnderMouse())
@@ -1026,40 +1199,102 @@ function KnoxGridView:renderGrid()
             if en.y + sh > top and en.y < bottom and not L:cellAt(en.x, en.y) then self:drawSilhouette(en, gk) end
         end
     end
-    for _, e in ipairs(L.placed) do
-        local _, eh = KnoxGrid.dims(e, e.r)
-        if e.y + eh <= top or e.y >= bottom then
-            -- (out of sight)
-        elseif e.reserved then
-            -- cells an item is coming to: only a breathing frame, no item yet
-            local rx, ry, rw, rh = self:tileRect(e)
-            if rx then
-                T.target(self, rx, ry, rw, rh)
-                -- several moves at once: this one's turn in a sand square
-                local rec = KnoxGrid.pending[e.item]
-                local turn = rec and KnoxGrid.orderOf(rec)
-                if turn then T.turnBadge(self, rx, ry, turn) end
-            end
-        elseif e.ghost then
-            self:drawTile(e, 0.4)
-            local _, p = KnoxGrid.pendingOf(e.item)
-            local rx, ry, rw, rh = self:tileRect(e)
-            if p and rx then T.progress(self, rx, ry, rw, rh, p) end
-        elseif not g and knoxDrawTiles and not (KnoxTestBench and KnoxTestBench.luaTiles) and self:isQuiet(e) then
-            -- (the Java part draws a grid's cells in rows: not a bag's compartments)
-            nq = nq + 1
-            quiet[nq] = e
-        elseif lifts[e.item] then
-            -- (lifted: drawn after the others, or the tile above would cover its top)
-            raised = raised or {}
-            table.insert(raised, e)
+    -- (the Java part draws a grid's cells in rows: not a bag's compartments)
+    local quietOk = not g and knoxDrawTiles and not (KnoxTestBench and KnoxTestBench.luaTiles)
+    -- A calm grid (calmNow) keeps the tiles it found quiet, with their stack counts, in
+    -- a ready list until it is built again (stage 3, the author, 2026-10-29: the check
+    -- of 91 tiles of a floor took ~1 ms a frame); the others - under the mouse,
+    -- settling, flashing, marked, on their way - are drawn live as the loop draws them,
+    -- in its order. A bag with compartments draws its tiles one by one: its list holds
+    -- them all, and is kept only while all of them in sight are quiet.
+    local TL = calmNow(self) and gridList(self, "tilesList") or nil
+    local run = self.tileRun
+    local mode = nil   -- "play": from the list; "write": the loop, the list written; nil: the loop as ever
+    if TL then
+        if not run then
+            run = {loud = {}, nl = 0, nq = 0, stamp = 0}
+            self.tileRun = run
+        end
+        local rows, hov = top * 100000 + bottom, self.hovered or false
+        if run.ok and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
+                and run.epoch == tilesEpoch and run.sel == KnoxSelect.items and run.toggles == KnoxSelect.toggles
+                and run.fresh == KnoxGridView.fresh then
+            mode = run.mode
         else
-            self:drawTile(e, KnoxGridView.isDragged(e) and 0.3 or 1)
+            run.ok, run.list, run.layout, run.rows, run.hov = true, TL, L, rows, hov
+            run.epoch, run.sel, run.toggles, run.fresh = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh
+            run.stamp = run.stamp + 1
+            run.nl = 0
+            mode = "write"
+            if g then
+                for _, e in ipairs(L.placed) do
+                    local _, eh = KnoxGrid.dims(e, e.r)
+                    if e.y + eh > top and e.y < bottom and (e.reserved or e.ghost or not self:isQuiet(e)) then
+                        mode = nil
+                        break
+                    end
+                end
+            end
+            run.mode = mode
+        end
+    elseif run then
+        run.ok = false
+    end
+    if mode == "play" and not g then
+        local loud = run.loud
+        for i = 1, run.nl do
+            local e = loud[i]
+            local what = drawEntry(self, e, quietOk)
+            if what == "quiet" then
+                -- (quiet since - its flash or its settling over: drawn as the Java part
+                -- draws it, and the list is written anew next frame)
+                self:drawTile(e, 1)
+                run.ok = false
+            elseif what == "raised" then
+                raised = raised or {}
+                table.insert(raised, e)
+            end
+        end
+        nq = run.nq
+    else
+        -- (a bag with compartments, all quiet: its whole loop is the list)
+        local whole = mode ~= nil and g ~= nil
+        if not (whole and T.listDraw(self, TL, run.stamp)) then
+            local remember = mode == "write" and not g
+            local loud, nl = run and run.loud, 0
+            for _, e in ipairs(L.placed) do
+                local _, eh = KnoxGrid.dims(e, e.r)
+                if e.y + eh > top and e.y < bottom then   -- (else out of sight)
+                    local what = drawEntry(self, e, quietOk)
+                    if what == "quiet" then
+                        nq = nq + 1
+                        quiet[nq] = e
+                    else
+                        if what == "raised" then
+                            raised = raised or {}
+                            table.insert(raised, e)
+                        end
+                        if remember then
+                            nl = nl + 1
+                            loud[nl] = e
+                        end
+                    end
+                end
+            end
+            if remember then
+                for i = nl + 1, #loud do loud[i] = nil end
+                run.nl = nl
+            end
+            if whole then
+                T.listEnd(TL)
+                run.mode = TL.ok and "play" or nil
+            end
         end
     end
     -- the quiet tiles in one call to the Java part (KnoxTiles.java), then
-    -- their stack counts here (text)
-    if nq > 0 then
+    -- their stack counts here (text) - from the ready list while the grid is calm
+    local listed = mode ~= nil and not g
+    if nq > 0 and not (listed and T.listDraw(self, TL, run.stamp)) then
         knoxDrawTiles(self.javaObject, quiet, nq, cs, T.color)
         local f, fh = T.fontTile, T.fontTileH
         for i = 1, nq do
@@ -1075,6 +1310,14 @@ function KnoxGridView:renderGrid()
                 end
             end
         end
+        if listed then
+            T.listEnd(TL)
+            run.mode = TL.ok and "play" or nil
+        end
+    end
+    if mode == "write" and not g then
+        run.nq = nq
+        if nq == 0 then run.mode = "play" end
     end
     for i = nq + 1, #quiet do quiet[i] = nil end
     for _, e in ipairs(raised or {}) do self:drawTile(e, KnoxGridView.isDragged(e) and 0.3 or 1) end
@@ -1102,30 +1345,43 @@ function KnoxGridView:renderGrid()
         local w, h = KnoxDrag.dims()
         local merge = KnoxDrag.mergeTarget(self)
         local bag = not merge and KnoxDrag.bagUnderMouse(self)
-        local ok
+        local ok, why
         if merge then
             x, y = merge.x, merge.y
             w, h = KnoxGrid.dims(merge, merge.r)
-            ok = KnoxDrag.canDrop(L, x, y, self:player(), merge)
+            ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
         elseif bag then
             -- onto a bag: the bag lights up, green when the item fits inside
             x, y = bag.x, bag.y
             w, h = KnoxGrid.dims(bag, bag.r)
-            ok = KnoxDrag.intoBag(bag, self:player())
+            local fits, inside, _, _, _, bagWhy = KnoxDrag.intoBag(bag, self:player())
+            ok, why = fits, bagWhy
+            -- (it may go in, but no place is left in it)
+            if not ok and not why and inside then why = "IGUI_Knox_NoRoom" end
         else
-            ok = KnoxDrag.canDrop(L, x, y, self:player(), merge)
+            ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
             -- it doesn't go as it is turned but would the other way: shown that way
             -- (the drop turns it by itself)
             if not ok and dragged.w ~= dragged.h then
                 KnoxDrag.rotate()
                 local x2, y2 = self:dropCell()
                 if KnoxDrag.canDrop(L, x2, y2, self:player(), nil) then
-                    ok = true
+                    ok, why = true, nil
                     x, y = x2, y2
                     w, h = KnoxDrag.dims()
                 end
                 KnoxDrag.rotate()
             end
+            -- (the cells are taken, and no other place in the grid is free: no room.
+            -- Not within its own grid - rearranging a full bag)
+            if not ok and not why and L.container ~= (KnoxDrag.source and KnoxDrag.source.layout and KnoxDrag.source.layout.container)
+                    and KnoxDrag.noPlaceIn(L) then
+                why = "IGUI_Knox_NoRoom"
+            end
+        end
+        -- (walked away with it in hand: red, the drop is refused - KnoxDrag.tooFarFor)
+        if ok and KnoxDrag.tooFarFor(self:player(), bag and bag.item:getInventory() or L.container) then
+            ok, why = false, "IGUI_Knox_TooFar"
         end
         local c = ok and T.color.ok or T.color.bad
         -- clip the highlight to the grid
@@ -1150,6 +1406,12 @@ function KnoxGridView:renderGrid()
         elseif x1 > x0 and y1 > y0 then
             self:drawRect(x0 * cs + 1, y0 * cs + 1, (x1 - x0) * cs - 1, (y1 - y0) * cs - 1, 0.22, c.r, c.g, c.b)
             self:drawRectBorder(x0 * cs + 1, y0 * cs + 1, (x1 - x0) * cs - 1, (y1 - y0) * cs - 1, 1, c.r, c.g, c.b)
+        end
+        -- refused, and there are words for why: the plate by the held tile says it
+        -- (KnoxDragLayer:drawReason), kept to the grid's sides
+        if not ok and why then
+            local ax = self:getAbsoluteX() + self:getXScroll()
+            KnoxDrag.setHint(why, ax, ax + L.cols * cs + 1)
         end
     end
 
@@ -1251,10 +1513,113 @@ function KnoxDragLayer:follow(e)
     return math.floor(st.px + 0.5), math.floor(st.py + 0.5)
 end
 
+-- The reason plate (option A in the style "Чертёж", the author 2026-10-28):
+-- the held tile over a place it can't go, and caught up with the cursor (the
+-- author: only then) - a plate over the held tile says why, with a picture
+-- (tools/reason_icons). Over the tile, not the red footprint: over a big bag the
+-- footprint is the bag, and the plate lay on the tile (the author, 2026-10-28).
+-- Below the tile, clear of the arrow, when the screen's top is too near; kept
+-- to the grid's sides and the screen. In 120 ms, out in 170.
+-- Mockup: .claude/mockups/drop_reason.
+local REASON_ICON = {IGUI_Knox_TooFar = "far", IGUI_Knox_NoRoom = "full", IGUI_Knox_BagGrowsNoRoom = "grow"}
+local CURSOR_H = 27            -- Knox's arrow (knox_cursor.png) below its point
+local SHADOW = {r = 0, g = 0, b = 0}
+local reasonBand, reasonOpts = {0, 0, 0, 0}, {align = "centre"}
+local reasonTexts, reasonPaths = {}, {}
+
+-- the picture's size for the plate: the largest made that is no bigger than half a cell
+local function reasonSize()
+    local want = math.max(20, math.floor(T.cell * 0.5 + 0.5))
+    local sizes = KnoxReasonIcons and KnoxReasonIcons.sizes
+    if not sizes then return nil end
+    local best = sizes[1]
+    for i = 1, #sizes do
+        if sizes[i] <= want then best = sizes[i] end
+    end
+    return best
+end
+
+local function reasonTex(name, size)
+    local byName = reasonPaths[name]
+    if not byName then
+        byName = {}
+        reasonPaths[name] = byName
+    end
+    local p = byName[size]
+    if not p then
+        local stem = "media/ui/knoxreason/" .. name .. "_" .. size
+        p = {stem .. "_base.png", stem .. "_mark.png"}
+        byName[size] = p
+    end
+    return T.readyTex(p[1]), T.readyTex(p[2])
+end
+
+--- `x, y, w, h`: the held tile on the screen (without its shake).
+function KnoxDragLayer:drawReason(settled, x, y, w, h)
+    local k = KnoxDrag.hint
+    local now = getTimestampMs()
+    local st = self.reasonState
+    if not st then
+        st = {a = 0, ms = now, why = nil, x = 0, y = 0, w = 0, h = 0, left = 0, right = 0, mouseY = 0}
+        self.reasonState = st
+    end
+    local dt = now - st.ms
+    st.ms = now
+    if k.frame == KnoxDrag.frame and k.why and settled then
+        if st.why ~= k.why then st.why, st.a = k.why, 0 end
+        st.x, st.y, st.w, st.h = x, y, w, h
+        st.left, st.right, st.mouseY = k.left, k.right, getMouseY()
+        st.a = math.min(1, st.a + dt / 120)
+    else
+        st.a = math.max(0, st.a - dt / 170)
+    end
+    if st.a <= 0 or not st.why then return end
+
+    local text = reasonTexts[st.why]
+    if not text then
+        text = getText(st.why)
+        reasonTexts[st.why] = text
+    end
+    local font, pad = T.fontText, T.pad
+    local left, _, right = T.inkBox(font, text)
+    local tw = right - left
+    local name = REASON_ICON[st.why]
+    local size = name and reasonSize()
+    local m = size and KnoxReasonIcons[name] and KnoxReasonIcons[name][size]
+    local gap = math.floor(pad / 2)
+    local bh = math.max(T.fontH(font), m and size or 0) + pad
+    local bw = pad + (m and (m.w + gap) or 0) + tw + pad
+    local sw, sh = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local bx = st.x + math.floor((st.w - bw) / 2)
+    bx = math.max(st.left + 1, math.min(bx, st.right - 1 - bw))
+    bx = math.max(0, math.min(bx, sw - bw))
+    -- (above the "+N" badge of things held along with it, when there is one)
+    local badge = #KnoxDrag.extras > 0 and T.fontTileH + 2 or 0
+    local by = st.y - badge - gap - bh
+    if by < 0 then by = math.min(sh - bh, math.max(st.y + st.h + gap, st.mouseY + CURSOR_H + 2)) end
+    local a = st.a
+    T.rect(self, bx + 4, by + 6, bw, bh, SHADOW, 0.45 * a)
+    T.rect(self, bx, by, bw, bh, T.color.window, 0.97 * a)
+    T.border(self, bx, by, bw, bh, T.color.bad, a)
+    local tx = bx + pad
+    if m then
+        local base, mark = reasonTex(name, size)
+        local iy = by + math.floor((bh - (m.bottom - m.top + 1)) / 2) - m.top
+        local c, r = T.color.text, T.color.bad
+        if base then self:drawTextureScaled(base, tx, iy, m.w, m.h, 0.92 * a, c.r, c.g, c.b) end
+        if mark then self:drawTextureScaled(mark, tx, iy, m.w, m.h, a, r.r, r.g, r.b) end
+        tx = tx + m.w + gap
+    end
+    reasonBand[1], reasonBand[2], reasonBand[3], reasonBand[4] = tx, by, tw, bh
+    reasonOpts.font, reasonOpts.a = font, a
+    T.label(self, text, reasonBand, T.color.text, reasonOpts)
+end
+
 function KnoxDragLayer:render()
     local e = KnoxDrag.entity
     if not e then
         self.inertia = nil
+        KnoxDrag.frame = KnoxDrag.frame + 1
         return
     end
     local cs = T.cell
@@ -1282,6 +1647,7 @@ function KnoxDragLayer:render()
     local kg = 0
     for _, it in ipairs(e.items or {e.item}) do kg = kg + KnoxGrid.weightOf(it) end
     local sx, sy = KnoxGridView.strain(kg)
+    local restX, restY = x, y
     x, y = x + sx, y + sy
     T.rect(ui, x, y, pw, ph, T.category[T.categoryOf(e.item)], 0.85)
     T.border(ui, x, y, pw, ph, T.color.accent, 1)
@@ -1295,6 +1661,12 @@ function KnoxDragLayer:render()
         T.rect(ui, x + pw - tw, y - T.fontTileH - 2, tw, T.fontTileH + 2, T.color.accent)
         T.drawText(ui, text, x + pw - tw + 4, y - T.fontTileH - 1, 0.08, 0.08, 0.08, 1, T.fontTile)
     end
+    -- caught up with the cursor: the reason plate may show (the author: not before)
+    local st = self.inertia
+    local settled = math.abs(fx - getMouseX()) <= 1 and math.abs(fy - getMouseY()) <= 1
+        and (not st or (T.animOn and not T.animOn()) or math.abs(st.vx) + math.abs(st.vy) < 40)
+    self:drawReason(settled, restX, restY, pw, ph)
+    KnoxDrag.frame = KnoxDrag.frame + 1
 end
 
 --- Is this tile being dragged (itself or as part of the selection)?
@@ -1435,41 +1807,129 @@ end
 
 --- The battery slot used (the author, 2026-10-21: it showed the battery, but it
 --- could not be taken out): `remove` - the battery out into the main inventory;
---- else `battery` (the fullest of the character's) put in. As the game does it:
---- a radio's or walkie's set - its battery action, the thing in the main inventory
---- first; a flashlight - its recipes (the game's light menu).
-function KnoxGridView.batteryAct(player, item, remove, battery)
-    if not player or not item then return end
+--- else `battery` put in - the one chosen in the slot's panel (the author,
+--- 2026-10-29: "choose which to put in"); with one in, it comes out first. As the
+--- game does it: a radio's or walkie's set - its battery action, the thing in the
+--- main inventory first; a flashlight - its recipes (the game's light menu).
+
+local function toMain(player, it)
     local inv = player:getInventory()
-    local function toMain(it)
-        if it:getContainer() ~= inv then
-            ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(player, it, it:getContainer(), inv))
-        end
+    if it:getContainer() ~= inv then
+        ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(player, it, it:getContainer(), inv))
     end
-    if instanceof(item, "Radio") then
-        if not remove and not battery then return end
-        toMain(item)
-        if battery then toMain(battery) end
-        local act = ISDeviceBatteryAction:new(player, remove, battery,
-            ISDeviceBatteryAction:getDeviceDataParameter(player, item, "InventoryItem"))
-        -- (the game finds the set by its ID in the main inventory only, when the
-        -- action is made - a set in a bag is moved there first, by the action
-        -- queued before: so it is looked for again when this one starts; the
-        -- author, 2026-10-22: "attempted index: getIsBatteryPowered of non-table")
-        local valid = act.isValid
-        act.isValid = function(self)
-            if not self.deviceData then
-                self.deviceData = ISDeviceBatteryAction:getDeviceDataFromParameter(self.character, self.parameter)
-            end
-            return self.deviceData ~= nil and valid(self)
+end
+
+local function radioAct(player, item, remove, battery)
+    toMain(player, item)
+    if battery then toMain(player, battery) end
+    local act = ISDeviceBatteryAction:new(player, remove, battery,
+        ISDeviceBatteryAction:getDeviceDataParameter(player, item, "InventoryItem"))
+    -- (the game finds the set by its ID in the main inventory only, when the
+    -- action is made - a set in a bag is moved there first, by the action
+    -- queued before: so it is looked for again when this one starts; the
+    -- author, 2026-10-22: "attempted index: getIsBatteryPowered of non-table")
+    local valid = act.isValid
+    act.isValid = function(self)
+        if not self.deviceData then
+            self.deviceData = ISDeviceBatteryAction:getDeviceDataFromParameter(self.character, self.parameter)
         end
-        ISTimedActionQueue.add(act)
+        return self.deviceData ~= nil and valid(self)
+    end
+    ISTimedActionQueue.add(act)
+end
+
+--- A flashlight's battery in: this one, as the game's craft window does with its
+--- inputs picked by hand (HandcraftLogic's manual inputs). false: it can't be
+--- done so (the caller lets the game pick).
+local function insertChosen(player, item, battery)
+    local ok, done = pcall(function()
+        local recipe = getScriptManager():getCraftRecipe("InsertBattery")
+        if not recipe or not HandcraftLogic or not ISEntityUI then return false end
+        toMain(player, item)
+        toMain(player, battery)
+        local logic = HandcraftLogic.new(player, nil, nil)
+        logic:setIsoObject(logic:findCraftSurface(player, 2))
+        logic:setContainers(ISInventoryPaneContextMenu.getContainers(player))
+        logic:setRecipeFromContextClick(recipe, item)
+        logic:setManualSelectInputs(true)
+        local inputs = recipe:getInputs()
+        for i = 0, inputs:size() - 1 do
+            local input = inputs:get(i)
+            if input:getResourceType() == ResourceType.Item then
+                local list = ArrayList.new()
+                if input:canUseItem(battery, player) then list:add(battery)
+                elseif input:canUseItem(item, player) then list:add(item) end
+                if list:isEmpty() or not logic:setManualInputsFor(input, list) then return false end
+            end
+        end
+        if not logic:canPerformCurrentRecipe() then return false end
+        return ISEntityUI.HandcraftStart(player, logic, false, true) ~= nil
+    end)
+    return ok and done == true
+end
+
+-- A battery chosen while one is in: it comes out first (its recipe), and the chosen
+-- one goes in once the flashlight is empty - the game's craft checks that when it is
+-- set up, so it is set up then. Given up when the character stopped (the way out
+-- cancelled) or after a while.
+local WAIT_MS = 20000
+local waiting = nil
+
+local function byId(w) return w.player:getInventory():getItemWithIDRecursiv(w.id) end
+
+local function waitOut()
+    local w = waiting
+    if not w then
+        Events.OnTick.Remove(waitOut)
         return
     end
+    local now = getTimestampMs()
+    -- (in a game with others a thing moved comes back as a new object: by its ID)
+    local found, again = pcall(byId, w)
+    local item = (found and again) or w.item
+    local b = item and KnoxGridView.batteryOf(item)
+    local busy = not w.player:getCharacterActions():isEmpty()
+    if b and not b.has then
+        waiting = nil
+        Events.OnTick.Remove(waitOut)
+        if not insertChosen(w.player, item, w.battery) then KnoxGridView.batteryAct(w.player, item, false, nil) end
+    elseif now - w.ms > WAIT_MS or (not busy and now - w.ms > 500) then
+        waiting = nil
+        Events.OnTick.Remove(waitOut)
+    end
+end
+
+function KnoxGridView.batteryAct(player, item, remove, battery)
+    if not player or not item then return end
+    local b = KnoxGridView.batteryOf(item)
+    local swap = not remove and battery ~= nil and b ~= nil and b.has
+    if instanceof(item, "Radio") then
+        if not remove and not battery then return end
+        if swap then radioAct(player, item, true, nil) end
+        radioAct(player, item, remove, battery)
+        return
+    end
+    -- (B42: a flashlight's battery goes out and in by the craft recipes RemoveBattery
+    -- and InsertBattery - the light menu's old recipes find nothing, the battery
+    -- stayed in: the author, 2026-10-29; the game's own way from an item's menu)
+    if swap then
+        if not KnoxGridView.batteryAct(player, item, true, nil) then return end
+        if waiting then Events.OnTick.Remove(waitOut) end
+        waiting = {player = player, item = item, id = item:getID(), battery = battery, ms = getTimestampMs()}
+        Events.OnTick.Add(waitOut)
+        return
+    end
+    if not remove and battery and insertChosen(player, item, battery) then return true end
+    local ok, recipe = pcall(function() return getScriptManager():getCraftRecipe(remove and "RemoveBattery" or "InsertBattery") end)
+    if ok and recipe and ISInventoryPaneContextMenu and ISInventoryPaneContextMenu.OnNewCraft then
+        ISInventoryPaneContextMenu.OnNewCraft(item, recipe, player:getPlayerNum(), false)
+        return true
+    end
     require "ISUI/ISLightSourceRadialMenu"
-    if not ISLightSourceRadialMenu then return end
+    if not ISLightSourceRadialMenu then return false end
     local menu = setmetatable({character = player, playerNum = player:getPlayerNum()}, {__index = ISLightSourceRadialMenu})
     if remove then menu:onRemoveBattery(item) else menu:onInsertBattery(item) end
+    return true
 end
 
 --- The fullest battery of `list`, or nil.
@@ -1499,24 +1959,32 @@ function KnoxGridView:offerBattery()
     end
     ref.e = e
     if not KnoxSlotPicker.isOpenFor(ref) and now - ref.sinceMs < KINDS_HOVER_MS then return end
-    if not b.has then
-        -- (looked for twice a second, not every frame the mouse rests on the radio)
-        if not ref.spares or now - (ref.sparesMs or 0) > 500 then
-            local spares = {}
-            local list = self:player():getInventory():getAllTypeRecurse("Base.Battery")
-            for i = 0, list:size() - 1 do table.insert(spares, list:get(i)) end
-            ref.spares, ref.sparesMs = spares, now
+    -- The character's batteries, fullest first, with their charge (the author,
+    -- 2026-10-29: choose which goes in - with one in as well, to swap it).
+    -- (looked for twice a second, not every frame the mouse rests on the radio)
+    if not ref.spares or now - (ref.sparesMs or 0) > 500 then
+        local spares, charge = {}, {}
+        local list = self:player():getInventory():getAllTypeRecurse("Base.Battery")
+        for i = 0, list:size() - 1 do
+            local it = list:get(i)
+            table.insert(spares, it)
+            charge[it] = it:getCurrentUsesFloat() or 0
         end
-        b.spares = ref.spares
+        table.sort(spares, function(x, y) return charge[x] > charge[y] end)
+        local charges = {}
+        for i, it in ipairs(spares) do charges[i] = charge[it] end
+        ref.spares, ref.charges, ref.sparesMs = spares, charges, now
     end
+    b.spares, b.charges = ref.spares, ref.charges
     local view = self
-    b.act = function(what)
+    -- ("put": `battery` - the one clicked; none - the fullest)
+    b.act = function(what, battery)
         local player = view:player()
         if what == "take" then
             KnoxGridView.batteryAct(player, ref.item, true, nil)
         elseif what == "put" then
-            local best = fullest(ref.spares)
-            if best then KnoxGridView.batteryAct(player, ref.item, false, best) end
+            local it = battery or fullest(ref.spares)
+            if it then KnoxGridView.batteryAct(player, ref.item, false, it) end
         end
         ref.spares = nil
         for _, v in ipairs(KnoxActions.allViews()) do v:markDirty() end
@@ -1679,7 +2147,9 @@ function KnoxGridView:onMouseUp(x, y)
                 return true
             end
         end
-        KnoxGridView.lastClicks[self.container] = {ms = now, mods = p.mods, type = kind}
+        -- (only the last click is kept: the table no longer grows with every
+        -- container clicked - SΞNSΞI's report, 2026-10-28)
+        KnoxGridView.lastClicks = {[self.container] = {ms = now, mods = p.mods, type = kind}}
         -- a click with what was held when it began: its own action
         local act = KnoxControls.actionFor("mouse", p.mods .. "lmb")
         if act then

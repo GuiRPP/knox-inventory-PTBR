@@ -490,6 +490,12 @@ local function defaultText(name, control)
     return ok and text or nil
 end
 
+--- A number setting: its tooltip ends with the game's "Min Max Default" line.
+local function isNumeric(name)
+    local ok, kind = pcall(function() return getSandboxOptions():getOptionByName(name):getType() end)
+    return ok and (kind == "integer" or kind == "double")
+end
+
 local function drawHelp(self)
     local k, pad = self.knox, T.pad
     local f = k.file
@@ -519,10 +525,13 @@ local function drawHelp(self)
                 self.knoxHelpTitle = T.wrap(label.name or "", T.fontHeader, k.textW)
                 local default = defaultText(name, p.controls[name])
                 self.knoxHelpDefault = default
+                local numeric = isNumeric(name)
                 for _, para in ipairs(paragraphs(p.knoxTips and p.knoxTips[name])) do
                     -- (the game ends a tooltip with "Default = value": shown
-                    -- once, as the line of its own below)
-                    local own = default ~= nil and default ~= "" and string.find(para, "=", 1, true) ~= nil
+                    -- once, as the line of its own below. A number's tooltip ends
+                    -- with "Min Max Default" instead, kept: in Chinese it has "="
+                    -- too and went with min and max - laoda, 2026-10-28)
+                    local own = not numeric and default ~= nil and default ~= "" and string.find(para, "=", 1, true) ~= nil
                         and string.sub(para, -string.len(default)) == default
                     if not own then table.insert(self.knoxHelpText, T.wrap(para, T.fontText, k.textW)) end
                 end

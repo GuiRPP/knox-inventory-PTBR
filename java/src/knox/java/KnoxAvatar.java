@@ -78,13 +78,22 @@ public class KnoxAvatar {
         return src != null;
     }
 
-    static String staticModel(InventoryItem item, boolean overrideHandModels) {
+    static String staticModel(InventoryItem item, boolean overrideHandModels, ItemReplacement hand) {
         if (item == null) return "";
         if (item instanceof HandWeapon && item.getClothingItem() == null) {
             String s = ((HandWeapon) item).getStaticModel();
             return s == null ? "" : s;
         }
         if (overrideHandModels && item.getStaticModel() != null) return item.getStaticModel();
+        // an item held with a hand pose of its own (primaryAnimMask / secondaryAnimMask:
+        // a flashlight of Tactical Flashlight Animation) - the world shows its model by
+        // that mask (ModelManager.addMaskingModel); the model here had empty hands (the
+        // author, 2026-10-29)
+        if (hand != null && hand.maskVariableValue != null && !hand.maskVariableValue.isEmpty()
+                && hand.clothingItem == null) {
+            String s = item.getStaticModel();
+            if (s != null && !s.trim().isEmpty()) return s;
+        }
         return "";
     }
 
@@ -118,8 +127,9 @@ public class KnoxAvatar {
             override = true;
             s = chr.overrideSecondaryHandModel;
         }
-        if (p == null) p = staticModel(primary, override);
-        if (s == null) s = secondary == primary ? "" : staticModel(secondary, override);
+        if (p == null) p = staticModel(primary, override, primary == null ? null : primary.getItemReplacementPrimaryHand());
+        if (s == null) s = secondary == primary ? "" : staticModel(secondary, override,
+                secondary == null ? null : secondary.getItemReplacementSecondHand());
         return p + "|" + s;
     }
 

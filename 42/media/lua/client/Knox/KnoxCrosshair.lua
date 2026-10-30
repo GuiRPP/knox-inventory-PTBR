@@ -38,6 +38,7 @@ local TIMES = string.char(215)   -- (the game reads Lua as single bytes)
 local UNFOLD_MS, FOLD_MS, SHOW_MS = 170, 130, 110
 local ENTER_MS, LEAVE_MS, BAG_MS, HINT_MS = 220, 220, 200, 200
 local HOLD_MS, RETRACT_MS = 180, 120
+local GRP_MAX = 6   -- a group's rows shown at most; more scroll between two strips (as Knox's menu)
 
 -- Sizes at 1080p (a cell of 48), scaled with the cell -------------------------------
 
@@ -59,6 +60,9 @@ local function sizes()
     Z.AWAY, Z.SRC = px(48), px(18)        -- from the crosshair (as Viewpoint's); the square it unfolds from
     Z.PH_SUB, Z.PH = px(7) * 2 + px(43), px(7) * 2 + px(26)   -- the header with a line under the name, without
     Z.P5, Z.P10, Z.P16, Z.P40 = px(5), px(10), px(16), px(40)   -- a few of the mockup's small gaps
+    -- (a row with a line under its name - what "Disassemble" needs: 9 over the capitals, 7 between
+    -- the lines, 9 under; the dot between the parts 4 off their letters - .claude/mockups/vp_scrap_v1.html)
+    Z.R9, Z.R7, Z.DOT_G = px(9), px(7), px(4)
     -- (the chosen row's name a size up: 15 -> 17)
     Z.big = T.javaFonts and T.makeFont("body", c * 0.31 + 2 * s) or T.fontText
 end
@@ -71,13 +75,21 @@ local function strings()
     STR = {
         take = getText("IGUI_Knox_VPTake"), all = getText("IGUI_Knox_VPTakeAll"), open = getText("IGUI_Knox_VPOpen"),
         use = getText("IGUI_Knox_VPUse"), peek = getText("IGUI_Knox_VPPeek"), fold = getText("IGUI_Knox_VPFold"),
+        unfold = getText("IGUI_Knox_VPUnfold"),
         searching = getText("IGUI_Knox_VPSearching"), unsearched = getText("IGUI_Knox_VPUnsearched"),
         empty = getText("IGUI_Knox_VPEmpty"), locked = getText("IGUI_Knox_VPLocked"),
         inside = getText("IGUI_Knox_VPInside"), actions = getText("IGUI_Knox_MenuActions"),
         kg = getText("IGUI_Knox_Kg"), plural = getText("IGUI_Knox_VPPlural"),
         thing1 = getText("IGUI_Knox_VPThing1"), thing2 = getText("IGUI_Knox_VPThing2"), thing5 = getText("IGUI_Knox_VPThing5"),
-        dot = "  " .. string.char(183) .. "  ",
+        dot = "  " .. string.char(183) .. "  ", dot1 = string.char(183),
+        needs = getText("IGUI_Knox_VPNeeds"),
+        -- (what Viewpoint adds to a locked door's action: Viewpoint_Interact, " [" .. EC_Locked .. "]")
+        lockedTail = " [" .. getText("EC_Locked") .. "]",
     }
+    STR.lockedCaps = T.upper(STR.locked)
+    STR.other = getText("IGUI_Knox_MenuOther")
+    STR.titles = {use = getText("IGUI_Knox_MenuUse"), act = getText("IGUI_Knox_MenuActions"),
+                  move = getText("IGUI_Knox_MenuMove"), build = getText("IGUI_Knox_MenuBuild")}
     return STR
 end
 
@@ -143,6 +155,100 @@ function LIVE.actions() return knoxVpPanelActions() end
 function LIVE.actionLabel(i) return knoxVpPanelActionLabel(i) end
 function LIVE.actionOn(i) return knoxVpPanelActionOn(i) end
 function LIVE.actionsTitle() return knoxVpPanelActionsTitle() end
+function LIVE.actionsVersion() return knoxVpPanelActionsVersion() end
+-- (the function behind action i: Viewpoint keeps its actions in the order of its labels -
+-- for the action's icon; nil with another Viewpoint)
+local function vpAction(i)
+    local list = ViewpointInteract and ViewpointInteract.actions
+    local act = type(list) == "table" and list[i + 1] or nil
+    return type(act) == "table" and act or nil
+end
+function LIVE.actionFn(i)
+    local act = vpAction(i)
+    return act and act.fn or nil
+end
+-- (Viewpoint's own first ones - "Enter Vehicle", "Open Door": on top, chosen at once)
+function LIVE.actionFirst(i)
+    local act = vpAction(i)
+    return act ~= nil and act.first == true
+end
+-- (the sub menu it came from: Viewpoint leaves its name off the options of the one it
+-- names the panel by - a TV's "Disassemble" read as the TV's name alone, the author 2026-10-29)
+function LIVE.actionGroup(i)
+    local act = vpAction(i)
+    return act and type(act.group) == "string" and act.group or nil
+end
+-- (a locked door tried, as the game's interact key does: it rattles, the character finds it locked)
+function LIVE.rattle()
+    local obj = knoxVpPanelObject()
+    local p = getSpecificPlayer(0)
+    if not p or not obj then return end
+    if instanceof(obj, "IsoDoor") or (instanceof(obj, "IsoThumpable") and obj:isDoor()) then obj:ToggleDoor(p) end
+end
+-- (what "Disassemble" needs, as the game's tooltip on it lists it - the skill "now/needed", the
+-- tools, the parts, what stands in the way ("- Items on the surface"): {s, bad} each, its own
+-- colours telling which is missing; nil when there is nothing to say. The author, 2026-10-29:
+-- "as our right-click menu has it")
+function LIVE.scrapNeeds(i)
+    local act = vpAction(i)
+    local v = act and act.args and act.args[2]
+    local p = getSpecificPlayer(0)
+    if type(v) ~= "table" or not v.moveProps or not p or not ISMoveableSpriteProps then return nil end
+    local ok, info = pcall(function() return v.moveProps:getInfoPanelDescription(v.square, v.object, p, "scrap") end)
+    if not ok or type(info) ~= "table" then return nil end
+    local bhc = ISMoveableSpriteProps.bhc
+    local br, bg, bb = bhc:getR() * 255, bhc:getG() * 255, bhc:getB() * 255
+    local function isBad(c) return math.abs(c.r - br) < 2 and math.abs(c.g - bg) < 2 and math.abs(c.b - bb) < 2 end
+    local skip = {[getText("IGUI_Name") .. ":"] = true, [getText("Tooltip_item_Weight") .. ":"] = true,
+                  [getText("IGUI_ChanceToBreak") .. ":"] = true}
+    local none, tool = getText("IGUI_None"), getText("IGUI_Tool") .. ":"
+    local out = {}
+    -- (the lines under a tool's, with no label, are tools that would do instead - one need, not
+    -- "· 3 more"; had - the one the player has, by its name. The author's radio, 2026-10-29)
+    local alt, slot = false, 0
+    for _, line in ipairs(info) do
+        local a, b = line[1], line[2]
+        if a and a.txt ~= "" then alt = a.txt == tool end
+        if b and a and a.txt == "" and alt then
+        elseif b and a and not skip[a.txt] and b.txt ~= none then
+            local s = b.txt
+            if a.txt == tool then
+                slot = slot + 1
+                if not isBad(b) then
+                    local ok2, it = pcall(function() return v.moveProps:hasScrapTool(p, slot == 2) end)
+                    if ok2 and it and instanceof(it, "InventoryItem") then s = it:getDisplayName() end
+                end
+            end
+            table.insert(out, {s = s, bad = isBad(b)})
+        elseif not b and a and isBad(a) then
+            table.insert(out, {s = string.gsub(a.txt, "^%- ", ""), bad = true})
+        end
+    end
+    return #out > 0 and out or nil
+end
+-- (the thing looked at by its name, as the game names a piece of furniture: the header, when
+-- Viewpoint named the panel after a sub menu - "Disassemble")
+function LIVE.objectName()
+    local obj = knoxVpPanelObject()
+    if not obj or not ISMoveableSpriteProps or not Translator then return nil end
+    local ok, name = pcall(function()
+        local props = ISMoveableSpriteProps.fromObject(obj)
+        return props and props.name and Translator.getMoveableDisplayName(props.name)
+    end)
+    return ok and type(name) == "string" and name ~= "" and name or nil
+end
+-- (the thing of the player's an action is done to - "Wash: T-Shirt" - for its picture on the
+-- row, as the right-click menu shows it; nil when none)
+function LIVE.actionItem(i)
+    local act = vpAction(i)
+    local args = act and act.args or nil
+    if type(args) ~= "table" then return nil end
+    for j = 1, args.n or #args do
+        local v = args[j]
+        if v ~= nil and instanceof(v, "InventoryItem") then return v end
+    end
+    return nil
+end
 function LIVE.actionProgress(i) return knoxVpPanelActionProgress(i) end
 function LIVE.run(i) return knoxVpPanelRun(i) end
 function LIVE.wheel() return knoxVpPanelWheel() end
@@ -250,12 +356,13 @@ P.pick = {}      -- the rows the wheel can stop on
 P.sel = 0        -- index into P.pick
 P.grow = {}      -- row key -> 0..1: how far it has grown as the chosen one
 P.bags = {}      -- a bag (its item) -> {to = open or not, k = 0..1}
+P.groups = {}    -- a group of actions (its row's key) -> {to, k, top = its rows above the window, n = its rows}
 P.seen = {}      -- row key -> true: in the list before (a key new to it enters)
 P.L = {}         -- the layout of this frame (heights, the list's window, the plate)
 
 local function selectable(r)
     if r.kind == "item" then return not r.leave and not r.closing end
-    return r.kind == "act" and r.on
+    return r.kind == "act" and (r.on or r.locked) and not r.closing
 end
 
 local function catColor(item) return T.category[P.src.category(item)] or T.category.misc end
@@ -331,22 +438,231 @@ function P.searchRows(out, container, depth, parent, none)
     end
 end
 
--- (a world action's icon and group, by its name: kept - its label is asked each build)
+-- (a world action's icon and group, by its name and the function behind it: kept - its
+-- label is asked each build)
 local actLook = {}
-local function lookOf(label)
-    local v = actLook[label]
+
+-- The rows left without an icon, written down while the test bench asks for it (the
+-- author, 2026-10-29: find which actions lack Knox's icons) - Zomboid\Lua\knox_noicons.txt,
+-- "what is looked at | the row", each once.
+P.noIconLog = false
+local logged = {}
+function P.logNoIcons(on)
+    P.noIconLog = on == true
+    actLook, logged = {}, {}   -- (looked up anew: rows seen before are written too)
+end
+
+-- (`name`: looked up by it instead - a group's row by its own name, "Yourself" of "Wash: Yourself")
+local function lookOf(label, i, name)
+    local key = name and (label .. "|" .. name) or label
+    local v = actLook[key]
     if not v then
         local icon, g = nil, nil
-        if KnoxContextMenu and KnoxContextMenu.worldLook then icon, g = KnoxContextMenu.worldLook(label) end
-        v = {icon = icon or false, danger = g == "danger"}
-        actLook[label] = v
+        local fn = P.src.actionFn and P.src.actionFn(i)
+        if KnoxContextMenu and KnoxContextMenu.worldLook then icon, g = KnoxContextMenu.worldLook(name or label, fn) end
+        v = {icon = icon or false, danger = g == "danger", g = g}
+        actLook[key] = v
+        if not icon and P.noIconLog and not logged[label] then
+            logged[label] = true
+            local f = getFileWriter("knox_noicons.txt", true, true)
+            if f then
+                f:write(tostring(P.src.actionsTitle() or "") .. " | " .. label .. "\r\n")
+                f:close()
+            end
+        end
     end
     return v
 end
 
-local lockTex, lensTex
+local lockTex, lensTex, moreTex
 local function texOf(name)
     return getTexture("media/ui/knoxicons/menu_" .. name .. ".png")
+end
+
+-- The right-click menu's groups of a thing's actions, in its order, and their titles
+-- (KnoxContextMenu, OBJECT_GROUPS); anything else is "Other"
+local ACT_GROUPS = {"use", "act", "move", "build", "other"}
+local IN_GROUP = {use = true, act = true, move = true, build = true}
+
+--- What "Disassemble" needs, as the row shows it (the author approved the mockup
+--- .claude/mockups/vp_scrap_v1.html, 2026-10-29): it can't be done - only what is
+--- missing, "Needs:" before it (not by colour alone); it can - all it takes.
+local function reqParts(needs, on)
+    if not needs then return nil end
+    local out = {}
+    for _, p in ipairs(needs) do
+        if on or p.bad then table.insert(out, {s = p.s, bad = p.bad}) end
+    end
+    if #out == 0 then return nil end
+    if out[1].bad then out[1].s = strings().needs .. " " .. out[1].s end
+    return out
+end
+
+--- A row that unfolds into `kids` (a sub menu's options, or "Other"'s): each of them with
+--- the player's thing it is done to as its picture (the author, 2026-10-29: as the right-click
+--- menu shows them), else its own icon.
+local function groupRow(name, kids, key, icon)
+    local look = lookOf(name, kids[1].index)
+    local g, on = look.g, false
+    for _, k in ipairs(kids) do
+        on = on or k.on
+        if not g then g = k.g end
+        k.item = P.src.actionItem and P.src.actionItem(k.index) or nil
+        k.icon = nil
+        if not k.item then k.icon = lookOf(k.label, k.index, k.name ~= k.label and k.name or nil).icon or nil end
+    end
+    return {kind = "act", grp = key, name = name, kids = kids, on = on, icon = icon or look.icon or nil, g = g,
+            key = key, region = "acts"}
+end
+
+--- A group's row and, while it is unfolded (or folding), its rows under it.
+local function addGroup(rows, gr)
+    table.insert(rows, gr)
+    local st = P.groups[gr.key]
+    if not st or (st.k <= 0 and not st.to) then return end
+    st.n = #gr.kids
+    st.top = math.max(0, math.min(st.top, st.n - GRP_MAX))
+    local many = st.n > GRP_MAX
+    if many then table.insert(rows, {kind = "gstrip", up = true, parent = gr.key, key = gr.key .. "|up", region = "acts"}) end
+    for j, k in ipairs(gr.kids) do
+        k.parent, k.gj, k.closing = gr.key, j, not st.to
+        table.insert(rows, k)
+    end
+    if many then table.insert(rows, {kind = "gstrip", up = false, parent = gr.key, key = gr.key .. "|down", region = "acts"}) end
+end
+
+--- The actions' rows, as the right-click menu groups a thing's options (the author,
+--- 2026-10-29: the mockup .claude/mockups/vp_groups_v1.html, without counts): titles
+--- with two groups or more, "Other" then one row that unfolds, under a line; a sub
+--- menu's options (Viewpoint glues them to its name: "Wash: Yourself") under one row
+--- that unfolds; the dangerous ones red at the bottom, under a line.
+local function actionRows(rows, na, titled)
+    local s = strings()
+    local firstAct = #rows + 1
+    local tops, heads, bad, firsts = {}, {}, {}, {}
+    local title = P.src.actionsTitle()
+    P.titleIsGroup = false
+    -- (the sub menu is an action - "Disassemble" - not the thing itself: its name back on its
+    -- options; a window's own "Window" stays off them - "Window: Close Window", the author 2026-10-29)
+    local isAction = nil
+    for i = 0, na - 1 do
+        local label = P.src.actionLabel(i) or ""
+        local grp = P.src.actionGroup and P.src.actionGroup(i)
+        if grp and grp == title then
+            P.titleIsGroup = true
+            if isAction == nil then
+                local _, g = nil, nil
+                if KnoxContextMenu and KnoxContextMenu.worldLook then _, g = KnoxContextMenu.worldLook(grp) end
+                isAction = g ~= nil
+            end
+            if isAction and label ~= grp and string.sub(label, 1, #grp + 2) ~= grp .. ": " then label = grp .. ": " .. label end
+        end
+        -- a locked door (a house's, a car's): Viewpoint's "[Locked]" off the name - a red
+        -- lock and "LOCKED" at the row's right instead (the author, 2026-10-29: the mockup
+        -- .claude/mockups/vp_locked_v1.html, variant B)
+        local locked = #label > #s.lockedTail and string.sub(label, -#s.lockedTail) == s.lockedTail
+        if locked then label = string.sub(label, 1, #label - #s.lockedTail) end
+        local look = lookOf(label, i)
+        local r = {kind = "act", name = label, label = label, index = i, on = P.src.actionOn(i), icon = look.icon or nil,
+                   danger = look.danger, g = look.g, locked = locked, key = "act|" .. i .. "|" .. label, region = "acts"}
+        local fn = P.src.actionFn and P.src.actionFn(i)
+        -- (a car's doors opened or closed: under "Other" - first it is got into, the author 2026-10-29)
+        if fn and ISVehicleMenu and (fn == ISVehicleMenu.onOpenDoor or fn == ISVehicleMenu.onCloseDoor) then r.g = "other" end
+        -- (a radio's, a TV's "Device Options": what it is there for - on top, chosen at once; the author 2026-10-29)
+        local device = fn ~= nil and ISRadioAndTvMenu ~= nil
+            and (fn == ISRadioAndTvMenu.openRadioPanel or fn == ISRadioAndTvMenu.openTvPanel)
+        r.scrap = fn ~= nil and ISDisassembleMenu ~= nil and fn == ISDisassembleMenu.disassemble
+        if r.scrap and P.src.scrapNeeds then r.req = reqParts(P.src.scrapNeeds(i), r.on) end
+        local head, rest = string.match(label, "^(.-): (.+)$")
+        if r.danger then
+            table.insert(bad, r)
+        elseif device or (P.src.actionFirst and P.src.actionFirst(i)) then
+            table.insert(firsts, r)
+        elseif head then
+            local gr = heads[head]
+            if not gr then
+                gr = {head = head, kids = {}}
+                heads[head] = gr
+                table.insert(tops, gr)
+            end
+            r.name = rest
+            table.insert(gr.kids, r)
+        else
+            table.insert(tops, r)
+        end
+    end
+    -- (a sub menu of one option stays a row of its own, by its whole name)
+    local byGroup, present = {}, 0
+    for j, e in ipairs(tops) do
+        if e.kids then
+            if #e.kids == 1 then
+                e = e.kids[1]
+                -- ("Disassemble: TV" - the thing looked at itself: "Disassemble", as the menu has it)
+                e.name = e.scrap and e.label ~= e.name and string.sub(e.label, 1, #e.label - #e.name - 2) or e.label
+            else
+                e = groupRow(e.head, e.kids, "grp|" .. e.head)
+            end
+            tops[j] = e
+        end
+        local g = IN_GROUP[e.g] and e.g or "other"
+        if not byGroup[g] then
+            byGroup[g] = {}
+            present = present + 1
+        end
+        table.insert(byGroup[g], e)
+    end
+    -- (titles as the menu's: two groups, or one under what is on top)
+    local labelled = present >= 2 or (#firsts > 0 and present >= 1)
+    if titled and not labelled then
+        -- (one group under the things: its own title - "Actions" over a shelf's "Disassemble" read as
+        -- nothing, the author 2026-10-29)
+        local only = nil
+        for _, g in ipairs(ACT_GROUPS) do if byGroup[g] then only = g end end
+        table.insert(rows, {kind = "label", text = (present == 1 and s.titles[only]) or s.actions, key = "label|acts", region = "acts"})
+    end
+    for _, r in ipairs(firsts) do table.insert(rows, r) end
+    -- (the first one locked - a car: what gets in instead right under it, "Smash Window";
+    -- the author, 2026-10-29)
+    if firsts[1] and firsts[1].locked and #bad > 0 then
+        for _, r in ipairs(bad) do table.insert(rows, r) end
+        bad = {}
+    end
+    for _, g in ipairs(ACT_GROUPS) do
+        local list = byGroup[g]
+        if list then
+            if g == "other" and labelled then
+                -- "Other": under a line; two or more in it - one row that unfolds (as the
+                -- menu's folded "Other"), one - that row itself
+                local flat = {}
+                for _, e in ipairs(list) do
+                    if e.kids then
+                        for _, k in ipairs(e.kids) do
+                            k.name = k.label
+                            table.insert(flat, k)
+                        end
+                    else
+                        table.insert(flat, e)
+                    end
+                end
+                table.insert(rows, {kind = "sep", key = "sep|other", region = "acts"})
+                if #flat > 1 then
+                    if moreTex == nil then moreTex = texOf("more") or false end
+                    addGroup(rows, groupRow(s.other, flat, "grp||other", moreTex or nil))
+                else
+                    table.insert(rows, flat[1])
+                end
+            else
+                if labelled then table.insert(rows, {kind = "label", text = s.titles[g], key = "label|" .. g, region = "acts"}) end
+                for _, e in ipairs(list) do
+                    if e.kids then addGroup(rows, e) else table.insert(rows, e) end
+                end
+            end
+        end
+    end
+    if #bad > 0 then
+        if #rows >= firstAct then table.insert(rows, {kind = "sep", key = "sep", region = "acts"}) end
+        for _, r in ipairs(bad) do table.insert(rows, r) end
+    end
 end
 
 --- The rows of what is looked at (made anew when what it holds changes - not
@@ -354,7 +670,6 @@ end
 --- folding away, where they were.
 function P.build(player)
     sizes()
-    local s = strings()
     local old = P.rows
     local rows = {}
     local kind = P.src.kind()
@@ -383,25 +698,10 @@ function P.build(player)
             P.searchRows(rows, c, 0, nil, #rows == mark)
         end
     end
-    -- the actions: what can be done to it (Viewpoint's, as the world menu has them);
-    -- the dangerous ones red at the bottom, under a line
+    -- the actions: what can be done to it (Viewpoint's, as the world menu has them)
     local na = P.src.actions()
-    if na > 0 then
-        local bad = {}
-        local firstAct = #rows + 1
-        if loot and #rows > 0 then table.insert(rows, {kind = "label", text = s.actions, key = "label|acts", region = "acts"}) end
-        for i = 0, na - 1 do
-            local label = P.src.actionLabel(i) or ""
-            local look = lookOf(label)
-            local r = {kind = "act", name = label, index = i, on = P.src.actionOn(i), icon = look.icon or nil,
-                       danger = look.danger, key = "act|" .. i .. "|" .. label, region = "acts"}
-            if r.danger then table.insert(bad, r) else table.insert(rows, r) end
-        end
-        if #bad > 0 then
-            if #rows >= firstAct then table.insert(rows, {kind = "sep", key = "sep", region = "acts"}) end
-            for _, r in ipairs(bad) do table.insert(rows, r) end
-        end
-    end
+    P.titleIsGroup = false
+    if na > 0 then actionRows(rows, na, loot and #rows > 0) end
     -- what was in the list and is gone folds away where it was (a thing taken)
     local keep = {}
     for _, r in ipairs(rows) do keep[r.key] = true end
@@ -451,6 +751,66 @@ function P.build(player)
     P.sel = at
 end
 
+-- (where a text's letters start and end, by their pixels - the dot set between them as the mockup's)
+local function inkOf(font, s)
+    local l, _, r = T.inkBox(font, s)
+    return l, r
+end
+local function capH(font)
+    local _, t, _, b = T.inkBox(font, "H")
+    return b - t
+end
+
+--- The parts of a row's second line as they fit in `room`: whole ones with a dot between
+--- them; what doesn't fit - "· N more" after the last that does (red if anything missing is
+--- among them); only a first part too long is cut with "...". Worked out once a build.
+local function reqFit(r, room)
+    local s = strings()
+    local G = Z.DOT_G
+    local dl, dr = inkOf(T.fontTile, s.dot1)
+    local dotW = G + (dr - dl) + G
+    local parts = r.req
+    r.reqX, r.dotX = r.reqX or {}, r.dotX or {}
+    r.reqN, r.reqCut, r.reqMore, r.reqMoreBad = 0, nil, nil, false
+    local x = 0   -- (the first column after the last letters)
+    for k, p in ipairs(parts) do
+        local pl, pr = inkOf(T.fontTile, p.s)
+        local more = #parts - k
+        local plus = 0
+        if more > 0 then
+            local ml, mr = inkOf(T.fontTile, getText("IGUI_Knox_VPMore", more))
+            plus = dotW + mr - ml
+        end
+        local dw = k > 1 and dotW or 0
+        if x + dw + (pr - pl) + plus <= room then
+            if k > 1 then
+                r.dotX[k] = x + G - dl
+                x = x + dotW
+            end
+            r.reqX[k] = x - pl
+            x = x + pr - pl
+            r.reqN = k
+        else
+            local from = k
+            if k == 1 then
+                local cut = T.fit(p.s, T.fontTile, room - plus)
+                local cl, cr = inkOf(T.fontTile, cut)
+                r.reqCut, r.reqX[1], r.reqN = cut, -cl, 1
+                x = cr - cl
+                from = 2
+            end
+            local n = #parts - from + 1
+            if n > 0 then
+                r.reqMore = getText("IGUI_Knox_VPMore", n)
+                local ml = inkOf(T.fontTile, r.reqMore)
+                r.moreDotX, r.moreX = x + G - dl, x + dotW - ml
+                for j = from, #parts do if parts[j].bad then r.reqMoreBad = true end end
+            end
+            return
+        end
+    end
+end
+
 --- The plate's width: the widest of its rows, header and hints (worked out once a build).
 function P.measureNeed()
     local s = strings()
@@ -458,7 +818,7 @@ function P.measureNeed()
     local ph = P.hasSub() and Z.PH_SUB or Z.PH
     local cell = ph - 2 * Z.M
     need = math.max(need, Z.GAP * 2 + Z.M * 2 + Z.P10 + cell + T.measure(T.fontHeader, P.title or ""))
-    local hasItem, hasBag, hasAct = false, false, false
+    local hasItem, hasBag, hasAct, hasGrp = false, false, false, false
     for _, r in ipairs(P.rows) do
         if r.kind == "item" and not r.leaveMs then
             hasItem = true
@@ -478,7 +838,27 @@ function P.measureNeed()
             end
         elseif r.kind == "act" then
             hasAct = true
-            need = math.max(need, Z.TX + T.measure(T.fontText, r.name) + Z.L)
+            if r.req then
+                -- (the line under it whole: the plate takes it, up to its widest)
+                local s1 = strings()
+                local dl, dr = inkOf(T.fontTile, s1.dot1)
+                local w = 0
+                for k, p in ipairs(r.req) do
+                    local pl, pr = inkOf(T.fontTile, p.s)
+                    w = w + (k > 1 and (2 * Z.DOT_G + dr - dl) or 0) + pr - pl
+                end
+                need = math.max(need, Z.TX + (r.parent and Z.IND or 0) + w + Z.L)
+            end
+            need = math.max(need, Z.TX + (r.parent and Z.IND or 0) + T.measure(T.fontText, r.name) + Z.L
+                + (r.grp and Z.CHEV or 0) + (r.locked and (Z.P10 + T.measure(T.fontTile, s.lockedCaps)) or 0))
+            -- (a group's rows count whether it is unfolded or not: the plate doesn't widen as it unfolds)
+            if r.grp then
+                hasGrp = true
+                for _, k in ipairs(r.kids) do
+                    need = math.max(need, Z.TX + Z.IND + T.measure(T.fontText, k.name) + Z.L
+                        + (k.locked and (Z.P10 + T.measure(T.fontTile, s.lockedCaps)) or 0))
+                end
+            end
         elseif r.kind == "label" then
             need = math.max(need, Z.L + T.measure(T.fontTile, T.upper(r.text)) + Z.P40 + Z.L)
         elseif r.kind == "searching" or r.kind == "unsearched" or r.kind == "empty" then
@@ -497,7 +877,15 @@ function P.measureNeed()
         end
     end
     if hasAct then need = math.max(need, Z.L + P.hintW(KEYS.take, s.use) + win + Z.L) end
+    if hasGrp then
+        need = math.max(need, Z.L + P.hintW(KEYS.take, s.unfold) + win + Z.L, Z.L + P.hintW(KEYS.take, s.fold) + win + Z.L)
+    end
     P.needW = math.min(Z.MAXW, math.max(Z.MINW, math.ceil(need)))
+    Z.CAP1, Z.CAP2 = capH(T.fontText), capH(T.fontTile)
+    Z.REQ = Z.R9 + Z.CAP1 + Z.R7 + Z.CAP2 + Z.R9
+    for _, r in ipairs(P.rows) do
+        if r.req then reqFit(r, P.needW - Z.TX - Z.L - (r.parent and Z.IND or 0)) end
+    end
 end
 
 function P.hintW(key, label)
@@ -531,6 +919,7 @@ function P.head()
         end
     else
         P.title = P.src.actionsTitle() or getText("IGUI_Controller_Interact")
+        if P.titleIsGroup and P.src.objectName then P.title = P.src.objectName() or P.title end
         local first = nil
         for _, r in ipairs(P.rows) do if r.kind == "act" then first = r break end end
         P.icon = (first and first.icon) or texOf("here")
@@ -591,6 +980,16 @@ local function toggleBag(r)
     P.dirty = true
 end
 
+local function toggleGroup(r)
+    local st = P.groups[r.grp]
+    if not st then
+        st = {to = false, k = 0, top = 0, n = #r.kids}
+        P.groups[r.grp] = st
+    end
+    st.to = not st.to
+    P.dirty = true
+end
+
 local function cancel(player, item) P.src.cancel(player, item) end
 
 local function input(player, now)
@@ -625,7 +1024,9 @@ local function input(player, now)
     end
     if not r then return end
     if r.kind == "act" then
-        P.src.run(r.index)
+        if r.grp then toggleGroup(r)
+        elseif r.on then P.src.run(r.index)
+        elseif r.locked and P.src.rattle then P.src.rattle(r.index) end
     elseif r.kind == "item" then
         if r.bag and r.depth == 0 then
             if not P.hold then P.hold = {ms = now, row = r} end
@@ -661,6 +1062,7 @@ local function rowFull(r)
     if r.kind == "item" then return Z.ROW + Z.GROW_H * (P.grow[r.key] or 0) end
     if r.kind == "label" then return Z.LABEL end
     if r.kind == "sep" then return Z.SEP end
+    if r.req then return Z.REQ or Z.ROW end
     return Z.ROW
 end
 
@@ -735,13 +1137,32 @@ local function layout(now, dt)
     end
     L.maxScroll = maxScroll
     y = y + regionH
+    -- (a group's rows open and close with it, GRP_MAX of them at most - the rest under its
+    -- strips, the window following the choice; whole pixels by the running sum, as the list's)
+    local r0 = chosen()
+    local st0 = r0 and r0.gj and P.groups[r0.parent]
+    if st0 then
+        if r0.gj <= st0.top then st0.top = r0.gj - 1
+        elseif r0.gj > st0.top + GRP_MAX then st0.top = r0.gj - GRP_MAX end
+    end
+    acc = y
     for _, r in ipairs(rows) do
         if r.region == "acts" then
-            r.h = rowFull(r)
-            r.y = y
-            y = y + r.h
+            local hf = rowFull(r)
+            if r.parent then
+                local st = P.groups[r.parent]
+                local k = st and ease(st.k) or 0
+                if r.kind == "gstrip" then hf = Z.STRIP * k
+                elseif st and st.n > GRP_MAX and (r.gj <= st.top or r.gj > st.top + GRP_MAX) then hf = 0
+                else hf = hf * k end
+            end
+            local a = math.floor(acc + 0.5)
+            acc = acc + hf
+            r.y = a
+            r.h = math.floor(acc + 0.5) - a
         end
     end
+    y = math.floor(acc + 0.5)
     L.hasFoot = P.hintCount > 0
     L.footY = L.hasFoot and (y + Z.GAP) or nil
     if L.hasFoot then L.H = L.footY + 1 + Z.GAP + Z.KH + Z.GAP
@@ -780,6 +1201,15 @@ local function animate(now, dt)
             local step = T.animOn() and dt / BAG_MS or 1
             st.k = st.k + math.max(-step, math.min(step, to - st.k))
             if st.k == 0 then P.dirty = true end   -- (closed: its things leave the list)
+        end
+    end
+    -- groups of actions the same
+    for _, st in pairs(P.groups) do
+        local to = st.to and 1 or 0
+        if st.k ~= to then
+            local step = T.animOn() and dt / BAG_MS or 1
+            st.k = st.k + math.max(-step, math.min(step, to - st.k))
+            if st.k == 0 then P.dirty = true end
         end
     end
     -- the chosen row grows, the one it left shrinks back (exp, 60 ms); the growth
@@ -932,17 +1362,62 @@ local function drawRow(ui, r, x0, y, W, sel, taking, a, inset)
     elseif r.kind == "act" then
         local tint = (not r.on and C.dim) or (r.danger and RED) or (sel and C.accent) or C.dim
         local ia = r.on and a or a * 0.5
-        if r.icon then
-            ui:drawTextureScaledAspect(r.icon, x0 + Z.L + math.floor((Z.CELL - Z.AIC) / 2), y + math.floor((Z.ROW - Z.AIC) / 2),
-                Z.AIC, Z.AIC, ia, tint.r, tint.g, tint.b)
+        local ic = r.icon
+        if r.locked then
+            -- (locked: a red lock in place of its picture, whether it can be done or not)
+            if lockTex == nil then lockTex = texOf("lock") or false end
+            ic, tint, ia = lockTex or nil, RED, a
         end
-        local col = (not r.on and C.dim) or (r.danger and RED) or (sel and C.bright) or C.text
+        -- (a row with a second line: its picture and name on the first line's capitals)
+        -- (its picture in the middle of both lines: on the first one's it stood 10 px above the
+        -- row's middle - "why is Disassemble not centred", the author 2026-10-29)
+        local ny, nh = y, Z.ROW
+        if r.req then ny, nh = y + Z.R9, Z.CAP1 end
+        local iy = y + math.floor(((r.req and Z.REQ or Z.ROW) - Z.AIC) / 2)
+        if ic then
+            ui:drawTextureScaledAspect(ic, x0 + Z.L + math.floor((Z.CELL - Z.AIC) / 2), iy, Z.AIC, Z.AIC, ia, tint.r, tint.g, tint.b)
+        elseif r.item then
+            -- (a group's row done to a thing of the player's: its picture, as the menu has it)
+            P.src.icon(ui, r.item, x0 + Z.L + math.floor((Z.CELL - Z.AIC) / 2), iy, ia, Z.AIC)
+        end
+        -- (a locked one can be chosen and tried: as any other - the lock and "LOCKED" say it; the critic, 2026-10-29)
+        local col = ((not r.on and not r.locked) and C.dim) or (r.danger and RED) or (sel and C.bright) or C.text
         if taking then
-            local fw = math.floor((W - 2) * taking + 0.5)
-            ui:drawRect(x0 + 1, y, fw, Z.ROW, 0.16 * a, C.accent.r, C.accent.g, C.accent.b)
+            local fw = math.floor((W + inset - 2) * taking + 0.5)
+            ui:drawRect(x0 + 1 - inset, y, fw, r.req and Z.REQ or Z.ROW, 0.16 * a, C.accent.r, C.accent.g, C.accent.b)
         end
-        label(ui, T.fit(r.name, T.fontText, W - Z.L - Z.TX), x0 + Z.TX, y, W - Z.L - Z.TX, Z.ROW, col, T.fontText,
-            r.on and a or a * 0.75)
+        local room = W - Z.L - Z.TX
+        if r.req then
+            -- what it needs, under the name (worked out by reqFit): what is missing red
+            local by, bx = ny + nh + Z.R7, x0 + Z.TX
+            local okA = (sel and 1 or 0.9) * a
+            for k = 1, r.reqN do
+                local p = r.req[k]
+                if k > 1 then label(ui, s.dot1, bx + r.dotX[k], by, 0, Z.CAP2, C.dim, T.fontTile, okA) end
+                label(ui, (k == 1 and r.reqCut) or p.s, bx + r.reqX[k], by, 0, Z.CAP2, p.bad and RED or C.dim, T.fontTile,
+                    p.bad and a or okA)
+            end
+            if r.reqMore then
+                label(ui, s.dot1, bx + r.moreDotX, by, 0, Z.CAP2, C.dim, T.fontTile, okA)
+                label(ui, r.reqMore, bx + r.moreX, by, 0, Z.CAP2, r.reqMoreBad and RED or C.dim, T.fontTile, a)
+            end
+        end
+        if r.grp then
+            -- a group: a chevron at the right, as a bag's - pointing on, down while unfolded
+            local st = P.groups[r.grp]
+            local ch = math.max(3, math.floor(Z.P10 * 0.45))
+            local cx, cy = x0 + W - Z.L - math.floor(Z.CHEV / 2), math.floor(y + Z.ROW / 2)
+            if st and st.k >= 0.5 then chevron(ui, cx - 1, cy - math.floor(ch / 2) - 1, ch, -2, C.dim, a)
+            else chevron(ui, cx - math.floor(ch / 2) - 1, cy - 1, ch, 1, C.dim, a) end
+            room = room - Z.CHEV
+        end
+        if r.locked then
+            -- (at the right, as the things' weight: "LOCKED" in red)
+            local tw = label(ui, s.lockedCaps, x0, y, W - Z.L, Z.ROW, RED, T.fontTile, a, "right")
+            room = room - math.ceil(tw) - Z.P10
+        end
+        label(ui, T.fit(r.name, T.fontText, room), x0 + Z.TX, ny, room, nh, col, T.fontText,
+            (r.on or r.locked) and a or a * 0.75)
     elseif r.kind == "searching" then
         -- the thing being looked for: a plate filling with sand from the bottom in a
         -- breathing frame, as on Knox's grid
@@ -964,6 +1439,7 @@ end
 --- How far the row is being taken (its things on their way), or an action done; nil: neither.
 local function takingOf(r)
     if r.kind == "act" then
+        if not r.index then return nil end   -- (a group's row: done by its rows)
         local p = P.src.actionProgress(r.index)
         return p > 0 and p or nil
     end
@@ -1003,7 +1479,8 @@ local function hints()
         end
         n = addHint(n, KEYS.all, s.all)
     elseif r and r.kind == "act" then
-        n = addHint(n, KEYS.take, s.use)
+        local st = r.grp and P.groups[r.grp]
+        n = addHint(n, KEYS.take, (not r.grp and s.use) or (st and st.to and s.fold) or s.unfold)
     end
     if P.canOpen() then n = addHint(n, KEYS.open, s.open) end
     -- (changed: the old ones fade out, the new come up into place)
@@ -1103,6 +1580,64 @@ local function scrollStrip(ui, ox, y, W, up, on, a, fa)
     end
 end
 
+-- (the empty rows under an icon's drawing, of its 17 px: most have 1 or 2 - measured off
+-- the PNGs, 2026-10-29; a group's line starts 3 px under the drawing itself, as the mockup's)
+local ICON_PAD = {more = 7, attach = 4, hands = 4, inspect = 4, smoke = 4}
+local padOf = {}
+local function iconPad(tex)
+    local p = padOf[tex]
+    if p == nil then
+        local ok, name = pcall(function() return tex:getName() end)
+        local short = ok and type(name) == "string" and string.match(name, "menu_([%w_]+)%.png") or nil
+        p = short and ICON_PAD[short] or 2
+        padOf[tex] = p
+    end
+    return math.floor(p * Z.AIC / 17 + 0.5)
+end
+
+--- A group unfolded: a thin line down from under its icon, a short one to each of its
+--- rows (as a bag's things'), on to the strip under them when there are more.
+local function groupLines(ui, ox, oy, j, r, a)
+    local C = T.color
+    local last, below = nil, nil
+    for m = j + 1, #P.rows do
+        local q = P.rows[m]
+        if q.parent ~= r.grp then break end
+        if q.kind == "gstrip" then
+            if not q.up and q.h > 0 then below = q end
+        elseif q.h > 2 then last = q end
+    end
+    if not last then return end
+    local ka = ease(P.groups[r.grp].k) * a
+    local gx = ox + Z.L + math.floor(Z.CELL / 2) - 1
+    local top = oy + r.y + math.floor((Z.ROW - Z.AIC) / 2) + Z.AIC - (r.icon and iconPad(r.icon) or 0) + 3
+    local bot = below and (oy + below.y) or (oy + math.floor(last.y + last.h / 2 + 0.5))
+    T.rect(ui, gx, top, 1, math.max(0, bot - top + 1), C.tileEdge, ka)
+    for m = j + 1, #P.rows do
+        local q = P.rows[m]
+        if q.parent ~= r.grp then break end
+        if q.kind == "act" and q.h > 2 then
+            local qy = oy + math.floor(q.y + q.h / 2 + 0.5)
+            -- (to 2 px before its picture; a row with none: on to 6 px before its name)
+            local qx = (q.icon or q.item or q.locked) and (ox + Z.L + Z.IND + math.floor((Z.CELL - Z.AIC) / 2) - 2)
+                or (ox + Z.TX + Z.IND - 6)
+            T.rect(ui, gx, qy, qx - gx, 1, C.tileEdge, ka)
+        end
+    end
+end
+
+-- (a group's more above or below: a strip in the header's colour, as the list's, under the group)
+local function groupStrip(ui, ox, oy, W, r, a)
+    local st = P.groups[r.parent]
+    local x, w = ox + Z.L + Z.IND, W - 2 * Z.L - Z.IND
+    T.rect(ui, x, oy + r.y, w, r.h, T.color.header, a)
+    if r.h >= 8 then
+        local on = (r.up and st.top > 0) or (not r.up and st.top + GRP_MAX < st.n)
+        chevron(ui, ox + math.floor((W + Z.IND) / 2) - 1, oy + r.y + math.floor(r.h / 2) - 3, 4, r.up and 2 or -2,
+            T.color.text, (on and 1 or 0.3) * a)
+    end
+end
+
 local function draw(ui, ox, oy, now)
     local C = T.color
     local L = P.L
@@ -1180,8 +1715,27 @@ local function draw(ui, ox, oy, now)
         scrollStrip(ui, ox, oy + L.regionY, W, true, P.scroll > 1, a, fa)
         scrollStrip(ui, ox, oy + L.regionY + L.regionH - L.strip, W, false, P.scroll < L.maxScroll - 1, a, fa)
     end
+    for j, r in ipairs(P.rows) do
+        if r.grp and P.groups[r.grp] and P.groups[r.grp].k > 0 then groupLines(ui, ox, oy, j, r, a) end
+    end
     for _, r in ipairs(P.rows) do
-        if r.region == "acts" then drawRow(ui, r, ox, oy + r.y, W, r == r0, takingOf(r), a, 0) end
+        if r.region ~= "acts" or r.h <= 0 then
+        elseif not r.parent then
+            drawRow(ui, r, ox, oy + r.y, W, r == r0, takingOf(r), a, 0)
+        else
+            -- a group's row: in by a step; opening or folding - cut to its height, fading
+            local k = P.groups[r.parent] and P.groups[r.parent].k or 0
+            local fa = k < 1 and math.max(0, k * 1.6 - 0.6) or 1
+            if r.kind == "gstrip" then
+                groupStrip(ui, ox, oy, W, r, fa * a)
+            elseif r.h < Z.ROW then
+                pushClip(ui, ox, oy + r.y, W, r.h)
+                drawRow(ui, r, ox + Z.IND, oy + r.y - math.floor((Z.ROW - r.h) / 2), W - Z.IND, false, takingOf(r), fa * a, Z.IND)
+                popClip(ui)
+            else
+                drawRow(ui, r, ox + Z.IND, oy + r.y, W - Z.IND, r == r0, takingOf(r), fa * a, Z.IND)
+            end
+        end
     end
     -- the foot: the keys under a thin line
     if L.hasFoot then
@@ -1238,10 +1792,10 @@ P.ghost = nil    -- {x, y, W, H, ph, cx, cy, ms}: a plate left, folding away
 P.box = nil
 
 -- (all a plate's own state: a news demo's plate swaps its own in for its frame - P.swap)
-P.STATE = {"rows", "pick", "sel", "grow", "bags", "seen", "L", "w", "shownW", "hold", "retract", "hintsMs",
+P.STATE = {"rows", "pick", "sel", "grow", "bags", "groups", "seen", "L", "w", "shownW", "hold", "retract", "hintsMs",
     "hintCount", "prevCount", "shownKeys", "shownLabels", "prevKeys", "prevLabels", "hintAt", "roll", "marquee",
     "scroll", "hiY", "hiH", "hiA", "openMs", "sigMs", "dirty", "visible", "ghost", "box", "tobj", "tsq", "tkind",
-    "target", "builtFor", "locked", "loot", "containers", "tex", "icon", "title", "sub", "count", "sumW",
+    "target", "builtFor", "locked", "loot", "titleIsGroup", "containers", "tex", "icon", "title", "sub", "count", "sumW",
     "countText", "needW", "alpha", "sig", "ms", "subN", "hints", "src"}
 
 --- Swap the panel's state with `st`'s (twice: back as it was).
@@ -1252,7 +1806,7 @@ function P.swap(st)
 end
 
 local function reset(now)
-    P.rows, P.pick, P.sel, P.grow, P.bags, P.seen = {}, {}, 1, {}, {}, {}
+    P.rows, P.pick, P.sel, P.grow, P.bags, P.groups, P.seen = {}, {}, 1, {}, {}, {}, {}
     P.L = {}
     P.w, P.shownW, P.hold, P.retract, P.hintsMs = nil, nil, nil, nil, nil
     P.hintCount, P.prevCount = 0, 0
@@ -1265,10 +1819,12 @@ local function reset(now)
 end
 
 --- A number that changes when what the panel shows does: the things in its
---- containers and open bags, the search, the actions. (Cheap: sizes and ids.)
+--- containers and open bags, the search, the actions - gathered anew by Viewpoint
+--- (a stove turned on: "Turn on" became "Turn off", as many actions as before; the
+--- author, 2026-10-29). (Cheap: sizes and ids.)
 local function signature()
     local src = P.src
-    local sig = src.actions() * 7 + (src.locked() and 3 or 0)
+    local sig = (src.actions() * 7 + (src.locked() and 3 or 0) + src.actionsVersion() * 131) % 1000000007
     local cs = src.containers()
     for i = 0, (cs and cs:size() or 0) - 1 do
         local items = cs:get(i):getItems()
@@ -1313,6 +1869,14 @@ function P.drawGhost(ui, now)
     if t < 1 and k > 0.01 then foldPlate(ui, P.ghost, k) else P.ghost = nil end
 end
 
+--- The take key the panel's (true) or the game's; told to the Java part only when it changes.
+P.wants = nil
+function P.wantKey(on)
+    if on == P.wants then return end
+    P.wants = on
+    if knoxVpPanelWants then knoxVpPanelWants(on) end
+end
+
 function P.frame(ui)
     local now = getTimestampMs()
     local dt = math.min(100, now - (P.ms or now))
@@ -1348,9 +1912,13 @@ function P.frame(ui)
             P.src.wheel()
             P.src.pressed()
         end
+        P.wantKey(false)
         return
     end
     P.step(player, now, dt)
+    -- (the take key the panel's only with a row chosen it runs or takes: else the game's -
+    -- F held at a fence with "Disassemble" greyed out climbed nothing, the author 2026-10-29)
+    P.wantKey(not P.locked and chosen() ~= nil)
     -- where: beside the crosshair, as Viewpoint's (left of it with the camera over
     -- the left shoulder); held about it as if the chosen row were grown, so the
     -- header stays put when the choice moves to the actions
@@ -1359,7 +1927,7 @@ function P.frame(ui)
     local W = math.floor(P.w + 0.5)
     local Hc = P.heldH()
     local ox = knoxVpPanelLeft() and math.max(0, cx - Z.AWAY - W) or math.min(cx + Z.AWAY, sw - W)
-    local oy = math.max(0, math.floor(cy - Hc / 2 + 0.5))
+    local oy = math.max(0, math.min(math.floor(cy - Hc / 2 + 0.5), sh - P.L.H))
     P.paint(ui, ox, oy, cx, cy, now)
 end
 
@@ -1410,15 +1978,18 @@ end
 --- The plate's height as if the chosen row were grown (what it is held about).
 function P.heldH()
     local L = P.L
-    local extra = 0
+    local extra, folded = 0, 0
     local anyItem = false
     for _, r in ipairs(P.rows) do
         if r.kind == "item" and r.region == "list" then
             anyItem = true
             extra = extra + math.max(0, r.h - Z.ROW)
+        elseif r.region == "acts" and r.parent then
+            -- (a group unfolding grows the plate down: its top stays - the mockup's)
+            folded = folded + r.h
         end
     end
-    return (anyItem and not L.clipped) and (L.H - extra + Z.GROW_H) or L.H
+    return ((anyItem and not L.clipped) and (L.H - extra + Z.GROW_H) or L.H) - folded
 end
 
 --- The plate at ox, oy, unfolding out of cx, cy (the crosshair) at first.

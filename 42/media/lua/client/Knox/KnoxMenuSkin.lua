@@ -144,6 +144,10 @@ function ISButton:render()
 end
 
 local function skinButton(b)
+    -- (a button with no title and no image is a colour swatch of the options: the
+    -- game reads the colour back from its background on "Apply" - painted, a white
+    -- outline was saved black. 糕级冻雾, 2026-10-28)
+    if (b.title == nil or b.title == "") and not b.image then return end
     if neutral(b.backgroundColor) then b.backgroundColor = colored(T.color.cell, 0.95) end
     if neutral(b.borderColor) then b.borderColor = colored(T.color.tileFrame, 1) end
     if not b.image and neutral(b.backgroundColorMouseOver) then

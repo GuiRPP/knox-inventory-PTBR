@@ -85,6 +85,12 @@ local function pageItems(page)
         table.insert(out, {"sec", "Controls_Title", "reset"})
         for _, a in ipairs(C.ACTIONS) do table.insert(out, {"bind", a.id}) end
         table.insert(out, {"help"})
+        -- Viewpoint's crosshair panel keys, where it is (the author, 2026-10-29)
+        if KnoxCompat and KnoxCompat.vpHas("panel") == true and C.vpKeys() then
+            table.insert(out, {"sec", "Controls_VP", "vpreset"})
+            for _, a in ipairs(C.VP_ACTIONS) do table.insert(out, {"bind", a.id}) end
+            table.insert(out, {"help", "vp"})
+        end
         return out
     end
     local seen = {}
@@ -191,7 +197,7 @@ function KnoxSettings:layout()
                     e.y, e.line = y, p ~= "modules"
                 end
                 e.text = T.upper(getText("IGUI_Knox_" .. key))
-                e.beta, e.reset = it[3] == "beta", it[3] == "reset"
+                e.beta, e.reset, e.vp = it[3] == "beta", it[3] == "reset" or it[3] == "vpreset", it[3] == "vpreset"
                 y = y + fc + pad
             elseif kind == "mod" then
                 e.name = T.upper(getText("IGUI_Knox_Module_" .. key))
@@ -251,7 +257,8 @@ function KnoxSettings:layout()
             elseif kind == "help" then
                 y = y + math.floor(pad / 2)
                 e.y = y
-                e.lines = T.wrap(getText("IGUI_Knox_Controls_Help") .. " " .. getText("IGUI_Knox_Controls_HelpMore"), T.fontText, wide)
+                e.lines = T.wrap(key == "vp" and getText("IGUI_Knox_Controls_VPHelp")
+                    or (getText("IGUI_Knox_Controls_Help") .. " " .. getText("IGUI_Knox_Controls_HelpMore")), T.fontText, wide)
                 y = y + #e.lines * (ft + 2)
             elseif kind == "camp" then
                 e.lines = T.wrap(getText("IGUI_Knox_Camp_Reset_Info"), T.fontText, wide)
@@ -494,7 +501,7 @@ end
 function KnoxSettings:assign(gesture)
     local cap = self.capture
     if not cap then return end
-    C.set(cap.id, gesture)
+    if C.vp(cap.id) then C.vpSet(cap.id, gesture) else C.set(cap.id, gesture) end
     T.saveSettings()
     self.capture = nil
     getSoundManager():playUISound("UIActivateButton")
@@ -551,7 +558,8 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         if e.beta then plateMark(self, L.betaMark, L.x0 + math.floor(w + 0.5) + pad, y + math.floor((fc - T.fontTileH - 4) / 2), T.color.warn) end
         if e.reset then
             local r = self:resetRect(e, oy)
-            button(self, r, L.resetText, hot and inRect(mx, my, r), false, C.isDefault(), T.fontTile)
+            local same = (e.vp and C.vpIsDefault()) or (not e.vp and C.isDefault())
+            button(self, r, L.resetText, hot and inRect(mx, my, r), false, same, T.fontTile)
         end
     elseif kind == "mod" then
         local on = self.want[e.key]
@@ -670,8 +678,10 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         local hover = not cap and hot and inRect(mx, my, r)
         T.rect(self, r[1], r[2], r[3], r[4], catching and T.color.accent or T.color.cell, catching and 0.18 or 1)
         T.border(self, r[1], r[2], r[3], r[4], (catching or hover) and T.color.accent or T.color.tileEdge)
-        local gesture = C.get(e.key)
-        if e.gWas ~= gesture then e.gWas, e.gText = gesture, T.upper(C.label(gesture)) end
+        -- (Viewpoint's keys: as Viewpoint writes and shows them)
+        local vp = C.vp(e.key)
+        local gesture = vp and C.vpGet(e.key) or C.get(e.key)
+        if e.gWas ~= gesture then e.gWas, e.gText = gesture, T.upper(vp and C.vpLabel(gesture) or C.label(gesture)) end
         local text, color = e.gText, gesture == "" and T.color.dim or T.color.bright
         if catching then
             local key = cap.kind ~= "mouse" and "IGUI_Knox_Controls_PressKey" or "IGUI_Knox_Controls_Click"
@@ -841,7 +851,7 @@ function KnoxSettings:clickItem(e, x, y, oy)
     local kind = e.kind
     local ey = oy + e.y
     if kind == "sec" and e.reset and inRect(x, y, self:resetRect(e, oy)) then
-        self.pressed = "reset"
+        self.pressed = e.vp and "vpreset" or "reset"
         return true
     elseif kind == "mod" and inRect(x, y, set(R1, L.sideW + 1, ey, L.w, e.h)) then
         self.want[e.key] = not self.want[e.key]
@@ -993,6 +1003,8 @@ function KnoxSettings:onMouseUp(x, y)
     elseif pressed == "reset" then
         C.reset()
         T.saveSettings()
+    elseif pressed == "vpreset" then
+        C.vpReset()
     elseif pressed == "camp" and KnoxMenuKeep and #KnoxMenuKeep.load() > 0 then
         if self.campSureAt and getTimestampMs() - self.campSureAt < 4000 then
             self.campSureAt = nil
@@ -1004,7 +1016,8 @@ function KnoxSettings:onMouseUp(x, y)
     elseif string.sub(pressed, 1, 5) == "bind:" then
         -- the plate is armed on release, so this click is not taken for the gesture
         local id = string.sub(pressed, 6)
-        self.capture = {id = id, kind = C.action(id).kind, mouse = C.action(id).mouse}
+        local a = C.action(id) or C.vp(id)
+        self.capture = {id = id, kind = a.kind, mouse = a.mouse}
     end
     return true
 end
@@ -1062,6 +1075,14 @@ function KnoxSettingsTab:new()
     return o
 end
 
+local function devShown()
+    return KnoxTestBench ~= nil and KnoxTestBench.devOn() == true
+end
+-- (what the plate is laid out for: placed again when it changes)
+local function placeKey()
+    return tostring(T.cell) .. "/" .. tostring(T.javaFonts) .. "/" .. getCore():getScreenWidth() .. "/" .. tostring(devShown())
+end
+
 function KnoxSettingsTab:place()
     T.ensure()
     local pad = T.pad
@@ -1079,16 +1100,22 @@ function KnoxSettingsTab:place()
     self.line2 = self.edLabel and (self.line1 + 1 + pad * 2 + self.wLabel + pad * 2) or nil
     local w = self.line1 + 1 + pad * 2 + self.wLabel + pad * 3
     if self.line2 then w = self.line2 + 1 + pad * 2 + self.wEd + pad * 3 end
+    -- the test bench's part last, only in DEV mode (the author 2026-10-28: "the bench
+    -- in the game's main menu too"; players never get it, as the DEV button in the game)
+    self.devLabel = devShown() and "DEV" or nil
+    self.wDev = self.devLabel and T.measure(font, self.devLabel) or 0
+    self.line3 = self.devLabel and (w - pad) or nil
+    if self.line3 then w = self.line3 + 1 + pad * 2 + self.wDev + pad * 3 end
     local h = T.fontH(font) + pad * 2
     self:setWidth(w)
     self:setHeight(h)
     self:setX(math.floor((getCore():getScreenWidth() - w) / 2))
     self:setY(pad)   -- a little off the screen's edge: the frame is whole
-    self.placedFor = tostring(T.cell) .. "/" .. tostring(T.javaFonts) .. "/" .. getCore():getScreenWidth()
+    self.placedFor = placeKey()
 end
 
 function KnoxSettingsTab:prerender()
-    if self.placedFor ~= tostring(T.cell) .. "/" .. tostring(T.javaFonts) .. "/" .. getCore():getScreenWidth() then self:place() end
+    if self.placedFor ~= placeKey() then self:place() end
     local w, h, pad = self:getWidth(), self:getHeight(), T.pad
     local over = self:isMouseOver()
     local edOpen = KnoxEditor ~= nil and KnoxEditor.instance ~= nil
@@ -1096,9 +1123,12 @@ function KnoxSettingsTab:prerender()
     local a = hover and 1 or 0.55
     T.rect(self, 0, 0, w, h, T.color.header, hover and 0.96 or 0.7)
     -- the part under the mouse: a faint sand band over it (only with the editor's part there)
-    local onEd = over and self.line2 ~= nil and self:getMouseX() >= self.line2
+    local mxs = self:getMouseX()
+    local onDev = over and self.line3 ~= nil and mxs >= self.line3
+    local onEd = over and not onDev and self.line2 ~= nil and mxs >= self.line2
     if over and self.line2 then
-        if onEd then T.rect(self, self.line2 + 1, 1, w - self.line2 - 2, h - 2, T.color.accent, 0.14)
+        if onDev then T.rect(self, self.line3 + 1, 1, w - self.line3 - 2, h - 2, T.color.accent, 0.14)
+        elseif onEd then T.rect(self, self.line2 + 1, 1, (self.line3 or w - 1) - self.line2 - 1, h - 2, T.color.accent, 0.14)
         else T.rect(self, self.line1 + 1, 1, self.line2 - self.line1 - 1, h - 2, T.color.accent, 0.14) end
     end
     -- a sand frame all round, as every Knox plate in the menu has
@@ -1112,13 +1142,18 @@ function KnoxSettingsTab:prerender()
     x = self.line1
     T.rect(self, x, y, 1, T.fontH(font), T.color.tileEdge, a)
     x = x + 1 + pad * 2
-    local onSet = (over and not onEd) or KnoxSettings.instance ~= nil
+    local onSet = (over and not onEd and not onDev) or KnoxSettings.instance ~= nil
     if not self.line2 then onSet = hover end
     T.text(self, self.label, x, y, onSet and T.color.bright or T.color.text, font, a)
     if self.line2 then
         x = self.line2
         T.rect(self, x, y, 1, T.fontH(font), T.color.tileEdge, a)
         T.text(self, self.edLabel, x + 1 + pad * 2, y, (onEd or edOpen) and T.color.bright or T.color.text, font, a)
+    end
+    if self.line3 then
+        x = self.line3
+        T.rect(self, x, y, 1, T.fontH(font), T.color.tileEdge, a)
+        T.text(self, self.devLabel, x + 1 + pad * 2, y, (onDev or KnoxTestBench.instance ~= nil) and T.color.bright or T.color.text, font, a)
     end
 end
 
@@ -1130,7 +1165,8 @@ end
 -- (on release, as the window's own buttons: see KnoxSettings.onMouseUp)
 function KnoxSettingsTab:onMouseUp(x, y)
     if self.pressed then
-        if self.line2 and x >= self.line2 then KnoxEditor.open() else KnoxSettings.open() end
+        if self.line3 and x >= self.line3 then KnoxTestBench.toggle(0)
+        elseif self.line2 and x >= self.line2 then KnoxEditor.open() else KnoxSettings.open() end
     end
     self.pressed = nil
     return true

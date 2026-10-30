@@ -215,4 +215,84 @@ function C.hints(ids)
     return list
 end
 
+-- Viewpoint's crosshair panel keys (the author, 2026-10-29: changed from Knox's
+-- settings too; the mockup .claude/mockups/settings/settings_vp_keys.html). They
+-- are Viewpoint's own: read and set through its Lua (Viewpoint.Keys, as its page
+-- in the game's mod options does) and kept in its settings - Viewpoint frees a key
+-- one of its other bindings had. Knox's panel reads them from there (KnoxCrosshair).
+C.VP_ACTIONS = {
+    {id = "vpTake", key = "keys.lootTake", kind = "key"},       -- take, or do the action chosen
+    {id = "vpAll",  key = "keys.lootTakeAll", kind = "key"},
+    {id = "vpOpen", key = "keys.lootWindow", kind = "key"},     -- open what is looked at in Knox
+}
+local vpById = {}
+for _, a in ipairs(C.VP_ACTIONS) do vpById[a.id] = a end
+
+--- Viewpoint's keys (nil: no Viewpoint, or one without them).
+function C.vpKeys()
+    local k = Viewpoint and Viewpoint.Keys
+    if k and k.get and k.set and k.display and k.fallback then return k end
+    return nil
+end
+
+--- A Viewpoint key's entry ({id, key, kind}), or nil for Knox's own.
+function C.vp(id)
+    return vpById[id]
+end
+
+local function vpCall(f, ...)
+    local ok, v = pcall(f, ...)
+    if ok then return v end
+    return nil
+end
+
+--- A Viewpoint key as Viewpoint writes it ("F", "SHIFT+F", "" none).
+function C.vpGet(id)
+    local k, a = C.vpKeys(), vpById[id]
+    return (k and a and vpCall(k.get, a.key)) or ""
+end
+
+--- How it is shown on the plate ("-": none).
+function C.vpLabel(text)
+    local k = C.vpKeys()
+    local s = (k and text ~= "" and vpCall(k.display, text)) or ""
+    if s == "" or s == "NONE" then return "-" end
+    return s
+end
+
+--- Bind it to a Knox gesture of a key ("ctrl+shift+key:33", "" none): Viewpoint
+--- reads a key by its number and the modifiers by name.
+function C.vpSet(id, gesture)
+    local k, a = C.vpKeys(), vpById[id]
+    if not k or not a then return end
+    local text = "NONE"
+    local code = string.match(gesture or "", "key:(%d+)$")
+    if code then
+        text = ""
+        for mod in string.gmatch(gesture, "([a-z]+)%+") do text = text .. string.upper(mod) .. "+" end
+        text = text .. code
+    end
+    vpCall(k.set, a.key, text)
+    C.changed()
+end
+
+function C.vpIsDefault()
+    local k = C.vpKeys()
+    if not k then return true end
+    for _, a in ipairs(C.VP_ACTIONS) do
+        if vpCall(k.get, a.key) ~= vpCall(k.fallback, a.key) then return false end
+    end
+    return true
+end
+
+function C.vpReset()
+    local k = C.vpKeys()
+    if not k then return end
+    for _, a in ipairs(C.VP_ACTIONS) do
+        local f = vpCall(k.fallback, a.key)
+        if f then vpCall(k.set, a.key, f) end
+    end
+    C.changed()
+end
+
 return KnoxControls

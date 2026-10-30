@@ -84,7 +84,6 @@ local function script(d)
     function sc:getObsolete() return false end
     function sc:getDisplayCategory() return self.d.cat end
     function sc:isItemType(t) return self.d.kind == t end
-    function sc:getCanBeEquipped() return self.d.equip end
     function sc:getBodyLocation() return self.d.worn end
     function sc:getNormalTexture() return {tex = self.d.ft} end
     return sc

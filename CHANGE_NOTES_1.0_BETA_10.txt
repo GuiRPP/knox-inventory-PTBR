@@ -1,0 +1,51 @@
+[h1]Knox Inventory 1.0 BETA - update 10: Faster and sharper[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[b]A new Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, click "Allow".[/b]
+
+A technical update: your reports from Steam, a faster inventory screen and a lot of work on the Viewpoint crosshair panel. Thank you for every report!
+
+[h2]Fixes from your reports[/h2]
+[list]
+[*]Item editor: no more hundreds of errors when it opens; backpacks are back in their own group.
+[*]"Disassemble" in the world menu shows the game's tooltip again.
+[*]Items can't be moved from or into containers you can no longer reach - "Too far" instead.
+[*]An item that can't go somewhere tells why, right at the cursor ("No room" and others).
+[*]Dashboard: a trunk button for vans, SUVs and trucks; a car without a trunk gets a proper dash instead of an empty slot.
+[*]Sandbox options show their min / max again (Chinese).
+[*]A white highlight colour no longer turns black after "Apply".
+[*]Two small memory leaks fixed.
+[/list]
+
+[h2]Speed[/h2]
+[list]
+[*]The open inventory screen costs much less per frame: its header, slots, surroundings and grids are drawn from ready lists by the Java part.
+[*]Moving 500 rounds or looking at a floor of 300 items no longer stutters.
+[/list]
+
+[h2]Items[/h2]
+[list]
+[*]The mod's own sizes for 52 items (your presets and edits still come first).
+[*]Batteries: removing and inserting work as in B42; choose which battery to put in from the ones you carry.
+[*]Swap items between quick slots, and between hands, by dragging one onto the other.
+[*]A flashlight with its own hand pose shows in the screen model's hand.
+[*]Trash bins and dumpsters take twice as long to search.
+[*]"Pour on Ground" has an icon.
+[/list]
+
+[h2]Viewpoint crosshair panel[/h2]
+[list]
+[*]Actions grouped as in the right-click menu: Use, Actions, Move, Build, "Other" folded; sub menus ("Wash") unfold.
+[*]The main action is always on top and chosen: a locked door no longer leaves "Disassemble" chosen. Locked doors show a red lock and "LOCKED".
+[*]Cars: "Enter" first; locked - "Smash Window" right under it.
+[*]"Disassemble" shows what it needs; what you lack is red.
+[*]Radio and TV: "Device Options" first.
+[*]The panel follows what you do ("Turn On" becomes "Turn Off").
+[*]Things taken with the panel go to the chosen bag, remembered in the save.
+[*]The panel's keys can be changed in Knox's settings.
+[*]Holding the interact key at a fence climbs it again while the panel is up.
+[*]The generator window and the item size editor free the mouse.
+[*]The car radio card folds when Viewpoint's cursor mode is turned off.
+[/list]
+
+Not everything here has been played through in game yet - if something breaks, tell us in the discussion thread.

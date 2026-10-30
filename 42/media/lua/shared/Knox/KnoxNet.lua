@@ -281,6 +281,16 @@ function N.setPocketsLayout(tpl)
     delta().layout = tpl or "-"
 end
 
+--- The active container's key (KnoxActions: a worn bag chosen by its header), or nil: the pockets.
+function N.activeKey()
+    return N.me.active
+end
+
+function N.setActiveKey(key)
+    N.me.active = key
+    delta().active = key or "-"
+end
+
 --- Send the changes of the character's own data.
 function N.flushMe()
     local d = N.delta
@@ -314,6 +324,7 @@ function N.flushMe()
         end
         if d.order then msg.order, d.order, any = d.order, nil, true end
         if d.layout then msg.layout, d.layout, any = d.layout, nil, true end
+        if d.active then msg.active, d.active, any = d.active, nil, true end
         if not any then break end
         sendClientCommand(player, N.MODULE, "me", msg)
         if not more then break end
@@ -351,6 +362,7 @@ function N.applyMe(args)
         N.me.order = o
     end
     if type(args.layout) == "table" then N.me.layout = args.layout end
+    if type(args.active) == "string" then N.me.active = args.active end
     if args.last then
         N.ready = true
         if N.onChanged then N.onChanged() end
@@ -523,6 +535,11 @@ function N.serverMe(player, args)
         local l = layouts({pockets = args.layout})
         s.layout = l and l.pockets or nil
     end
+    if args.active == "-" then
+        s.active = nil
+    elseif type(args.active) == "string" and #args.active <= 200 then
+        s.active = args.active
+    end
 end
 
 --- The server's sizes: Zomboid/Lua/knox_server.txt ("grid.scale = 100") and its
@@ -672,7 +689,7 @@ function N.serverHello(player)
         while i <= #known and #msg.known < N.CHUNK do table.insert(msg.known, known[i]) i = i + 1 end
         while j <= #seen and #msg.seen < N.CHUNK do table.insert(msg.seen, seen[j]) j = j + 1 end
         while l <= #locks and #msg.locks < N.CHUNK do table.insert(msg.locks, locks[l]) l = l + 1 end
-        if part == 1 then msg.order, msg.layout = s.order, s.layout end
+        if part == 1 then msg.order, msg.layout, msg.active = s.order, s.layout, s.active end
         local last = i > #known and j > #seen and l > #locks
         msg.last = last or nil
         sendServerCommand(player, N.MODULE, "me", msg)

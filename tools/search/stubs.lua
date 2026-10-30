@@ -82,6 +82,7 @@ function newContainer(name, markable)
     local c = {name = name, items = {}, markable = markable ~= false}
     function c:getItems() return list(self.items) end
     function c:getParent() return nil end
+    function c:getType() return self.name end
     function c:getPutSound() return self.put end
     function c:getOpenSound() return self.open end
     function c:getCloseSound() return self.close end
