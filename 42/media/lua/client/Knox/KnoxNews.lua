@@ -24,6 +24,7 @@ local N = KnoxNews
 local T = KnoxTheme
 
 local MOD_ID = T.MOD_ID
+local TRANSLATION_MOD_ID = "KnoxInventoryPTBR"
 local openOpts = {primary = true}   -- (a post's button: drawn every frame, its options filled in)   -- (the release or the beta: whose files these are)
 local SEEN_FILE = "knox_news_seen.txt"
 local DOT = string.char(183)   -- the game reads Lua files as single bytes: the middle dot by its code
@@ -32,8 +33,8 @@ local DOT = string.char(183)   -- the game reads Lua files as single bytes: the 
 
 local function trim(s) return (string.gsub(s or "", "^%s*(.-)%s*$", "%1")) end
 
-local function readModFile(path)
-    local r = getModFileReader(MOD_ID, path, false)
+local function readModFile(modId, path)
+    local r = getModFileReader(modId, path, false)
     if not r then return nil end
     local lines = {}
     local line = r:readLine()
@@ -47,8 +48,10 @@ end
 
 --- Posts of the current language: {id, version, date, tag, title, body = {lines}}.
 function N.load()
-    local lines = readModFile("media/knox/" .. getText("IGUI_Knox_NewsFile"))
-        or readModFile("media/knox/news_en.txt") or {}
+    local file = getText("IGUI_Knox_NewsFile")
+    local lines = readModFile(TRANSLATION_MOD_ID, "media/knox/" .. file)
+        or readModFile(MOD_ID, "media/knox/" .. file)
+        or readModFile(MOD_ID, "media/knox/news_en.txt") or {}
     local posts, cur = {}, nil
     for _, raw in ipairs(lines) do
         local line = string.gsub(raw, "\r", "")
