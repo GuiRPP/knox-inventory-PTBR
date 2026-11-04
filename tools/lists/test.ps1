@@ -12,6 +12,9 @@ try {
     # an equipment slot with its list (stage 2, 2026-10-29)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
         (Join-Path $here 'slot_pre.lua') (Join-Path $knox 'KnoxEquipment.lua') (Join-Path $here 'slot.lua')
+    # the game's hotbar with its list (the overhaul's stage 3, 2026-11-04)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
+        (Join-Path $here 'hotbar_pre.lua') (Join-Path $knox 'KnoxHotbarOrder.lua') (Join-Path $knox 'KnoxHotbar.lua') (Join-Path $here 'hotbar.lua')
     # a grid with its lists: the cells, the quiet tiles (stage 3, 2026-10-29)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
         (Join-Path $here 'grid_pre.lua') (Join-Path $knox 'KnoxSelect.lua') (Join-Path $knox 'KnoxGridView.lua') (Join-Path $here 'grid.lua')

@@ -141,6 +141,99 @@ local function offer(hb, i, slot)
     return ref, items, pick
 end
 
+-- The bar from a ready list (the overhaul's stage 3, 2026-11-04: by knox_perf.txt the dearest
+-- thing of Knox's with the screen shut, 150-190 us a frame, what it shows hardly ever changing).
+-- While the mouse is off it, nothing is dragged, no panel is open and nothing is settling in,
+-- Java draws it again in one call; in all the rest Lua draws it as before. What it shows is
+-- kept in hb.knoxBarShows and looked at every frame: the slots, their faint pictures and what
+-- hangs in them, the hands, a gun's rounds in hand. A tile's height and colour one tile a
+-- frame, in turn (a burning torch's charge moves all the time, what shows of it seldom).
+-- Nothing new is made in a frame.
+local barLists = {}   -- (one per player and for good: Java keeps every list)
+
+local function isGun(item)
+    return item ~= nil and instanceof(item, "HandWeapon") and item:isRanged()
+end
+
+--- Tile `at`'s thing: the slots, then the hands.
+local function tileAt(hb, at, n, p, s)
+    if at <= n then return hb.attachedItems[at] end
+    if at == n + 1 then return p end
+    return s
+end
+
+--- What shows of tile `at`'s state: its height, as T.levelKey has it.
+local function levelShown(shows, at, item, size)
+    if not item then return false end
+    if shows.levelFor[at] ~= item then shows.levelFor[at], shows.levelFrom[at] = item, T.levelKind(item) end
+    return T.levelKey(item, size, T.itemLevel(item, shows.levelFrom[at]))
+end
+
+local function barRemember(hb, n, p, s)
+    local shows = hb.knoxBarShows
+    if not shows then
+        shows = {stamp = 0, at = 0, slot = {}, tex = {}, item = {}, level = {}, cat = {}, levelFor = {}, levelFrom = {}}
+        hb.knoxBarShows = shows
+    end
+    shows.stamp = shows.stamp + 1
+    shows.n, shows.p, shows.s, shows.hands = n, p, s, hb.knoxHands
+    shows.order, shows.hide = T.settings["hotbar.order"], KnoxMagKnown and KnoxMagKnown.hide
+    shows.gunP, shows.gunS = isGun(p), isGun(s)
+    shows.ammoP, shows.maxP = shows.gunP and p:getCurrentAmmoCount(), shows.gunP and p:getMaxAmmo()
+    shows.ammoS, shows.maxS = shows.gunS and s:getCurrentAmmoCount(), shows.gunS and s:getMaxAmmo()
+    for i = 1, n do
+        local slot = hb.availableSlot[i]
+        shows.slot[i], shows.tex[i], shows.item[i] = slot, slot.texture, hb.attachedItems[i]
+    end
+    for at = 1, n + 2 do
+        local item = tileAt(hb, at, n, p, s)
+        shows.level[at] = levelShown(shows, at, item, hb.slotWidth)
+        shows.cat[at] = item and T.categoryOf(item) or false
+    end
+end
+
+--- Is the bar as its list has it? (No: Lua draws it this frame.)
+local function barQuiet(hb)
+    -- (T.settleIn wants no list: what is settling in changes every frame)
+    if hb.knoxBarBusy ~= false or hb.knoxSlotDrag or hb.knoxHandDrag or ISMouseDrag.dragging
+            or KnoxSlotPicker.instance then
+        return false
+    end
+    local mx, my = hb:getMouseX(), hb:getMouseY()
+    -- (getSlotIndexAt's reach, the hands' width past the right edge with it)
+    if my >= 0 and my < hb.height and mx >= 0 and mx < hb.width + handsW(hb) then return false end
+    local shows = hb.knoxBarShows
+    local slots, items, chr = hb.availableSlot, hb.attachedItems, hb.chr
+    local n = #slots
+    local p, s = chr:getPrimaryHandItem(), chr:getSecondaryHandItem()
+    local same = shows ~= nil and shows.n == n and shows.p == p and shows.s == s and shows.hands == hb.knoxHands
+        and shows.order == T.settings["hotbar.order"] and shows.hide == (KnoxMagKnown and KnoxMagKnown.hide)
+    if same then
+        for i = 1, n do
+            -- (the picture apart: other clothes giving the same slot change it on the same table)
+            local slot = slots[i]
+            if shows.slot[i] ~= slot or shows.tex[i] ~= slot.texture or shows.item[i] ~= items[i] then
+                same = false
+                break
+            end
+        end
+    end
+    if same and shows.gunP and (shows.ammoP ~= p:getCurrentAmmoCount() or shows.maxP ~= p:getMaxAmmo()) then same = false end
+    if same and shows.gunS and (shows.ammoS ~= s:getCurrentAmmoCount() or shows.maxS ~= s:getMaxAmmo()) then same = false end
+    if same then
+        local at = shows.at % (n + 2) + 1
+        shows.at = at
+        local item = tileAt(hb, at, n, p, s)
+        if shows.level[at] ~= levelShown(shows, at, item, hb.slotWidth)
+                or shows.cat[at] ~= (item and T.categoryOf(item) or false) then
+            same = false
+        end
+    end
+    if same then return true end
+    barRemember(hb, n, p, s)
+    return false
+end
+
 function ISHotbar:render()
     if (self.playerNum > 0) or JoypadState.players[self.playerNum + 1] then
         self:setVisible(false)   -- as the game does: update() keeps running for refresh()
@@ -150,6 +243,21 @@ function ISHotbar:render()
     applySizes(self)
 
     local w, h = self.width, self.height
+    local L = barLists[self.playerNum]
+    if not L then
+        L = T.newList()
+        barLists[self.playerNum] = L
+    end
+    if not L.dead and T.listsOn() and barQuiet(self) then
+        if T.listDraw(self, L, w, h, self.slotWidth, self.knoxBarShows.stamp) then return end
+    elseif L.writing then
+        -- a frame being written fell over a Lua error and no T.listDraw comes now to start it
+        -- anew: thrown away, or what is drawn now (the mouse's glow) stays in it for good
+        T.listEnd(L)
+        L.ok = false
+    end
+    self.knoxBarBusy = false
+
     -- plate: the Knox bottom bar's color, a thin frame
     T.rect(self, 0, 0, w, h, T.color.header, 0.85)
     T.border(self, 0, 0, w, h, T.color.border)
@@ -182,6 +290,7 @@ function ISHotbar:render()
             T.tileFill(self, x, y, size, size, T.levelOf(memo, item), T.category[T.categoryOf(item)])
             local side = math.floor(size * 0.66)
             local dy, da = T.settleIn(memo, self.attachedItems[i])
+            if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
             if T.itemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, side, da) then
                 T.brokenMark(self, x, y + dy, size, size, da)
             end
@@ -252,6 +361,7 @@ function ISHotbar:render()
         end
         x = x + size + self.slotPad
     end
+    T.listEnd(L)
 end
 
 -- Hands ----------------------------------------------------------------------------
@@ -316,6 +426,7 @@ function ISHotbar:drawHands()
             T.tileFill(self, x, y, w, h, T.levelOf(memo, item), T.category[T.categoryOf(item)])
             local side = math.floor(h * 0.66)
             local dy, da = T.settleIn(memo, item)
+            if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
             if T.itemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, side, da) then
                 T.brokenMark(self, x, y + dy, w, h, da)
             end
