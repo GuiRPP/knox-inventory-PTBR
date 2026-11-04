@@ -8,35 +8,33 @@ import fmod.javafmodJNI;
 /**
  * The radio by the fire as a radio (the author, 2026-10-15: the channel's
  * low-pass alone was "not a radio"; hiss, interference, a bit of room asked
- * for). The menu's own music, while it plays "from the radio", goes through a
- * chain of FMOD's own effects (on a channel group of its own - below):
- *   - a small speaker's band: highs and lows cut, a nasal bump in the middle
- *     (multiband EQ);
- *   - a little breakup of a cheap amplifier (distortion);
- *   - the box: a very short echo;
- *   - the camp around it: a short, dark reverb.
+ * for). The menu's own music, while it plays "from the radio", goes through
+ * FMOD's multiband EQ (on a channel group of its own - below): a small
+ * speaker's band, highs and lows cut, a nasal bump in the middle.
  * And the air: the signal swells and sinks a little all the time, and now and
  * then sinks away for a moment into the air's noise (media/sound/knox_radio/
  * air.wav, made by Knox), which goes through the same speaker. The steady hiss
  * under it all is KnoxRadioStatic (Lua).
  *
  * The game's FMOD bridge creates an effect by its type number, and those
- * numbers moved between FMOD versions: each effect is told apart by what
- * parameters it has, not trusted by number. (By their count and kind only: FMOD
- * clips a value out of range and says nothing, so the checks that expected an
- * error for one never passed - only the EQ was ever on. Asked of the game's FMOD
- * 2.03.09 itself, outside the game; the author, 2026-11-04: fix it, the sound changes.)
+ * numbers moved between FMOD versions: the EQ is told apart by what parameters
+ * it has, not trusted by number.
+ *
+ * The EQ alone is the sound the author knows and chose. A breakup, a box's echo
+ * and a reverb were here from the start, and their checks never passed (FMOD
+ * clips a value out of range and says nothing). Found and turned on 2026-11-04,
+ * they made the fire and the bar sound alike and bad: gone again (the author,
+ * 2026-11-05, "it was better before"). Their values: git, 8d8d7bd.
  */
 public class KnoxRadioFx {
 
     // FMOD 2.03's numbers (looked at first; the rest are searched)
-    static final int GUESS_EQ = 32, GUESS_DIST = 9, GUESS_ECHO = 6, GUESS_REVERB = 17;
+    static final int GUESS_EQ = 32;
     // FMOD_DSP_MULTIBAND_EQ_FILTER_TYPE
     static final int F_OFF = 0, F_LOWPASS_24 = 2, F_HIGHPASS_24 = 5, F_PEAKING = 9;
-    static final int NO_SUCH = 31;   // FMOD_ERR_INVALID_PARAM: no parameter of that number
 
     static boolean tried;
-    static long eq, dist, echo, reverb;
+    static long eq;
     static long attachedTo;
     static boolean on;
 
@@ -58,21 +56,6 @@ public class KnoxRadioFx {
     static boolean isEq(long d) {
         return n(d, 0, 0) == 0 && n(d, 4, 0) == 0 && n(d, 8, 0) == 0 && n(d, 12, 0) == 0 && n(d, 16, 0) == 0
             && f(d, 1, 1000f) == 0 && f(d, 19, 0f) == 0;
-    }
-
-    // one number and no more (a fader has a second, of another kind: it answers otherwise)
-    static boolean isDist(long d) {
-        return f(d, 0, 0.5f) == 0 && f(d, 1, 0f) == NO_SUCH && n(d, 1, 0) == NO_SUCH;
-    }
-
-    // four numbers
-    static boolean isEcho(long d) {
-        return f(d, 0, 50f) == 0 && f(d, 1, 20f) == 0 && f(d, 2, 0f) == 0 && f(d, 3, -10f) == 0 && f(d, 4, 0f) != 0;
-    }
-
-    // thirteen numbers
-    static boolean isReverb(long d) {
-        return f(d, 0, 1500f) == 0 && f(d, 11, -20f) == 0 && f(d, 12, 0f) == 0 && f(d, 13, 0f) != 0;
     }
 
     static long create(int type) {
@@ -119,78 +102,37 @@ public class KnoxRadioFx {
         tried = true;
         try {
             eq = find(GUESS_EQ, KnoxRadioFx::isEq);
-            dist = find(GUESS_DIST, KnoxRadioFx::isDist);
-            echo = find(GUESS_ECHO, KnoxRadioFx::isEcho);
-            reverb = find(GUESS_REVERB, KnoxRadioFx::isReverb);
             campTone();
-            tuned = TONE_CAMP;
-            System.out.println("[Knox] radio sound: eq " + (eq != 0L) + ", distortion " + (dist != 0L)
-                + ", echo " + (echo != 0L) + ", reverb " + (reverb != 0L));
+            tunedBroken = false;
+            System.out.println("[Knox] radio sound: eq " + (eq != 0L));
         } catch (Throwable t) {
             System.out.println("[Knox] radio sound: no effects (" + t + ")");
-            eq = dist = echo = reverb = 0L;
+            eq = 0L;
         }
     }
 
-    /** The radio by the fire's chain, as the fire has it. */
+    /** The speaker's band as the fire has it, and its nasal middle. (A car's radio too.) */
     static void campTone() {
-        if (eq != 0L) {
-            // the speaker's band, and its nasal middle
-            n(eq, 0, F_HIGHPASS_24); f(eq, 1, 320f); f(eq, 2, 0.707f);
-            n(eq, 4, F_LOWPASS_24); f(eq, 5, 3300f); f(eq, 6, 0.707f);
-            n(eq, 8, F_PEAKING); f(eq, 9, 1500f); f(eq, 10, 1.1f); f(eq, 11, 6f);
-            n(eq, 12, F_PEAKING); f(eq, 13, 600f); f(eq, 14, 1.0f); f(eq, 15, -3f);
-            n(eq, 16, F_OFF);
-        }
-        if (dist != 0L) f(dist, 0, 0.28f);
-        if (echo != 0L) {
-            // the box: a very short echo, quiet
-            f(echo, 0, 18f); f(echo, 1, 28f); f(echo, 2, 0f); f(echo, 3, -13f);
-        }
-        if (reverb != 0L) {
-            // a short dark reverb: by a fire in the woods, not a hall
-            f(reverb, 0, 900f); f(reverb, 1, 12f); f(reverb, 2, 20f); f(reverb, 3, 4000f);
-            f(reverb, 4, 45f); f(reverb, 5, 70f); f(reverb, 6, 80f); f(reverb, 7, 250f);
-            f(reverb, 8, 0f); f(reverb, 9, 3500f); f(reverb, 10, 55f); f(reverb, 11, -17f); f(reverb, 12, 0f);
-        }
+        if (eq == 0L) return;
+        n(eq, 0, F_HIGHPASS_24); f(eq, 1, 320f); f(eq, 2, 0.707f);
+        n(eq, 4, F_LOWPASS_24); f(eq, 5, 3300f); f(eq, 6, 0.707f);
+        n(eq, 8, F_PEAKING); f(eq, 9, 1500f); f(eq, 10, 1.1f); f(eq, 11, 6f);
+        n(eq, 12, F_PEAKING); f(eq, 13, 600f); f(eq, 14, 1.0f); f(eq, 15, -3f);
+        n(eq, 16, F_OFF);
     }
 
-    /**
-     * The radio in a car, as it has always sounded there: the speaker's band alone. The breakup,
-     * the box and the reverb by the fire came on for the fire and the bar (the author's answer,
-     * 2026-11-04), and were never asked of the car. (-80 dB: FMOD's "none" for both.)
-     */
-    static void carTone() {
-        campTone();
-        if (dist != 0L) f(dist, 0, 0f);
-        if (echo != 0L) f(echo, 3, -80f);
-        if (reverb != 0L) f(reverb, 11, -80f);
-    }
-
-    // Which radio the chain is tuned for: the fire's, the bar's (KnoxBarRadio; the author,
-    // 2026-11-01: each its own sound) or a car's. Tab goes between them with the music playing.
-    static final int TONE_CAMP = 0, TONE_BAR = 1, TONE_CAR = 2;
-    static int tuned = TONE_CAMP;
-
-    // (in the world: a track still fading on the loading screen keeps the fire's sound to its end)
-    static boolean inWorld() {
-        try {
-            zombie.gameStates.GameStateMachine states = zombie.GameWindow.states;
-            return states != null && states.current instanceof zombie.gameStates.IngameState;
-        } catch (RuntimeException | LinkageError e) {
-            return false;
-        }
-    }
+    // Which radio the EQ is tuned for: the fire's or the bar's (KnoxBarRadio; the author,
+    // 2026-11-01: each its own sound). Tab goes between them with the music playing.
+    static boolean tunedBroken;
 
     static void tune(long ch) {
-        int want = broken ? TONE_BAR : inWorld() ? TONE_CAR : TONE_CAMP;
-        if (tuned == want) return;
-        tuned = want;
-        if (want == TONE_BAR) {
-            KnoxBarRadio.tone(eq, dist, echo, reverb);
+        if (tunedBroken == broken) return;
+        tunedBroken = broken;
+        if (broken) {
+            KnoxBarRadio.tone(eq);
             KnoxBarRadio.begin(System.currentTimeMillis());
         } else {
-            if (want == TONE_CAR) carTone(); else campTone();
+            campTone();
             KnoxBarRadio.hush();
             KnoxBarRadio.pitch(ch, 1f);
         }
@@ -218,10 +160,7 @@ public class KnoxRadioFx {
         try {
             group = fmod.javafmod.FMOD_System_CreateChannelGroup("KnoxRadio");
             if (group == 0L) return false;
-            // (each at the head: the one added first ends up first in the signal's way)
-            for (long d : new long[] {eq, dist, echo, reverb}) {
-                if (d != 0L) javafmodJNI.FMOD_ChannelGroup_AddDSP(group, 0, d);
-            }
+            if (eq != 0L) javafmodJNI.FMOD_ChannelGroup_AddDSP(group, 0, eq);
             groupFx = true;
         } catch (Throwable t) {
             groupFx = false;

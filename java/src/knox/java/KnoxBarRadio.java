@@ -4,12 +4,10 @@ import java.util.Random;
 
 /**
  * The winter bar's radio has a sound of its own (the author, 2026-11-01: half broken, more
- * interference, not the same noise over and over, the sound itself distorted). The same chain of
- * FMOD's effects as the radio by the fire (KnoxRadioFx), tuned otherwise and never still:
+ * interference, not the same noise over and over, the sound itself distorted). The same EQ as the
+ * radio by the fire (KnoxRadioFx), tuned otherwise and never still:
  *   - a torn speaker: a narrower band, a hard resonance that wanders, a hole in the lows' middle,
  *     a rattle high up;
- *   - an amplifier breaking up, more when the joints give;
- *   - half a case: a short rattling echo; then the empty room around it;
  *   - the set drifting off the station: the pitch, a hair, and a lurch now and then;
  *   - a loose contact: the sound cut in bursts, a long sag when the speaker nearly gives up;
  *   - faults on the air: six kinds, several takes of each (tools/sound/make_bar_radio.py), at
@@ -47,24 +45,14 @@ final class KnoxBarRadio {
     private static long tunedAt;
     private static final double p1 = rnd.nextDouble() * 6.28, p2 = rnd.nextDouble() * 6.28, p3 = rnd.nextDouble() * 6.28;
 
-    /** The chain, as this radio has it. The moving parts: {@link #tick}. */
-    static void tone(long eq, long dist, long echo, long reverb) {
+    /** The EQ, as this radio has it. The moving parts: {@link #tick}. */
+    static void tone(long eq) {
         if (eq != 0L) {
             KnoxRadioFx.n(eq, 0, KnoxRadioFx.F_HIGHPASS_24); KnoxRadioFx.f(eq, 1, 480f); KnoxRadioFx.f(eq, 2, 0.707f);
             KnoxRadioFx.n(eq, 4, KnoxRadioFx.F_LOWPASS_24); KnoxRadioFx.f(eq, 5, 2500f); KnoxRadioFx.f(eq, 6, 0.9f);
             KnoxRadioFx.n(eq, 8, KnoxRadioFx.F_PEAKING); KnoxRadioFx.f(eq, 9, 1250f); KnoxRadioFx.f(eq, 10, 2.4f); KnoxRadioFx.f(eq, 11, 9f);
             KnoxRadioFx.n(eq, 12, KnoxRadioFx.F_PEAKING); KnoxRadioFx.f(eq, 13, 720f); KnoxRadioFx.f(eq, 14, 1.6f); KnoxRadioFx.f(eq, 15, -7f);
             KnoxRadioFx.n(eq, 16, KnoxRadioFx.F_PEAKING); KnoxRadioFx.f(eq, 17, 2050f); KnoxRadioFx.f(eq, 18, 5f); KnoxRadioFx.f(eq, 19, 5f);
-        }
-        if (dist != 0L) KnoxRadioFx.f(dist, 0, 0.55f);
-        if (echo != 0L) {
-            KnoxRadioFx.f(echo, 0, 11f); KnoxRadioFx.f(echo, 1, 45f); KnoxRadioFx.f(echo, 2, 0f); KnoxRadioFx.f(echo, 3, -9f);
-        }
-        if (reverb != 0L) {
-            // a long way to the walls of an empty room, little coming back high
-            KnoxRadioFx.f(reverb, 0, 1700f); KnoxRadioFx.f(reverb, 1, 25f); KnoxRadioFx.f(reverb, 2, 40f); KnoxRadioFx.f(reverb, 3, 3000f);
-            KnoxRadioFx.f(reverb, 4, 35f); KnoxRadioFx.f(reverb, 5, 60f); KnoxRadioFx.f(reverb, 6, 60f); KnoxRadioFx.f(reverb, 7, 250f);
-            KnoxRadioFx.f(reverb, 8, 0f); KnoxRadioFx.f(reverb, 9, 2500f); KnoxRadioFx.f(reverb, 10, 40f); KnoxRadioFx.f(reverb, 11, -12f); KnoxRadioFx.f(reverb, 12, 0f);
         }
     }
 
@@ -116,7 +104,7 @@ final class KnoxBarRadio {
 
     /**
      * Every frame the radio plays here: how much of the music comes through now (the volume's
-     * part), the moving parts of the chain set, the faults started.
+     * part), the moving parts of the EQ set, the faults started.
      */
     static float tick(long ch, long now, float volume) {
         if (now >= nextFaultAt) {
@@ -164,16 +152,11 @@ final class KnoxBarRadio {
         }
         k *= (float) (1.0 - 0.5 * sag);
 
-        // (the channel's and the effects' values: no need each frame)
+        // (the channel's and the EQ's values: no need each frame)
         if (now - tunedAt < 40L) return k;
         tunedAt = now;
         double t = now / 1000.0;
 
-        // a joint that gives: the breakup follows it
-        double joints = 0.5 + 0.5 * Math.sin(t * 0.73 + p1) * Math.sin(t * 2.1 + p2);
-        boolean bursting = burstUntil != 0L;
-        float d = (float) (0.42 + 0.26 * joints + (bursting ? 0.2 : 0.0) + 0.1 * sag);
-        if (KnoxRadioFx.dist != 0L) KnoxRadioFx.f(KnoxRadioFx.dist, 0, Math.min(0.92f, d));
         if (KnoxRadioFx.eq != 0L) {
             // the torn cone's resonance wanders; the band closes as the speaker sags
             float peak = (float) (1250.0 + 260.0 * Math.sin(t * 0.37 + p2) + 90.0 * Math.sin(t * 3.1 + p3));

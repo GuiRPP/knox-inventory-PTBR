@@ -1014,9 +1014,9 @@ function M:watchReveal(t)
     self.revealAt = t
 end
 
---- While a hero waits for its clip (the game still reading its animations
---- after a start), the scene's clips are put at the head of the game's loading
---- queue - a few times, as the game may still be adding to that queue.
+--- While a hero waits for its clip, and its clothes before that (the game still
+--- reading its animations and its wardrobe after a start), they are put at the head
+--- of the game's loading queue - a few times, as the game may still be adding to it.
 function M:hurryClips(t)
     if not knoxMenuHurryClips or t > 15 or (self.hurryAt or 0) > t then return end
     self.hurryAt = t + 0.5
@@ -1029,7 +1029,7 @@ function M:hurryClips(t)
         return
     end
     local n = knoxMenuHurryClips(self.menuClips or MENU_CLIPS)
-    if n and n > 0 then print("[Knox] menu scene: " .. n .. " of its animations moved ahead in the game's loading at " .. string.format("%.1f", t) .. " s") end
+    if n and n > 0 then print("[Knox] menu scene: " .. n .. " of its animations and clothes moved ahead in the game's loading at " .. string.format("%.1f", t) .. " s") end
 end
 
 --- A hero not in yet: kept too small to see until it is in its pose with its

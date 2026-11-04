@@ -788,6 +788,10 @@ public class KnoxMenu {
      * dropped or loaded differently; the game's own tasks just go in another
      * order. Returns how many were moved (0 if nothing waits or the game's
      * fields are not what this expects: then it does nothing at all).
+     *
+     * The same for the clothes the heroes wait for (clothesMissing): the game
+     * parses its whole wardrobe in that queue, one XML after another, and a Belt
+     * came after 8.9 s (the author's log, 2026-11-05: heroes 10 s after a start).
      */
     @LuaMethod(name = "knoxMenuHurryClips", global = true)
     public static int knoxMenuHurryClips(String clips) {
@@ -834,7 +838,7 @@ public class KnoxMenu {
             }
             return moved;
         } catch (Exception | LinkageError e) {
-            tell("hurrying the menu's animations", e);
+            tell("hurrying the menu's animations and clothes", e);
             return 0;
         }
     }
@@ -852,6 +856,7 @@ public class KnoxMenu {
     }
 
     static boolean isWanted(zombie.fileSystem.FileTask task, String[] want) {
+        if (task instanceof zombie.asset.FileTask_ParseXML) return CLOTHES_HURRY.contains(task.getErrorMessage());
         if (!(task instanceof zombie.core.skinnedmodel.model.FileTask_LoadAnimation)) return false;
         String name = ((zombie.core.skinnedmodel.model.FileTask_LoadAnimation) task).getRawFileName();
         if (name == null) return false;
@@ -867,6 +872,8 @@ public class KnoxMenu {
 
     /** clothing items whose loading Knox has asked for itself (once each) */
     static final Set<Object> CLOTHES_ASKED = Collections.newSetFromMap(new WeakHashMap<>());
+    /** the files of the clothes the heroes wait for, for knoxMenuHurryClips */
+    static final Set<String> CLOTHES_HURRY = new java.util.HashSet<>();
 
     /**
      * The hero's clothing items not loaded yet, by name. With `kick`, one that
@@ -880,7 +887,11 @@ public class KnoxMenu {
      * the game has not set up again after leaving a game gives no ClothingItem
      * at all, and such an item was taken as "nothing to wait for" - the hero
      * was built without it for good. They are waited for now, but only a few
-     * seconds: a thing from a mod that is off in the menu never shows up.
+     * seconds, and only one whose script is there: the scripts are loaded before
+     * the menu is (GameWindow, IngameState.exit), so one with none belongs to a
+     * mod that is off in the menu and never shows up. (Waited for all the same,
+     * one hidden thing of Over The Shoulder held the bar's heroes back 4 s on every
+     * entry and each Tab the 1.2 s the swipe waits for them: the author, 2026-11-05.)
      */
     static final java.util.HashMap<String, Long> UNKNOWN_SINCE = new java.util.HashMap<>();
     static final long UNKNOWN_WAIT_MS = 4000;
@@ -895,7 +906,7 @@ public class KnoxMenu {
             zombie.core.skinnedmodel.population.ClothingItem ci = iv == null ? null : iv.getClothingItem();
             if (ci == null) {
                 String type = iv == null ? null : iv.getItemType();
-                if (type == null || type.isEmpty()) continue;
+                if (type == null || type.isEmpty() || iv.getScriptItem() == null) continue;
                 if (unknownWait) {
                     long now = System.currentTimeMillis();
                     Long since = UNKNOWN_SINCE.putIfAbsent(save, now);
@@ -906,6 +917,7 @@ public class KnoxMenu {
             }
             if (!ci.isEmpty()) continue;
             out.add(ci.mame != null ? ci.mame : String.valueOf(ci.getPath()));
+            CLOTHES_HURRY.add(ci.getPath().getPath());
             if (kick && CLOTHES_ASKED.add(ci)) {
                 try {
                     ci.getAssetManager().load(ci);

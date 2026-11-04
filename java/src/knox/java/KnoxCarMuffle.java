@@ -12,8 +12,8 @@ import fmod.javafmodJNI;
  *   - the cabin's boom: the bass and the low middle carry, a bump at ~120 Hz and
  *     a smaller one at ~250 Hz; no rumble under 45 Hz.
  * (No echo: the sound the author approved had none - the check for one never passed, "echo false"
- * in every log; once the radio's checks were fixed it would have come on. Left as heard, 2026-11-04.)
- * No hiss and no air: the radio's chain (and its noise) is off the track meanwhile.
+ * in every log. Left as heard, 2026-11-04.)
+ * No hiss and no air: the radio's EQ (and its noise) is off the track meanwhile.
  * Two of them: MAIN for the player's track, PARKED for the one left playing in
  * another car (KnoxMusic's parked track - the author, 2026-10-21: both cars play);
  * and NET, one for each of the other players' tracks heard here (KnoxMusicNet).

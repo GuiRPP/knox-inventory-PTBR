@@ -408,7 +408,7 @@ clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 0})
 local only = mag(5, true)
 check("opens", open())
-check("no magazine: insert, no eject", kinds() == "insert,all,rack", kinds())
+check("no magazine: insert, no eject; no rounds, no loading them all", kinds() == "insert,rack", kinds())
 check("no magazine: a line", M.gunNone == true)
 KEYS[R] = true
 frame()
@@ -430,7 +430,8 @@ PLAYER.primary = gun
 rounds(10, "Base.ShotgunShells")
 check("opens", open())
 check("a shotgun's rows", kinds() == "self,rack", kinds())
-check("its first row: itself, its scale", M.rows[1].m == gun and M.rows[1].known == true and M.rows[1].lit == 2, M.rows[1].lit)
+check("its first row: itself, by what it does", M.rows[1].m == gun and M.rows[1].known == true and M.rows[1].name == "IGUI_Knox_RMenu_Load IGUI_Knox_RMenu_Load", M.rows[1].name)
+check("what it holds: in the head alone", M.gunLit == 2 and M.hasScale(M.rows[1]) == false and M.hasScale(M.rows[2]) == false, M.gunLit)
 check("a pump's name", M.rows[2].name == "IGUI_Knox_RMenu_RackPump IGUI_Knox_RMenu_RackPump")
 KEYS[R] = true
 frame()
@@ -460,6 +461,45 @@ clearAll()
 PLAYER.primary = newItem("Base.Revolver", INV, {n = 6})
 check("opens", open())
 check("a revolver: no rack, no chamber", kinds() == "self" and M.chamber == false, kinds())
+check("a revolver: no magazines to watch", M.allMags == nil)
+-- (the plate as wide as the gun's name made it: the head needs it. Only that name has a width here,
+-- or the hints' would decide)
+M.close()
+local measured, longName, cell = KnoxTheme.measure, PLAYER.primary, KnoxTheme.cell
+local LONG = string.rep("W", 34)
+KnoxTheme.measure = function(_, text) return text == LONG and 100000 or 0 end
+KnoxTheme.cell = cell + 1   -- (sizes anew: the hints' width is kept with them)
+bump(1000)
+check("opens", open())
+local shortW = M.W
+M.close()
+longName.getDisplayName = function() return LONG end
+bump(1000)
+check("opens", open())
+check("a long name: the plate wide for the head, as it was", M.W > shortW, shortW .. " " .. M.W)
+M.close()
+longName.getDisplayName = nil
+KnoxTheme.measure, KnoxTheme.cell = measured, cell
+bump(1000)
+check("opens", open())
+-- (one scale on the screen, the head's: the rects a frame draws, with its row and as a magazine's)
+local function rectsOf()
+    local n, was = 0, KnoxTheme.rect
+    KnoxTheme.rect = function(...) n = n + 1 return was(...) end
+    KEYS[R] = true
+    bump(40) frame()
+    KnoxTheme.rect = was
+    return n
+end
+KEYS[R] = true
+bump(200) frames(3)
+local noScale = rectsOf()
+M.rows[1].kind = "bag"
+local aScale = rectsOf()
+M.rows[1].kind = "self"
+check("a revolver: no second scale in its row", noScale > 0 and aScale >= noScale + 5, noScale .. " " .. aScale)
+KEYS[R] = false
+frames(1)
 
 -- no gun --------------------------------------------------------------------------------
 clearAll()
@@ -485,6 +525,7 @@ check("the box: opened", DONE[#DONE][1] == "craft", DONE[#DONE] and DONE[#DONE][
 clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
 for _ = 1, 12 do mag(5, true) end
+rounds(5)
 check("opens", open())
 KEYS[R] = true
 frames(10)
@@ -702,10 +743,43 @@ for _, q in ipairs(QUEUE) do if q.name == "ISLoadBulletsInMagazine" then table.i
 check("all: as far as the rounds go", #loads == 2 and loads[2].magazine == lowK and loads[2].b == 2, #loads)
 for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
 for i = #INV.items, 1, -1 do if INV.items[i].ft == "Base.Bullets9mm" then table.remove(INV.items, i) end end
-bump(200) frames(1)
-check("no rounds: LMB out", M.hints.noAct == true)
-M.lmb()
-check("no rounds: nothing", #QUEUE == 0)
+bump(600) frames(1)
+check("no rounds: the row goes", kinds() == "swap,swap,swap,swap,eject,rack", kinds())
+check("no rounds: the choice on the magazine before it, not on the red row", M.sel == 4, M.sel)
+rounds(3)
+bump(600) frames(1)
+check("rounds again: the row is back", kinds() == "swap,swap,swap,swap,all,eject,rack", kinds())
+check("rounds again: the choice stays", M.sel == 4, M.sel)
+clearAll()
+PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
+rounds(5)
+check("opens", open())
+check("no magazines, rounds: no row", kinds() == "eject,rack", kinds())
+clearAll()
+mag(3, true) mag(5, true)
+check("opens", open())
+check("no gun, no rounds: no row", kinds() == "bag,bag", kinds())
+rounds(4)
+bump(600) KEYS[R] = true frames(1)
+check("no gun, rounds come: the row", kinds():sub(1, 11) == "bag,bag,all", kinds())
+-- rounds coming under an action: the rows stay in their order, it comes after it (QA, 2026-11-05)
+clearAll()
+PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
+local firstMag, secondMag = mag(6, true), mag(5, true)
+check("opens", open())
+KEYS[R] = true
+frames(1)
+M.sel = 1
+check("under an action: as it was", kinds() == "swap,swap,eject,rack" and M.rows[1].m == firstMag, kinds())
+M.rmb() bump(50) frame() M.rmb()
+check("under an action: it is on", queued("ISUnloadBulletsFromMagazine") ~= nil)
+firstMag.n = 2
+rounds(3)
+bump(600) frames(1)
+check("under an action: the rows stay", kinds() == "swap,swap,eject,rack" and M.rows[1].m == firstMag, kinds())
+for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
+bump(600) frames(1)
+check("after it: the row, the order anew", kinds() == "swap,swap,all,eject,rack" and M.rows[1].m == secondMag, kinds())
 clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
 mag(15, true)
@@ -738,7 +812,7 @@ check("one shot: a part less", M.gunLit == 4, M.gunLit)
 clearAll()
 PLAYER.primary = newItem("Base.Shotgun", INV, {n = 5, chambered = true})
 check("opens", open())
-check("a shotgun, 5 + 1: full", M.rows[1].lit == 5 and M.rows[1].n == 5, M.rows[1].lit)
+check("a shotgun, 5 + 1: full", M.gunLit == 5 and M.rows[1].n == 5, M.gunLit)
 K.hide = false
 
 -- the magazines back from the pockets (the author, 2026-11-04) ----------------------------

@@ -309,8 +309,8 @@ public class KnoxMusic {
     }
 
     // The radio lying by the fire (the author's wish, 2026-10-15): the music as if
-    // from its small speaker. Its sound is KnoxRadioFx's chain of FMOD effects;
-    // where those can't be made, the channel's low-pass (`gain` below 1: the
+    // from its small speaker. Its sound is KnoxRadioFx's EQ;
+    // where that can't be made, the channel's low-pass (`gain` below 1: the
     // radio on - Lua's call stays as it was).
     private static float lowPass = 1f;
     private static boolean radio;

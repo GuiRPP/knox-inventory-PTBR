@@ -205,17 +205,30 @@ local function firstBox(player, mags)
     return nil
 end
 
---- The row that loads them all (the author, 2026-11-04), when one of them may take
---- rounds: all but those known to be full.
-local function allRow(mags, item, rows)
+--- Can any of them take rounds that are carried? (All but those known to be full; rounds of
+--- `mags`, the first of a type asked: they lie by type.)
+local function anyRounds(player, mags)
+    local inv = player:getInventory()
+    local last
     for _, m in ipairs(mags) do
-        if not (K.is(m) and m:getCurrentAmmoCount() >= m:getMaxAmmo()) then
-            local r = newRow("all", item, strings().loadAll)
-            r.mags = mags
-            table.insert(rows, r)
-            return
+        local at = m:getAmmoType()
+        local key = at and at:getItemKey()
+        if key and key ~= last and not (K.is(m) and m:getCurrentAmmoCount() >= m:getMaxAmmo()) then
+            if inv:getItemCountRecurse(key) > 0 then return true end
+            last = key
         end
     end
+    return false
+end
+
+--- The row that loads them all (the author, 2026-11-04), only when it can do something
+--- (2026-11-05: it stayed there out with no rounds). M.frame watches it come and go.
+local function allRow(player, mags, item, rows)
+    M.allMags, M.allOn = mags, anyRounds(player, mags)
+    if not M.allOn then return end
+    local r = newRow("all", item, strings().loadAll)
+    r.mags = mags
+    table.insert(rows, r)
 end
 
 --- Rows and head for what is in hand. Returns nothing to show: no rows.
@@ -223,11 +236,12 @@ function M.rowsOf(player)
     local s = strings()
     local rows = {}
     local gun = gunOf(player)
+    M.allMags, M.allOn = nil, false
     if not gun then
         local mags = allMags(player)
         sortMags(mags)
         for _, m in ipairs(mags) do table.insert(rows, magRow("bag", m)) end
-        allRow(mags, mags[1], rows)
+        allRow(player, mags, mags[1], rows)
         local box = #mags > 0 and firstBox(player, mags) or nil
         if box then table.insert(rows, newRow("box", box, s.box)) end
         return rows, nil
@@ -243,7 +257,7 @@ function M.rowsOf(player)
         local mags = carried(player, magType, {})
         sortMags(mags)
         for _, m in ipairs(mags) do table.insert(rows, magRow(gun:isContainsClip() and "swap" or "insert", m)) end
-        allRow(mags, L.sample(magType) or gun, rows)
+        allRow(player, mags, L.sample(magType) or gun, rows)
         if gun:isContainsClip() then
             local sample = L.sample(magType)
             local r = newRow("eject", sample or gun, s.eject)
@@ -251,7 +265,9 @@ function M.rowsOf(player)
             table.insert(rows, r)
         end
     else
-        local r = newRow("self", gun, gun:getDisplayName())
+        -- (what it holds is in the head; the row is what it does: its name and scale there
+        -- twice, the author 2026-11-05)
+        local r = newRow("self", gun, s.load)
         r.m = gun
         r.key = gun:getAmmoType() and gun:getAmmoType():getItemKey() or nil
         table.insert(rows, jam and 2 or 1, r)
@@ -303,22 +319,6 @@ local function chooseStrip(player)
     end
 end
 
---- Are there rounds for any of them? (Rounds of `mags`, the first of a type asked: they
---- lie by type.)
-local function anyRounds(player, mags)
-    local inv = player:getInventory()
-    local last
-    for _, m in ipairs(mags) do
-        local at = m:getAmmoType()
-        local key = at and at:getItemKey()
-        if key and key ~= last and not (K.is(m) and m:getCurrentAmmoCount() >= m:getMaxAmmo()) then
-            if inv:getItemCountRecurse(key) > 0 then return true end
-            last = key
-        end
-    end
-    return false
-end
-
 --- What a gun holds: the magazine and the round the rack took out of it for the chamber
 --- (a full magazine of 30 goes in as 29 + 1: the scale lost a part - the author, 2026-11-04).
 local function inGun(gun)
@@ -330,9 +330,7 @@ local function readRows(player)
         if r.m then
             r.n, r.cap = r.m:getCurrentAmmoCount(), r.m:getMaxAmmo()
             r.known = r.kind == "self" or K.is(r.m)
-            r.lit = M.levelOf(r.kind == "self" and inGun(r.m) or r.n, r.cap)
-        elseif r.kind == "all" then
-            r.able = anyRounds(player, r.mags)
+            r.lit = M.levelOf(r.n, r.cap)
         end
     end
     local gun = M.gun
@@ -345,6 +343,11 @@ local function readRows(player)
         M.canRack = ISReloadWeaponAction.canRack(gun)
     end
     readStrip(player)
+end
+
+--- Does this row have a scale of its own?
+function M.hasScale(r)
+    return r.m ~= nil and r.kind ~= "self"
 end
 
 --- How wide the hints can get in this language: the plate takes that, whatever is chosen
@@ -370,15 +373,17 @@ local function fitRows(wasW)
     if not W then
         local need = 0
         for _, r in ipairs(M.rows) do
-            need = math.max(need, Z.TX + math.floor(Z.GROW_CELL / 2) + T.measure(Z.big, r.name) + Z.L + 1
-                + (r.m and (Z.P16 + Z.SCW) or 0))
+            -- (a gun's own row keeps the plate as wide as its name and scale made it: the head needs it)
+            local own = r.kind == "self"
+            need = math.max(need, Z.TX + math.floor(Z.GROW_CELL / 2) + T.measure(Z.big, own and M.title or r.name) + Z.L + 1
+                + ((own or M.hasScale(r)) and (Z.P16 + Z.SCW) or 0))
         end
         W = math.max(hintsWide(), math.min(Z.MAXW, math.max(Z.MINW, need)))
         M.W = W
     end
     for _, r in ipairs(M.rows) do
         local nx = Z.TX + math.floor(Z.GROW_CELL / 2)
-        local room = W - nx - Z.L - (r.m and (Z.P16 + Z.SCW) or 0)
+        local room = W - nx - Z.L - (M.hasScale(r) and (Z.P16 + Z.SCW) or 0)
         r.fit, r.fitBig = T.fit(r.name, T.fontText, room), T.fit(r.name, Z.big, room)
     end
 end
@@ -397,6 +402,8 @@ function M.build(player, keepW)
         for i, r in ipairs(rows) do
             if r.item == wasItem and r.kind == wasKind then sel = i break end
         end
+        -- (the row that loads them all gone from under the choice: not onto the red one after it)
+        if wasKind == "all" and rows[sel].kind ~= "all" then sel = math.max(1, math.min(M.sel - 1, #rows)) end
     end
     M.sel = sel
     for i, r in ipairs(rows) do
@@ -715,7 +722,7 @@ function M.lmb()
         return
     end
     if r.kind == "all" then
-        if r.able then M.loadAll(r.mags) end
+        M.loadAll(r.mags)
     elseif r.kind == "box" then
         clearBusy(player)
         L.openBox(player, r.item)
@@ -967,7 +974,7 @@ local function drawRow(ui, r, ox, y, W, chosen, a)
     local col = r.red and RED or (chosen and C.bright or C.text)
     local big = g > 0.5
     label(ui, big and r.fitBig or r.fit, nx, y, W - (nx - ox), h, col, big and Z.big or T.fontText, a)
-    if r.m then
+    if M.hasScale(r) then
         drawScale(ui, ox + W - Z.L - Z.SCW, y + math.floor((h - Z.SH) / 2 + 0.5), r.lit, r.known, a)
     end
 end
@@ -998,7 +1005,7 @@ local function chooseHints(now)
         elseif r.kind == "insert" then lmb = s.insert
         elseif r.kind == "bag" then lmb, noAct = s.swap, true
         elseif r.kind == "self" then lmb, noAct = s.load, not M.canLoad(r)
-        elseif r.kind == "all" then lmb, noAct = s.load, not r.able
+        elseif r.kind == "all" then lmb = s.load
         elseif r.kind == "rack" or r.kind == "unjam" then noAct = not M.canRack
         end
     end
@@ -1179,7 +1186,10 @@ function M.frame(ui)
     local again = gunOf(player) ~= M.gun or (M.wasBusy and not busy)
     if not again and now - M.recountMs >= RECOUNT_MS then
         M.recountMs = now
+        -- (the row that loads them all comes and goes with the rounds, but not under an action:
+        -- the order of the rows is made after it - QA, 2026-11-05)
         again = M.countMags(player) ~= M.magCount
+            or (not busy and M.allMags ~= nil and anyRounds(player, M.allMags) ~= M.allOn)
     end
     M.wasBusy = busy
     if again then
