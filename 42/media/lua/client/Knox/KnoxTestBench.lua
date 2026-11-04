@@ -995,6 +995,202 @@ local function giveBatteries(p)
     dirtyAll()
 end
 
+--- Magazines and guns (the author, 2026-10-30): a pistol, its magazines empty and
+--- with 7, rounds of it in the bag on the back (else the pockets), a shotgun and
+--- shells, a revolver and its rounds, a laser; on the floor a box of the pistol's
+--- rounds, a box of shells and rounds that fit none of these (.308).
+local function giveGuns(p)
+    local inv = p:getInventory()
+    local back = p:getClothingItem_Back()
+    local bag = back and back.getItemContainer and back:getItemContainer() or inv
+    local function add(c, ft, n)
+        local last = nil
+        for _ = 1, n or 1 do
+            if exists(ft) then last = tag(c:AddItem(ft)) end
+        end
+        return last
+    end
+    add(inv, "Base.Pistol")
+    for _, n in ipairs({0, 7}) do
+        local m = add(inv, "Base.9mmClip")
+        if m then pcall(function() m:setCurrentAmmoCount(n) end) end
+    end
+    add(bag, "Base.Bullets9mm", 30)
+    add(inv, "Base.Shotgun")
+    add(inv, "Base.ShotgunShells", 12)
+    add(inv, "Base.Revolver")
+    add(inv, "Base.Bullets357", 12)
+    add(inv, "Base.Laser")
+    local sq = p:getCurrentSquare()
+    if sq then
+        B.dumped = B.dumped or {}
+        for _, ft in ipairs({"Base.Bullets9mmBox", "Base.ShotgunShellsBox"}) do
+            local it = exists(ft) and sq:AddWorldInventoryItem(ft, 0.5, 0.5, 0)
+            if it then table.insert(B.dumped, tag(it)) end
+        end
+        for _ = 1, 20 do
+            local it = exists("Base.308Bullets") and sq:AddWorldInventoryItem("Base.308Bullets", 0.4, 0.6, 0)
+            if it then table.insert(B.dumped, tag(it)) end
+        end
+    end
+    dirtyAll()
+end
+
+--- Things in every state (condition_v3, the author, 2026-10-31): a hammer at half, a
+--- knife nearly worn out, a pistol at 20%, a broken screwdriver and socks, a water
+--- bottle at 40%, a torch, a new knife.
+local function giveWorn(p)
+    local inv = p:getInventory()
+    local function add(ft, frac, broken)
+        local it = exists(ft) and tag(inv:AddItem(ft))
+        if not it then return nil end
+        if frac then pcall(function() it:setCondition(math.floor(it:getConditionMax() * frac + 0.5)) end) end
+        if broken then pcall(function() it:setCondition(0) it:setBroken(true) end) end
+        return it
+    end
+    add("Base.Hammer", 0.5)
+    add("Base.KitchenKnife", 0.08)
+    add("Base.Pistol", 0.2)
+    add("Base.Screwdriver", nil, true)
+    add("Base.Socks_Ankle", nil, true)
+    add("Base.HuntingKnife")
+    add("Base.HandTorch")
+    local bottle = add("Base.WaterBottle")
+    if bottle then
+        pcall(function()
+            local fc = bottle:getFluidContainer()
+            fc:Empty()
+            fc:addFluid("Water", fc:getCapacity() * 0.4)
+        end)
+    end
+    dirtyAll()
+end
+
+--- For a stack: batteries at different charges, broken screwdrivers.
+function B.giveWornStacks(p)
+    local inv = p:getInventory()
+    for _, f in ipairs({1, 0.5, 0.1}) do
+        local it = exists("Base.Battery") and tag(inv:AddItem("Base.Battery"))
+        if it then pcall(function() it:setCurrentUsesFloat(f) end) end
+    end
+    for _ = 1, 3 do
+        local it = exists("Base.Screwdriver") and tag(inv:AddItem("Base.Screwdriver"))
+        if it then pcall(function() it:setCondition(0) it:setBroken(true) end) end
+    end
+    dirtyAll()
+end
+
+-- The menu on R (ammo_live, the author, 2026-10-31): each gun as the mockup has it, in hand.
+local function giveR(p, gunType, n, magType, spares, loose)
+    local inv = p:getInventory()
+    if not exists(gunType) then return nil end
+    local gun = tag(inv:AddItem(gunType))
+    pcall(function()
+        if magType then gun:setContainsClip(true) end
+        gun:setCurrentAmmoCount(n)
+        if gun:haveChamber() then gun:setRoundChambered(true) end
+    end)
+    p:setPrimaryHandItem(gun)
+    for _, s in ipairs(spares) do
+        local m = exists(magType) and tag(inv:AddItem(magType))
+        if m then
+            pcall(function() m:setCurrentAmmoCount(s[1]) end)
+            if s[2] then KnoxMagKnown.mark(m, p) end
+        end
+    end
+    local at = gun:getAmmoType()
+    local key = at and at:getItemKey()
+    for _ = 1, loose do
+        if key and exists(key) then tag(inv:AddItem(key)) end
+    end
+    dirtyAll()
+    return gun
+end
+
+function B.giveRPistol(p)
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", {{15, true}, {7, true}, {3, false}}, 47)
+end
+
+function B.giveRRifle(p)
+    giveR(p, "Base.AssaultRifle", 22, "Base.556Clip", {{30, true}, {12, true}, {8, false}}, 95)
+end
+
+function B.giveRShotgun(p)
+    giveR(p, "Base.Shotgun", 4, nil, {}, 19)
+end
+
+function B.giveRRevolver(p)
+    giveR(p, "Base.Revolver", 5, nil, {}, 17)
+end
+
+--- Nothing in the hands: two magazines, loose rounds, a box.
+function B.giveRBare(p)
+    local inv = p:getInventory()
+    p:setPrimaryHandItem(nil)
+    p:setSecondaryHandItem(nil)
+    for _, s in ipairs({{7, true}, {3, false}}) do
+        local m = exists("Base.9mmClip") and tag(inv:AddItem("Base.9mmClip"))
+        if m then
+            pcall(function() m:setCurrentAmmoCount(s[1]) end)
+            if s[2] then KnoxMagKnown.mark(m, p) end
+        end
+    end
+    for _ = 1, 20 do
+        if exists("Base.Bullets9mm") then tag(inv:AddItem("Base.Bullets9mm")) end
+    end
+    if exists("Base.Bullets9mmBox") then tag(inv:AddItem("Base.Bullets9mmBox")) end
+    dirtyAll()
+end
+
+function B.giveRMany(p)
+    local spares = {}
+    for i = 1, 12 do spares[i] = {i, true} end
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", spares, 30)
+end
+
+--- The gun in hand jams.
+function B.jamR(p)
+    local gun = p:getPrimaryHandItem()
+    if gun and instanceof(gun, "HandWeapon") then gun:setJammed(true) end
+end
+
+--- Two pistols: the right hand's magazine full, the left's nearly empty.
+function B.giveRTwo(p)
+    local gun = giveR(p, "Base.Pistol", 15, "Base.9mmClip", {}, 0)
+    local other = exists("Base.Pistol") and tag(p:getInventory():AddItem("Base.Pistol"))
+    if gun and other then
+        pcall(function()
+            other:setContainsClip(true)
+            other:setCurrentAmmoCount(2)
+        end)
+        p:setSecondaryHandItem(other)
+    end
+end
+
+--- A pistol in hand and a magazine as found: not known, some rounds in it.
+function B.giveHiddenFound(p)
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", {{9, false}}, 0)
+end
+
+--- A water bottle at 40% in the inventory and one on the ground.
+function B.giveWornFloor(p)
+    local function fill(it)
+        pcall(function()
+            local fc = it:getFluidContainer()
+            fc:Empty()
+            fc:addFluid("Water", fc:getCapacity() * 0.4)
+        end)
+    end
+    if not exists("Base.WaterBottle") then return end
+    fill(tag(p:getInventory():AddItem("Base.WaterBottle")))
+    local sq = p:getCurrentSquare()
+    local it = instanceItem("Base.WaterBottle")
+    fill(it)
+    local w = sq and sq:AddWorldInventoryItem(it, 0.5, 0.5, 0)
+    if w then table.insert(B.dumped, w) end
+    dirtyAll()
+end
+
 -- a big stack moved, the game froze (sychmil): 500 bullets in one bag, an empty one
 -- beside; the longest frame of the next 20 s
 --- @return the full bag, the empty one
@@ -1343,7 +1539,129 @@ local function checkHiss()
     return not on or inCar, getText("IGUI_KnoxTB_Res_Hiss", tostring(on), tostring(T.settings["menu.radio"] or "0"), tostring(inCar))
 end
 
+-- the winter bar (the author, 2026-10-31): which scene the menu has now, how many
+-- of its models were made, and which one is kept for the season
+local function checkBar()
+    local s = KnoxMenuScene and KnoxMenuScene.instance
+    local name = s and s.Type or "-"
+    local kept = "-"
+    pcall(function()
+        local r = getFileReader(KnoxMenuPlace.FILE, false)
+        if r then
+            r:readLine()
+            kept = string.gsub(tostring(r:readLine() or "-"), "\t", " ")
+            r:close()
+        end
+    end)
+    return s ~= nil, getText("IGUI_KnoxTB_Res_Bar", name, tostring(s and s.objects and #s.objects or 0), kept)
+end
+
 B.POINTS = {
+    -- the winter bar in the main menu: the last ones leaving, stage 1 - the room as
+    -- the mockup has it, with the author's changes (the author, 2026-10-31)
+    {id = "w_bar4_room", menu = true, check = checkBar},
+    {id = "w_bar4_counter", menu = true},
+    {id = "w_bar4_dead", menu = true},
+    {id = "w_bar4_fire", menu = true},
+    {id = "w_bar4_window", menu = true},
+    {id = "w_bar4_door", menu = true},
+    {id = "w_bar4_furniture", menu = true},
+    {id = "w_bar4_floor", menu = true},
+    {id = "w_bar4_nomods", menu = true, check = checkBar},
+    {id = "w_bar5_light", menu = true, check = checkBar},
+    {id = "w_bar5_air", menu = true},
+    {id = "w_bar5_quality", menu = true},
+    {id = "w_bar5_window", menu = true},
+    {id = "w_bar5_save", menu = true},
+    {id = "w_bar6_heroes", menu = true},
+    {id = "w_bar6_look", menu = true},
+    {id = "w_bar6_ember", menu = true},
+    {id = "w_bar6_leave", menu = true},
+    {id = "w_bar6_door", menu = true},
+    {id = "w_bar6_zombies", menu = true},
+    {id = "w_bar6_new", menu = true},
+    {id = "w_bar6_dark", menu = true},
+    {id = "w_bar7_door", menu = true},
+    {id = "w_bar7_snow", menu = true},
+    {id = "w_bar7_smoke", menu = true},
+    {id = "w_bar7_breath", menu = true},
+    {id = "w_bar7_paper", menu = true},
+    {id = "w_bar7_long", menu = true},
+    {id = "w_bar7_still", menu = true},
+    {id = "w_bar7_perf", menu = true},
+    {id = "w_bar8_wind", menu = true},
+    {id = "w_bar8_door", menu = true},
+    {id = "w_bar8_quiet", menu = true},
+    {id = "w_bar8_radio", menu = true},
+    {id = "w_bar8_tab", menu = true},
+    {id = "w_bar8_game", menu = true},
+    {id = "w_bar9_point", menu = true},
+    {id = "w_bar9_bag", menu = true},
+    {id = "w_bar10_photos", menu = true},
+    {id = "w_bar10_zombies", menu = true},
+    {id = "w_bar10_door", menu = true},
+    {id = "w_bar11_radio", menu = true},
+    {id = "w_bar12_ember", menu = true},
+    {id = "w_bar12_hand", menu = true},
+    {id = "w_bar12_cans", menu = true},
+    {id = "w_bar12_needle", menu = true},
+    {id = "w_bar12_hit", menu = true},
+    {id = "w_bar2_perf", menu = true},
+    {id = "w_bar_open", menu = true, check = checkBar},
+    {id = "w_bar_light", menu = true},
+    {id = "w_bar_tab", menu = true, check = checkBar},
+    {id = "w_bar_keep", menu = true, check = checkBar},
+    {id = "w_bar_screens", menu = true},
+    {id = "w_bar_mods", menu = true},
+    {id = "w_bar_click", menu = true},
+    {id = "w_bar_alttab", menu = true},
+    {id = "w_bar_noanim", menu = true},
+    {id = "w_bar_back", menu = true},
+    {id = "w_bar_game", menu = true},
+    {id = "w_bar_camp", menu = true},
+    -- a thing's state as its category's colour (condition_v3, the author, 2026-10-31)
+    {id = "r_short", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "r_hold", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "r_mouse"},
+    {id = "r_head", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "r_swap"},
+    {id = "r_load"},
+    {id = "r_unload"},
+    {id = "r_move"},
+    {id = "r_eject"},
+    {id = "r_jam", actions = {{"RJam", function(p) B.jamR(p) end}}},
+    {id = "r_rifle", actions = {{"RRifle", function(p) B.giveRRifle(p) end}}},
+    {id = "r_shotgun", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
+    {id = "r_revolver", actions = {{"RRevolver", function(p) B.giveRRevolver(p) end}}},
+    {id = "r_bare", actions = {{"RBare", function(p) B.giveRBare(p) end}}},
+    {id = "r_none"},
+    {id = "r_scroll", actions = {{"RMany", function(p) B.giveRMany(p) end}}},
+    {id = "r_two", actions = {{"RTwo", function(p) B.giveRTwo(p) end}}},
+    {id = "r_size"},
+    {id = "r_again", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
+    {id = "r_again_close", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
+    {id = "r_swap_again", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "r_vp"},
+    {id = "r_alt"},
+    {id = "r_off"},
+    {id = "h_numbers", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "h_tooltip"},
+    {id = "h_menu"},
+    {id = "h_shift"},
+    {id = "h_stack", actions = {{"RMany", function(p) B.giveRMany(p) end}}},
+    {id = "h_known", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
+    {id = "h_save"},
+    {id = "h_found", actions = {{"RFound", function(p) B.giveHiddenFound(p) end}}},
+    {id = "h_cancel", actions = {{"RFound", function(p) B.giveHiddenFound(p) end}}},
+    {id = "h_kept"},
+    {id = "h_pad"},
+    {id = "d_cond", actions = {{"Worn", function(p) giveWorn(p) end}}},
+    {id = "d_cond_stack", actions = {{"WornStacks", function(p) B.giveWornStacks(p) end}}},
+    {id = "d_cond_floor", actions = {{"WornFloor", function(p) B.giveWornFloor(p) end}}},
+    {id = "d_cond_switch", actions = {{"Worn", function(p) giveWorn(p) end}}},
+    {id = "d_cond_hotbar", actions = {{"Worn", function(p) giveWorn(p) end}}},
+    {id = "d_cond_slots"},
+    {id = "d_cond_menu"},
     -- the inventory's FPS: measuring, by itself since stage 0 (the author, 2026-10-28)
     {id = "perf_inv", actions = {{"AutoPerf", function(p) B.autoPerf(p) end},
         {"AutoPerfDetail", function(p) B.autoPerf(p, true) end},
@@ -1364,6 +1682,22 @@ B.POINTS = {
     {id = "b_vp_keys"},
     {id = "b_vp_locked"},
     {id = "b_battery", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
+    -- magazines, rounds and guns: what fits lit up, the panel (the author, 2026-10-30)
+    {id = "c_mag", actions = {{"Guns", function(p) giveGuns(p) end}}},
+    {id = "c_gun"},
+    {id = "c_shotgun"},
+    {id = "c_fit"},
+    {id = "c_slots"},
+    {id = "c_battery_lit", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
+    {id = "c_tip", actions = {{"Guns", function(p) giveGuns(p) end}}},
+    {id = "c_load_bar", actions = {{"Guns", function(p) giveGuns(p) end}}},
+    {id = "c_insert_bar"},
+    {id = "c_look"},
+    {id = "c_hotbar", actions = {{"Guns", function(p) giveGuns(p) end}}},
+    {id = "c_tip_fade"},
+    {id = "c_hotbar_menu"},
+    {id = "perf_load", actions = {{"Guns", function(p) giveGuns(p) end}, {"Ammo500", function(p) B.ammo(p) end},
+        {"PerfDetail", function() B.perfDetail() end}, {"Mark", function() mark("perf_load") end}}},
     {id = "b_slot_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
     {id = "b_vp_gen"},
     {id = "b_vp_icons", actions = {{"IconLog", function(p)

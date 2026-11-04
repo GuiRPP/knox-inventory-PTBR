@@ -925,12 +925,88 @@ end
 
 KnoxGrid.useNow = {}   -- item -> progress 0..1, refreshed once a frame by the screen
 
+-- Rounds in or out one by one (the author, 2026-10-30: the magazine's bar stood
+-- still - the game ends these on their animation, maxTime -1, and the guess of
+-- half a second stopped at 95%): by the rounds in the thing itself - of those
+-- that will go in (room left, rounds carried) or come out - and between two
+-- rounds by the time a round took the last time: the bar runs the whole load,
+-- partial or full, in its time. Unloading, it goes down (the author, 2026-10-31).
+-- (the game's own job delta won't do: its R-reload asks a magazine for more
+-- rounds than go in, the bar never got to its end)
+local ROUNDS = {ISLoadBulletsInMagazine = "magazine", ISUnloadBulletsFromMagazine = "magazine",
+                ISReloadWeaponAction = "gun", ISUnloadBulletsFromFirearm = "gun"}
+local ROUNDS_OUT = {ISUnloadBulletsFromMagazine = true, ISUnloadBulletsFromFirearm = true}
+local ROUND_MS = {}        -- action type -> how long a round took the last time
+local ROUND_FIRST_MS = 700
+local useAction = nil      -- the action under way last frame (how long it took, when it ends)
+
+--- How many rounds the action moves (made once, when it has started).
+local function roundsOf(a, it, start)
+    if ROUNDS_OUT[a.Type] then return start end
+    local n = math.min(a.ammoCount or 0, it:getMaxAmmo() - start)
+    local ok, have = pcall(function()
+        return a.character:getInventory():getItemCountRecurse(it:getAmmoType():getItemKey())
+    end)
+    if ok and have then n = math.min(n, have) end
+    return n
+end
+
+--- Progress 0..1 of the action under way, for the items it works with.
+local function useDeltaOf(a)
+    if a.maxTime ~= -1 or not a.action then return deltaOf(a) end
+    local now = getTimestampMs()
+    if not a.knoxStartMs then a.knoxStartMs = now end
+    local field = ROUNDS[a.Type or ""]
+    local it = field and a[field]
+    if it then
+        local out = ROUNDS_OUT[a.Type] == true
+        local start = a.ammoCountStart   -- (set by the game's start())
+        if not start then return out and 1 or 0 end
+        if not a.knoxN then a.knoxN = roundsOf(a, it, start) end
+        local n = a.knoxN
+        if n <= 0 then return out and 0 or 1 end
+        local cur = it:getCurrentAmmoCount()
+        local d = math.max(0, math.min(1, (out and (start - cur) or (cur - start)) / n))
+        if d ~= a.knoxD then
+            if a.knoxD and d > a.knoxD then ROUND_MS[a.Type] = math.max(150, math.min(3000, now - a.knoxAtMs)) end
+            a.knoxD, a.knoxAtMs = d, now
+        end
+        local per = ROUND_MS[a.Type] or ROUND_FIRST_MS
+        local p = math.min(1, d + 0.95 / n * math.min(1, (now - a.knoxAtMs) / per))
+        return out and 1 - p or p
+    end
+    -- one animation (a magazine in or out, racking): by the time it took the last
+    -- time, slowing down past 80% instead of standing at the end
+    local x = (now - a.knoxStartMs) / animMs(a)
+    if x <= 0.8 then return math.max(0, x) end
+    return math.min(0.97, 0.8 + 0.2 * (1 - math.exp(-5 * (x - 0.8))))
+end
+KnoxGrid.useDelta = useDeltaOf
+
 function KnoxGrid.updateUse(player)
     local map = {}
     local q = queueOf(player)
     local a = q and q[1]
+    -- (an animation's action just over: how long such takes, for the next time)
+    if useAction and useAction ~= a then
+        local u = useAction
+        if u.maxTime == -1 and u.knoxStartMs and not u.knoxTimed and not ROUNDS[u.Type or ""] then
+            u.knoxTimed = true
+            ANIM_MS[u.Type or ""] = math.max(150, math.min(3000, getTimestampMs() - u.knoxStartMs))
+        end
+    end
+    useAction = a and a.action and a or nil
     if a and a.action then
-        local d = deltaOf(a)
+        local d = useDeltaOf(a)
+        -- (rounds in or out: the bar on the magazine or gun only - not on the
+        -- shells a shotgun takes, the author 2026-10-31)
+        local field = ROUNDS[a.Type or ""]
+        if field then
+            local it = a[field]
+            if it and not KnoxGrid.pending[it] then map[it] = d end
+            KnoxGrid.useNow = map
+            return
+        end
         local function take(v)
             if type(v) ~= "userdata" then return end
             if instanceof(v, "InventoryItem") then
@@ -1227,8 +1303,14 @@ end
 
 -- A magazine stacks only with magazines holding as many rounds: loaded and empty ones
 -- in one tile could be loaded only one at a time, from the first (Nik_135, 2026-10-17).
+-- A magazine not known keeps to itself: lying together or apart would tell how many it
+-- holds (the hidden rounds, the author, 2026-10-31). A gun is known (it never stacks
+-- unless the player says so in the item editor - that is kept).
 local function rounds(item)
     if (item:getMaxAmmo() or 0) <= 0 then return "" end
+    if KnoxMagKnown and KnoxMagKnown.hide and not instanceof(item, "HandWeapon") and not KnoxMagKnown.is(item) then
+        return "|u" .. tostring(item:getID())
+    end
     return "|r" .. tostring(item:getCurrentAmmoCount() or 0)
 end
 KnoxGrid.rounds = rounds

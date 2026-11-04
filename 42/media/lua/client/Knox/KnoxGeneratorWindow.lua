@@ -40,9 +40,10 @@ local function hex(s)
     return {r = tonumber(string.sub(s, 2, 3), 16) / 255, g = tonumber(string.sub(s, 4, 5), 16) / 255,
         b = tonumber(string.sub(s, 6, 7), 16) / 255}
 end
--- the mockup's colours (the sand is the skin's: T.color.accent, lit - brighter)
-local DIM, LIT = hex("#8f9289"), hex("#e6ddb8")
-local BRIGHT, DIGIT = hex("#ece8d8"), hex("#f2ecd8")
+-- the mockup's colours (the sand is the skin's: T.color.accent, lit - brighter; the captions and
+-- figures the skin's too: the ice's were left warm - the author, 2026-11-01)
+local DIM, LIT = T.color.dim, T.color.lit
+local BRIGHT, DIGIT = T.color.bright, T.color.digit
 local RED, GREEN = hex("#be463c"), hex("#6ca050")
 local CORD = hex("#9b9d92")
 local LVR_FILL, LVR_EDGE = hex("#141414"), hex("#2a2e2e")

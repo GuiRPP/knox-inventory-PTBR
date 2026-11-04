@@ -83,18 +83,6 @@ function ISHotbar:getSlotForKey(key)
     return O.indexAt(self, pos)
 end
 
---- The thin meter along a tile's bottom, as on the Knox grids: condition of a
---- weapon, what is left of a battery or tape.
-local function drawMeter(ui, item, x, y, w, h)
-    if instanceof(item, "HandWeapon") and item:getConditionMax() > 0 then
-        local f = item:getCondition() / math.max(1, item:getConditionMax())
-        local c = f > 0.5 and T.color.good or (f > 0.25 and T.color.warn or T.color.bad)
-        T.tileMeter(ui, x, y, w, h, f, c, 1, 0)
-    elseif item:IsDrainable() then
-        T.tileMeter(ui, x, y, w, h, item:getCurrentUsesFloat(), T.color.accent, 1, 0)
-    end
-end
-
 local function inHand(chr, item)
     return item == chr:getPrimaryHandItem() or item == chr:getSecondaryHandItem()
 end
@@ -107,6 +95,26 @@ function SlotRef:getAbsoluteX() return self.hb:getAbsoluteX() + handsW(self.hb) 
 function SlotRef:getAbsoluteY() return self.hb:getAbsoluteY() + self.hb.margins + 1 end
 function SlotRef:getWidth() return self.hb.slotWidth end
 function SlotRef:getHeight() return self.hb.slotHeight end
+
+-- The same for a hand's tile (a gun in hand: its magazine panel, 2026-10-30):
+-- where the tile was drawn last.
+local HandRef = {}
+HandRef.__index = HandRef
+function HandRef:getAbsoluteX() return self.hb:getAbsoluteX() + self.x end
+function HandRef:getAbsoluteY() return self.hb:getAbsoluteY() + self.y end
+function HandRef:getWidth() return self.w end
+function HandRef:getHeight() return self.h end
+
+local function handRef(hb, key, x, y, w, h)
+    hb.knoxHandRefs = hb.knoxHandRefs or {}
+    local r = hb.knoxHandRefs[key]
+    if not r then
+        r = setmetatable({hb = hb}, HandRef)
+        hb.knoxHandRefs[key] = r
+    end
+    r.x, r.y, r.w, r.h = x, y, w, h
+    return r
+end
 
 local function slotRef(hb, i)
     hb.knoxRefs = hb.knoxRefs or {}
@@ -166,20 +174,23 @@ function ISHotbar:render()
         T.rect(self, x, y, size, size, T.color.cell)
         if hot and dragged then item = dragged end
         if item then
-            T.rect(self, x, y, size, size, T.category[T.categoryOf(item)])
-            local side = math.floor(size * 0.66)
             -- just hung here: it settles in (one memory per slot)
             self.knoxSlotSettle = self.knoxSlotSettle or {}
             self.knoxSlotSettle[i] = self.knoxSlotSettle[i] or {}
-            local dy, da = T.settleIn(self.knoxSlotSettle[i], self.attachedItems[i])
-            ISInventoryItem.renderItemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, da, side, side)
-            drawMeter(self, item, x, y, size, size)
+            local memo = self.knoxSlotSettle[i]
+            -- (its state: the colour's height, condition_v3, the author, 2026-10-31)
+            T.tileFill(self, x, y, size, size, T.levelOf(memo, item), T.category[T.categoryOf(item)])
+            local side = math.floor(size * 0.66)
+            local dy, da = T.settleIn(memo, self.attachedItems[i])
+            if T.itemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, side, da) then
+                T.brokenMark(self, x, y + dy, size, size, da)
+            end
         elseif slot.texture then
             -- an empty slot: the game's faint picture of what goes there
             local side = math.floor(size * 0.5)
             self:drawTextureScaledAspect(slot.texture, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2), side, side, 0.2, 1, 1, 1)
         end
-        T.text(self, tostring(pos), x + 4, y + 1, T.color.dim, T.fontTile)   -- (hotbar key N: the Nth shown)
+        T.outlinedLeft(self, tostring(pos), x + 4, y + 1, T.color.dim, T.fontTile)   -- (hotbar key N: the Nth shown)
         if moving and moving.index == i then self:drawRect(x, y, size, size, 0.55, 0, 0, 0) end   -- being moved
 
         -- an empty slot under the mouse: how many carried items can hang here, and
@@ -201,6 +212,10 @@ function ISHotbar:render()
                 end
             end
         end
+        -- a gun hung here: its magazine / rounds panel above it (KnoxLoad, 2026-10-30)
+        if item and hot and not ISMouseDrag.dragging and KnoxLoad and instanceof(item, "HandWeapon") then
+            KnoxLoad.offer(KnoxLoad.refOf(slotRef(self, i)), item, self.chr, self.playerNum, "above")
+        end
 
         local edge = item and T.color.tileFrame or T.color.tileEdge
         if hot then
@@ -215,7 +230,12 @@ function ISHotbar:render()
         end
         if item and inHand(self.chr, item) then edge = T.color.accent end   -- taken in hand
         -- the item's tooltip (shown before the next frame by KnoxSlotPicker's OnPreUIDraw)
-        if hot and item and not ISMouseDrag.dragging then KnoxTooltip.want(item, self.playerNum) end
+        -- (a gun with its panel above - the quick items' key held: no tooltip over
+        -- the panel's cells, 2026-10-30)
+        if hot and item and not ISMouseDrag.dragging then
+            KnoxTooltip.want(item, self.playerNum,
+                KnoxLoad and KnoxLoad.tipQuiet(item, instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"))
+        end
         if item then T.tileFrame(self, x, y, size, size, edge) else T.border(self, x, y, size, size, edge) end
         if offered then T.target(self, x, y, size, size) end   -- its quick pick panel
 
@@ -237,7 +257,7 @@ end
 -- Hands ----------------------------------------------------------------------------
 -- What is in the hands, on the left of the bar (in place of the game's pictures
 -- at the top left of the screen): the right hand, the left hand, a two-handed
--- thing across both. Condition along the bottom, a gun's rounds in the corner.
+-- thing across both, its state as its colour's height.
 -- Hover: the tooltip; click: out of the hand; right click: its menu; an item
 -- dropped from a game window: into that hand.
 
@@ -287,22 +307,33 @@ function ISHotbar:drawHands()
         local hot = over and T.inRect(mx, my, r)
         T.rect(self, x, y, w, h, T.color.cell)
         if item then
-            -- only draw category color when there's an actual item
-            T.rect(self, x, y, w, h, T.category[T.categoryOf(item)])
-            local side = math.floor(h * 0.66)
             -- just taken in this hand: it settles in
             self.knoxHandSettle = self.knoxHandSettle or {}
             local hk = r.both and "both" or (r[5] and "right" or "left")
             self.knoxHandSettle[hk] = self.knoxHandSettle[hk] or {}
-            local dy, da = T.settleIn(self.knoxHandSettle[hk], item)
-            ISInventoryItem.renderItemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, da, side, side)
-            drawMeter(self, item, x, y, w, h)
+            local memo = self.knoxHandSettle[hk]
+            -- only draw category color when there's an actual item
+            T.tileFill(self, x, y, w, h, T.levelOf(memo, item), T.category[T.categoryOf(item)])
+            local side = math.floor(h * 0.66)
+            local dy, da = T.settleIn(memo, item)
+            if T.itemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, side, da) then
+                T.brokenMark(self, x, y + dy, w, h, da)
+            end
             -- a gun's rounds: loaded / magazine
-            if instanceof(item, "HandWeapon") and item:isRanged() then
+            if not (KnoxMagKnown and KnoxMagKnown.hide) and instanceof(item, "HandWeapon") and item:isRanged() then
                 local text = tostring(item:getCurrentAmmoCount()) .. "/" .. tostring(item:getMaxAmmo())
                 T.outlinedRight(self, text, x + w - 4, y + h - T.fontTileH - 6, T.color.bright, T.fontTile)
             end
-            if hot and not ISMouseDrag.dragging then KnoxTooltip.want(item, self.playerNum) end
+            -- a gun in hand: its magazine / rounds panel above it, the quick items'
+            -- key pressed - in place of its tooltip (the author's bench, 2026-10-30:
+            -- nothing came up in hand)
+            if hot and not ISMouseDrag.dragging then
+                local gun = KnoxLoad and instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"
+                if gun then
+                    KnoxLoad.offer(KnoxLoad.refOf(handRef(self, hk, x, y, w, h)), item, self.chr, self.playerNum, "above")
+                end
+                KnoxTooltip.want(item, self.playerNum, gun and KnoxLoad.tipQuiet(item, true))
+            end
         end
         -- an empty hand: a small grey palm in the middle of the tile (no
         -- caption); with something in the hand it goes
@@ -467,13 +498,19 @@ end
 
 local rightMouseUp = ISHotbar.onRightMouseUp
 function ISHotbar:onRightMouseUp(x, y)
+    -- (the menu told what it is about: Knox's header and groups, as in the screen -
+    -- the hotbar's came without them, the author's bench 2026-10-30)
     local r = self:handAt(x, y)
     if r then
         if r[6] then
+            if KnoxContextMenu then KnoxContextMenu.setTarget({r[6]}, self.playerNum) end
             ISInventoryPaneContextMenu.createMenu(self.playerNum, true, {r[6]}, getMouseX(), getMouseY())
         end
         return true
     end
+    local i = self:getSlotIndexAt(x, y)
+    local item = i ~= -1 and self.attachedItems[i] or nil
+    if item and KnoxContextMenu then KnoxContextMenu.setTarget({item}, self.playerNum) end
     return rightMouseUp(self, x, y)
 end
 
@@ -508,4 +545,13 @@ function ISEquippedItem:initialise()
         if m.displayString ~= p and m.displayString ~= s then table.insert(keep, m) end
     end
     self.mouseOverList = keep
+end
+
+-- The game's own item tooltip of a hotbar slot (ISHotbar:update) lay right
+-- under Knox's: Knox's went for the gun's panel, the game's stayed over it (the
+-- author's bench, 2026-10-30). Knox shows the slot's tooltip itself (render).
+local knoxUpdate = ISHotbar.update
+function ISHotbar:update()
+    knoxUpdate(self)
+    if self.toolRender and self.toolRender:getIsVisible() then self.toolRender:setVisible(false) end
 end

@@ -38,7 +38,9 @@ function instanceof(o, kind) return o.kind == kind end
 
 local function item(name, kind, cond)
     return {name = name, kind = kind, getConditionMax = function() return cond and 10 or 0 end,
-            getCondition = function() return cond or 0 end, getFullType = function() return name end}
+            getCondition = function() return cond or 0 end, getFullType = function() return name end,
+            isBroken = function() return false end, IsDrainable = function() return false end,
+            getFluidContainer = function() return nil end, getWorldItem = function() return nil end}
 end
 
 local hat, cap = item("Hat", "Clothing", 7), item("Cap", "Clothing", 10)

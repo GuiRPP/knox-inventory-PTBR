@@ -18,4 +18,16 @@ try {
     # the battery panel: the one in it and the character's to choose from (2026-10-29)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
         (Join-Path $here 'picker_pre.lua') (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $here 'picker.lua')
+    # a thing's state as its category's colour (condition_v3, 2026-10-31)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') (Join-Path $here 'condition.lua')
+    # every size of the broken thing's cross has its picture
+    $noCross = 8..44 | Where-Object { $_ % 2 -eq 0 -and -not (Test-Path (Join-Path $mod "42\media\ui\knox_cross_$_.png")) }
+    if ($noCross) { "FAIL no cross picture: $noCross" }
+    # magazines, rounds and guns: what fits, what is lit up, the panel and its actions (2026-10-30)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
+        (Join-Path $here 'load_pre.lua') (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $knox 'KnoxLoad.lua') (Join-Path $here 'load.lua')
+    # the menu on R (ammo_live, 2026-10-31)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
+        (Join-Path $here 'load_pre.lua') (Join-Path $here 'rmenu_pre.lua') (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $knox 'KnoxLoad.lua') `
+        (Join-Path $mod '42\media\lua\shared\Knox\KnoxMagKnown.lua') (Join-Path $knox 'KnoxRMenu.lua') (Join-Path $here 'rmenu.lua')
 } finally { Pop-Location }

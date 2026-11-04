@@ -293,6 +293,7 @@ local ICON_TEXT = {
     ContextMenu_Splint = "splint", ContextMenu_Remove_Splint = "unsplint", ContextMenu_Clean_Burn = "burn",
     ContextMenu_PlantainCataplasm = "poultice", ContextMenu_ComfreyCataplasm = "poultice", ContextMenu_GarlicCataplasm = "poultice",
     ContextMenu_InsertBulletsInMagazine = "magazine", ContextMenu_InsertBullets = "magazine",
+    IGUI_Knox_RMenu_LoadMagazine = "magazine", IGUI_Knox_RMenu_LoadGun = "magazine",
     ContextMenu_UnloadRounds = "magazine", ContextMenu_EjectMagazine = "magazine", ContextMenu_InsertMagazine = "magazine",
     IGUI_DeviceOptions = "device", ContextMenu_Attach = "attach",
     ContextMenu_Grab = "grab", ContextMenu_Grab_one = "grab", ContextMenu_Grab_half = "grab", ContextMenu_Grab_all = "grab",

@@ -8,7 +8,7 @@ import zombie.ui.UIElement;
 /**
  * The quiet tiles of a Knox grid, drawn in one call (KnoxGridView.renderGrid).
  *
- * A tile is made of some ten draws (its plate, frame, icon, meters, marks).
+ * A tile is made of some ten draws (its plate, frame, icon, marks).
  * Each draw from Lua into the game costs a few microseconds of crossing over,
  * and a floor of 270 things kept 1.5 ms a frame on that alone - 180 FPS fell
  * to 125 with the floor open (the author's test, 2026-10-15). Here the same
@@ -18,7 +18,7 @@ import zombie.ui.UIElement;
  *
  * A tile is the grid's own Lua table: x, y, r, w, h, item, overflow, and
  * `draw` - what KnoxGridView:tileInfo worked out once per grid build: cat
- * (a color), cookBase, cookBar, cookFrac, cond, uses, fluid, done, locked,
+ * (a color), cookBase, cookBar, cookFrac, level, done, locked,
  * freshColor, hasTex, iconOpaque. Colors are Lua tables {r, g, b}; the
  * palette is KnoxTheme.color. Must draw exactly what KnoxGridView:drawTile
  * draws for such a tile at full alpha.
@@ -44,22 +44,18 @@ public class KnoxTiles {
         ui.DrawTextureScaledCol(null, x, y, w, h, num(c, "r", 0), num(c, "g", 0), num(c, "b", 0), a);
     }
 
-    /** A thin meter along the tile's bottom (KnoxTheme.tileMeter). */
-    static void meter(UIElement ui, KahluaTable pal, double x, double y, double w, double h, double frac,
-                      KahluaTable color, int level) {
-        frac = Math.max(0, Math.min(1, frac));
-        double mx = x + 2, mw = w - 4;
-        double fy = y + h - 2 - 3 - level * 4;
-        rect(ui, mx, fy - 1, mw, 1, tab(pal, "tileFrame"), 1);
-        rect(ui, mx, fy, mw, 3, tab(pal, "line"), 1);
-        double fw = Math.floor(mw * frac);
-        if (fw > 0) rect(ui, mx, fy, fw, 3, color, 1);
-    }
-
-    static KahluaTable condColor(KahluaTable pal, double f) {
-        if (f > 0.6) return tab(pal, "good");
-        if (f > 0.25) return tab(pal, "warn");
-        return tab(pal, "bad");
+    /**
+     * A tile's background: its colour filled up to its level inside the 2 px frame, no
+     * level as full (KnoxTheme.tileFill, condition_v3, the author, 2026-10-31).
+     */
+    static void fill(UIElement ui, KahluaTable pal, double x, double y, double w, double h, KahluaTable d) {
+        KahluaTable cat = tab(d, "cat");
+        Object o = d.rawget("level");
+        rect(ui, x, y, w, h, tab(pal, "cell"), 1);
+        double level = o instanceof Double ? (Double) o : 1;
+        if (level <= 0) return;
+        double fh = Math.max(4, Math.floor((h - 6) * Math.min(1, level) + 0.5));
+        rect(ui, x + 2, y + h - 3 - fh, w - 4, fh + 1, cat, 1);
     }
 
     /**
@@ -93,7 +89,7 @@ public class KnoxTiles {
                 double x = num(e, "x", 0) * cs + 1, y = num(e, "y", 0) * cs + 1;
                 double pw = tw * cs - 1, ph = th * cs - 1;
 
-                rect(ui, x, y, pw, ph, tab(d, "cat"), 1);
+                fill(ui, pal, x, y, pw, ph, d);
                 // food: frozen, cooking, done, burning
                 KahluaTable cb = tab(d, "cookBase");
                 if (cb != null) rect(ui, x, y, pw, ph, cb, 0.22);
@@ -116,18 +112,6 @@ public class KnoxTiles {
                     double side = Math.floor(Math.min(pw, ph) * 0.85);
                     ui.DrawItemIcon(item, x + Math.floor((pw - side) / 2), y + Math.floor((ph - side) / 2), 1.0, side, side);
                 }
-                // meters: condition lowest, uses or liquid above it
-                int level = 0;
-                Object cond = d.rawget("cond");
-                if (cond instanceof Double) {
-                    double f = (Double) cond;
-                    meter(ui, pal, x, y, pw, ph, f, condColor(pal, f), 0);
-                    level = 1;
-                }
-                Object uses = d.rawget("uses");
-                Object fluid = d.rawget("fluid");
-                if (uses instanceof Double) meter(ui, pal, x, y, pw, ph, (Double) uses, accent, level);
-                else if (fluid instanceof Double) meter(ui, pal, x, y, pw, ph, (Double) fluid, tab(pal, "liquid"), level);
                 // read / watched: the top right corner folded down
                 if (yes(d, "done")) {
                     int dd = (int) Math.max(8, Math.floor(cs / 4));

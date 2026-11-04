@@ -1,0 +1,34 @@
+/* Knox Inventory: the bar's narrator's jacket, its left sleeve able to roll up (tools/bite/roll_sleeve.py;
+   KnoxBite.java rolls it). Worn by the menu's narrator only. */
+module KnoxBite
+{
+    imports
+    {
+        Base
+    }
+
+    item JacketRolled
+    {
+        DisplayCategory = Clothing,
+        ItemType = base:clothing,
+        Weight = 0.0,
+        Icon = Jacket_White,
+        BodyLocation = base:jacket,
+        ClothingItem = Knox_JacketRolled,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    /* the bite on his skin: the game's own, moved to the inside of the forearm near the wrist - the
+       side he looks at, clear of the rolled cuff (tools/bite/bite_texture.py) */
+    item BiteLForearm
+    {
+        DisplayCategory = Wound,
+        ItemType = base:clothing,
+        Weight = 0.0,
+        BodyLocation = base:wound,
+        ClothingItem = Knox_BiteLForearm,
+        WorldRender = false,
+        hidden = true,
+    }
+}

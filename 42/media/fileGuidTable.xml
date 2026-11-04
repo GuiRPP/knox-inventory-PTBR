@@ -140,4 +140,12 @@
 		<path>media/clothing/clothingItems/KH_Skeleton.xml</path>
 		<guid>4b6e0d2a-7c51-4f0e-9a3d-6b1c2e8f5a71</guid>
 	</files>
+	<files>
+		<path>media/clothing/clothingItems/Knox_JacketRolled.xml</path>
+		<guid>58193e42-4cf7-4edc-8f1c-9058221b979c</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Knox_BiteLForearm.xml</path>
+		<guid>46cb47c2-afb2-4cd5-9797-8c376dd51353</guid>
+	</files>
 </fileGuidTable>

@@ -384,12 +384,6 @@ end
 
 -- Drawing -------------------------------------------------------------------
 
-local function condColor(f)
-    if f > 0.6 then return T.color.good end
-    if f > 0.25 then return T.color.warn end
-    return T.color.bad
-end
-
 -- Search by name (the field in the screen's top bar): what matches gets a sand
 -- frame, the rest is dimmed; containers say how many things in them match.
 
@@ -575,17 +569,16 @@ function KnoxGridView:tileInfo(e)
     d.cookBase, d.cookBar, d.cookFrac = T.cookState(item)
     d.frozen = d.cookBar == T.COOK_BLUE
     d.heat, d.heatK = T.heatState(item)   -- a pot of water on the stove: red as it heats
-    if instanceof(item, "HandWeapon") or (instanceof(item, "Clothing") and item:getConditionMax() > 0) then
-        d.cond = item:getCondition() / math.max(1, item:getConditionMax())
-    end
     d.broken = item:isBroken()
-    if item:IsDrainable() and not d.broken then
+    -- how high its colour is filled (T.tileFill, condition_v3, the author, 2026-10-31):
+    -- a stack of batteries, tape...: what is left in all of them together
+    local kind = T.levelKind(item)
+    if kind == "u" and not d.broken then
         local sum = 0
         for _, it in ipairs(e.items) do sum = sum + it:getCurrentUsesFloat() end
-        d.uses = sum / math.max(1, #e.items)
+        d.level = sum / math.max(1, #e.items)
     else
-        local fluid = item:getFluidContainer()
-        if fluid and fluid:getCapacity() > 0 then d.fluid = fluid:getAmount() / fluid:getCapacity() end
+        d.level = T.itemLevel(item, kind)
     end
     -- the icon: as ISInventoryItem.renderItemIcon draws it (a thing with a liquid
     -- mask is drawn opaque, whatever the tile's fade)
@@ -734,11 +727,13 @@ function KnoxGridView:isQuiet(e)
         return false
     end
     if KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then return false end
+    if KnoxLoad and KnoxLoad.shown[item] then return false end   -- (lit up, or fading out)
     if KnoxGrid.useOf(e.items) then return false end
     -- (a favorite's star, the heat tint and a frozen tile's blue frame are drawn
     -- here, not by the Java part: the frame showed only under the mouse - 2026-10-18)
+    -- (a broken thing's dimmed icon and cross too, 2026-10-31: few, and not worth the Java part's time)
     local d = self:tileInfo(e)
-    if d.fav or d.heat or d.frozen then return false end
+    if d.fav or d.heat or d.frozen or d.broken then return false end
     return true
 end
 
@@ -785,7 +780,7 @@ function KnoxGridView:drawTile(e, alpha)
     -- went over the bag's header (the author, 2026-10-19)
     if y < 0 then y = 0 end
 
-    T.rect(self, x, y, pw, ph, d.cat, alpha)
+    T.tileFill(self, x, y, pw, ph, d.level, d.cat, alpha)
     -- food: frozen, cooking, done, burning - the tile takes that color
     if d.cookBase then self:drawRect(x, y, pw, ph, 0.22 * alpha, d.cookBase.r, d.cookBase.g, d.cookBase.b) end
     -- hot (red) or cold (blue), stronger the further from room temperature
@@ -816,6 +811,7 @@ function KnoxGridView:drawTile(e, alpha)
             or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item))
             or (KnoxFluidInfo and KnoxFluidInfo.isOpen(item))) then
         T.border(self, x, y, pw, ph, T.color.accent, alpha)   -- its bag, inspect, split or fluid window is open
+        T.border(self, x + 1, y + 1, pw - 2, ph - 2, T.color.tileFrame, alpha)   -- (the fill stops 2 px in, as at any frame)
     elseif e.overflow then
         T.tileFrame(self, x, y, pw, ph, T.color.bad, alpha)   -- doesn't fit the grid: take it out
     elseif d.frozen then
@@ -842,7 +838,9 @@ function KnoxGridView:drawTile(e, alpha)
     -- (what ISInventoryItem.renderItemIcon does, with its questions to the game asked once: tileInfo)
     if d.hasTex then
         local ix, iy = x + math.floor((pw - side) / 2) + jx, y + math.floor((ph - side) / 2) + jy
-        if d.iconOpaque and e.from then
+        if d.broken then
+            T.brokenIcon(self, item, ix, iy, side, alpha)
+        elseif d.iconOpaque and e.from then
             -- fading out where it has just gone from: a thing with a liquid mask
             -- (a water bottle) can't be drawn faded with its liquid, and stood
             -- whole on a vanishing tile - a bare icon left behind for a moment
@@ -853,23 +851,9 @@ function KnoxGridView:drawTile(e, alpha)
         end
     end
 
-    -- thin meters at the bottom (the exact values are in the tooltip):
-    -- condition (things that wear out) lowest, uses left or liquid above it;
+    if d.broken then T.brokenMark(self, x + jx, y + jy, pw, ph, alpha) end
     -- a stack's count as outlined text in the corner, like Tarkov
-    local level = 0
-    if d.cond then
-        T.tileMeter(self, x, y, pw, ph, d.cond, condColor(d.cond), alpha, 0)
-        level = 1
-    end
-    if d.uses then
-        -- a stack of batteries, tape...: what is left in all of them together
-        T.tileMeter(self, x, y, pw, ph, d.uses, T.color.accent, alpha, level)
-    elseif d.fluid then
-        T.tileMeter(self, x, y, pw, ph, d.fluid, T.color.liquid, alpha, level)
-    end
-    if d.broken then
-        T.outlinedRight(self, "0%", x + pw - 4, y + ph - fh - 3, T.color.bad, f, alpha)
-    elseif #e.items > 1 then
+    if #e.items > 1 then
         -- (in sand: not all alike - the mouse on it shows them one by one)
         T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3, d.mixed and T.color.accent or T.color.bright, f, alpha)
     end
@@ -922,8 +906,19 @@ function KnoxGridView:drawTile(e, alpha)
             self:drawRect(x, y, pw, ph, 0.16 * k * alpha, c.r, c.g, c.b)
         end
     end
-    -- offered by the quick pick panel of a hovered empty slot
-    if not e.ghost and KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then T.target(self, x, y, pw, ph, KnoxSlotPicker.offerColor) end
+    -- offered by the quick pick panel of a hovered empty slot; pointed at from a
+    -- cell of the magazine / battery panel: the sand frame of the panel's own
+    -- cell (the author, 2026-10-30)
+    if not e.ghost and KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then
+        local p = KnoxSlotPicker.instance
+        if p.load or p.battery then
+            T.tileFrame(self, x, y, pw, ph, T.color.accent, KnoxSlotPicker.offerA)
+        else
+            T.target(self, x, y, pw, ph, KnoxSlotPicker.offerColor, KnoxSlotPicker.offerA)
+        end
+    -- fits the magazine, gun, rounds, part or flashlight under the mouse (KnoxLoad:
+    -- the bright T.fits, fading in and out, 2026-10-30)
+    elseif not e.ghost and KnoxLoad and KnoxLoad.litA > 0 and KnoxLoad.shown[item] then T.fits(self, x, y, pw, ph, KnoxLoad.litA) end
     if not e.ghost then drawFlash(self, e, x, y, pw, ph) end
 
     -- an action using the item (eating, bandaging, reading...): fills up like a move
@@ -1183,6 +1178,7 @@ function KnoxGridView:renderGrid()
     self:updateLift()
     self:offerKinds()
     self:offerBattery()
+    self:offerLoad()
     local dragged = KnoxDrag.entity
     -- only the rows that can be seen: the grid lies in a scrolled column (or
     -- window) that shows a part of it, and a long one has hundreds of tiles
@@ -1300,14 +1296,10 @@ function KnoxGridView:renderGrid()
         for i = 1, nq do
             local e = quiet[i]
             local d = e.draw
-            if d.broken or #e.items > 1 then
+            if #e.items > 1 then
                 local x, y, pw, ph = self:tileRect(e)
-                if d.broken then
-                    T.outlinedRight(self, "0%", x + pw - 4, y + ph - fh - 3, T.color.bad, f, 1)
-                else
-                    T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3,
-                        d.mixed and T.color.accent or T.color.bright, f, 1)
-                end
+                T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3,
+                    d.mixed and T.color.accent or T.color.bright, f, 1)
             end
         end
         if listed then
@@ -1958,7 +1950,8 @@ function KnoxGridView:offerBattery()
         self.batteryRef = ref
     end
     ref.e = e
-    if not KnoxSlotPicker.isOpenFor(ref) and now - ref.sinceMs < KINDS_HOVER_MS then return end
+    -- (only once the quick items' key asked for it, 2026-10-30: the tooltip till then)
+    if not KnoxSlotPicker.isOpenFor(ref) and (not KnoxLoad or KnoxLoad.panelFor ~= e.item or now - ref.sinceMs < KINDS_HOVER_MS) then return end
     -- The character's batteries, fullest first, with their charge (the author,
     -- 2026-10-29: choose which goes in - with one in as well, to swap it).
     -- (looked for twice a second, not every frame the mouse rests on the radio)
@@ -1992,6 +1985,24 @@ function KnoxGridView:offerBattery()
     KnoxSlotPicker.wantBattery(ref, getText("IGUI_Knox_Battery"), b, self.playerNum)
 end
 
+--- A thing under the mouse: what fits it lights up green in the grids; a magazine
+--- or a gun gets its panel next to it (KnoxLoad, the author, 2026-10-30).
+function KnoxGridView:offerLoad()
+    if not KnoxLoad then return end
+    local e = self.hovered
+    if not e or e.ghost or KnoxDrag.isActive() or (self.band and self.band.active) then return end
+    KnoxLoad.hover(e.item)
+    -- (a stack showing its kinds keeps its own panel)
+    if self.kindsRef and KnoxSlotPicker.isOpenFor(self.kindsRef) then return end
+    local ref = self.loadRef
+    if not ref or ref.item ~= e.item then
+        ref = setmetatable({view = self, item = e.item, sinceMs = getTimestampMs()}, TileRef)
+        self.loadRef = ref
+    end
+    ref.e = e
+    KnoxLoad.offer(ref, e.item, self:player(), self.playerNum, "right")
+end
+
 function KnoxGridView:updateTooltip()
     if self.band and self.band.active then return end   -- drawing a selection frame
     -- (a stack showing its kinds: each of them has its tooltip in the panel)
@@ -2000,7 +2011,13 @@ function KnoxGridView:updateTooltip()
         return
     end
     if self.hovered then
-        KnoxTooltip.want(self.hovered.item, self.playerNum)
+        -- (a thing with its battery or magazine panel up, or the key for it held:
+        -- no tooltip, it lay over the panel's cells - the author, 2026-10-30; the
+        -- cells have theirs)
+        local e = self.hovered
+        local has = (self.batteryRef ~= nil and self.batteryRef.item == e.item)
+            or (KnoxLoad ~= nil and not e.ghost and KnoxLoad.panelOf(e.item) ~= nil)
+        KnoxTooltip.want(e.item, self.playerNum, KnoxLoad ~= nil and KnoxLoad.tipQuiet(e.item, has))
         for _, it in ipairs(self.hovered.items) do KnoxGridView.fresh[it] = nil end   -- seen
     end
 end

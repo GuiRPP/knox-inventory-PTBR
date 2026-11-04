@@ -625,7 +625,7 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         end
     elseif kind == "skins" then
         lines(self, e.lines, L.x0, y, T.color.dim)
-        local cur = T.skin()
+        local cur = T.skinChosen()
         for i, sk in ipairs(T.SKINS) do
             local r = self:skinRect(e, i, oy)
             local on = sk.id == cur
@@ -884,6 +884,8 @@ function KnoxSettings:clickItem(e, x, y, oy)
             if inRect(x, y, self:skinRect(e, i, oy)) then
                 T.settings["skin"] = sk.id
                 T.saveSettings()
+                -- (picked in the menu: seen at once, the place's own skin back with the next scene)
+                T.menuSkin = nil
                 T.applySkin()
                 getSoundManager():playUISound("UIActivateButton")
                 return true

@@ -40,6 +40,10 @@ C.ACTIONS = {
     {id = "sort",      kind = "key",   default = "ctrl+key:" .. tostring(Keyboard.KEY_S)},   -- Sort the grid under the mouse
     -- held while a quick slot of the bar is dragged to another place (KnoxHotbar)
     {id = "hotbarMove", kind = "hold", default = "key:" .. tostring(Keyboard.KEY_LMENU), hint = false},
+    -- pressed over a magazine, a gun, a flashlight: its quick items' panel in place
+    -- of its tooltip, pressed again: the tooltip back (the author, 2026-10-30;
+    -- KnoxLoad.tipQuiet; a "hold" key: read as held, its press found there)
+    {id = "quickItems", kind = "hold", default = "key:" .. tostring(Keyboard.KEY_LSHIFT), hint = false},
 }
 
 local byId = {}

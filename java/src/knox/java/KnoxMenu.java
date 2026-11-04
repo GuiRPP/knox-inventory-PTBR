@@ -1284,7 +1284,9 @@ public class KnoxMenu {
         // (set every frame since the camera sways and follows the mouse: the array is reused)
         float[] c = CAMERAS.get(scene);
         if (c == null) {
-            c = new float[7];
+            // (its 8th: the near plane - the bar's own, set by knoxBarEnd: KnoxBarFrame.NEAR;
+            // then the up, for the head's roll on the bar's walk: KnoxBarWalkLua)
+            c = new float[] {0, 0, 0, 0, 0, 0, 0, 0.5f, 0, 1, 0};
             CAMERAS.put(scene, c);
         }
         c[0] = (float) fov; c[1] = (float) ex; c[2] = (float) ey; c[3] = (float) ez;
@@ -1335,8 +1337,8 @@ public class KnoxMenu {
         float w = scene.getWidth().floatValue();
         float h = scene.getHeight().floatValue();
         if (w < 1f || h < 1f) return;
-        projection.setPerspective((float) Math.toRadians(c[0]), w / h, 0.5f, 200f);
-        modelView.setLookAt(c[1], c[2], c[3], c[4], c[5], c[6], 0f, 1f, 0f);
+        projection.setPerspective((float) Math.toRadians(c[0]), w / h, c.length > 7 && c[7] > 0f ? c[7] : 0.5f, 200f);
+        modelView.setLookAt(c[1], c[2], c[3], c[4], c[5], c[6], c[8], c[9], c[10]);
     }
 
     @Patch(className = "zombie.vehicles.UI3DScene", methodName = "calcMatrices")

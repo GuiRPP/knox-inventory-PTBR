@@ -78,7 +78,11 @@ local was = P.offered
 hover(p, 3)
 check("not built again the next frame", P.offered == was)
 hover(p, nil)
-check("nothing pointed at off the cells", none(P.offered))
+-- (the author, 2026-10-30: the thing hovered lights them all up at once, as a magazine
+-- does - KnoxLoad's green, the panel open or not: the panel points at none)
+check("off the cells: none pointed at", P.offered[b.spares[1]] == nil and P.offered[b.spares[3]] == nil)
+hover(p, 1)
+check("over the one in it: none pointed at", P.offered[b.spares[2]] == nil)
 p:useBattery(3)
 check("a spare clicked goes in", done.what == "put" and done.battery == b.spares[2], tostring(done.what))
 
@@ -92,7 +96,7 @@ p, b = open(false, 3)
 check("empty, over it: put in", p:batteryHint(1) == w.put)
 check("empty, over a spare: put in", p:batteryHint(2) == w.put)
 hover(p, 1)
-check("empty hovered: all of them, green", P.offered[b.spares[1]] and P.offered[b.spares[3]] and P.offerColor == T.color.ok)
+check("empty hovered: none pointed at", P.offered[b.spares[1]] == nil and P.offered[b.spares[3]] == nil)
 done = {}
 p:useBattery(1)
 check("empty clicked: the fullest goes in", done.what == "put" and done.battery == nil, tostring(done.what))

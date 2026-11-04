@@ -148,16 +148,17 @@ function KnoxQuickSlot:render()
     local alpha = 1
     local leaving, progress = KnoxGrid.leavingSlot(self.screen.pendingNow or {}, "quick:" .. self.index)
     if leaving then item, alpha = leaving, 0.4 end
-    local cat, dy, da = false, 0, 1
+    local cat, dy, da, level = false, 0, 1, nil
     if item then
         cat = T.category[T.categoryOf(item)]
+        level = T.levelOf(self, item)   -- (its state: the colour's height, condition_v3, the author, 2026-10-31)
         dy, da = T.settleIn(self, (not leaving) and item or nil)   -- just hung here: it settles in
     end
     local windowOpen = item and not leaving and ((KnoxInspectWindow and KnoxInspectWindow.isOpen(item))
         or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item)))
     -- (from the ready list while the slot is not under the mouse: the key is all it
-    -- shows - the item, its place, how it comes in, its colour, its number, a window
-    -- about it)
+    -- shows - the item, its place, how it comes in, its colour, its number, its state,
+    -- a window about it)
     local L
     if not over then
         L = self.readyList
@@ -167,19 +168,21 @@ function KnoxQuickSlot:render()
             quickLists[key], self.readyList = L, L
         end
         local flags = (leaving and 1 or 0) + (windowOpen and 2 or 0)
-        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, cat, self.pos or self.index) then L = false end
+        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, cat, self.pos or self.index, T.levelKey(item, h, level)) then L = false end
     end
     if L ~= false then
         T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
         if item then
-            T.rect(self, 0, 0, w, h, cat, alpha)
+            T.tileFill(self, 0, 0, w, h, level, cat, alpha)
             local side = math.floor(math.min(w, h) * 0.66)
-            ISInventoryItem.renderItemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, alpha * da, side, side)
+            if T.itemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, side, alpha * da) then
+                T.brokenMark(self, 0, dy, w, h, alpha * da)
+            end
         end
         if self.label then
             T.text(self, T.fit(T.upper(self.label), T.fontTile, w - 8), 5, 2, T.color.dim, T.fontTile, item and 1 or 0.8)
         else
-            T.text(self, tostring(self.pos or self.index), 4, 1, T.color.dim, T.fontTile)
+            T.outlinedLeft(self, tostring(self.pos or self.index), 4, 1, T.color.dim, T.fontTile)
         end
         local edge = item and T.color.tileFrame or T.color.tileEdge
         if KnoxDrag.isActive() and over then
@@ -193,6 +196,7 @@ function KnoxQuickSlot:render()
             edge = T.color.accent   -- being inspected, or in the pouring window
         end
         if item and not leaving then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
+        if leaving then T.border(self, 1, 1, w - 2, h - 2, T.color.tileFrame, alpha) end   -- (the fill stops 2 px in)
         if L then T.listEnd(L) end
     end
     if item and not leaving and KnoxEquip.isReplaced({item}) then T.replaceMark(self, 0, 0, w, h) end
@@ -209,7 +213,11 @@ function KnoxQuickSlot:render()
 
     if over and not KnoxDrag.isActive() then
         if item and not leaving then
-            KnoxTooltip.want(item, self.screen.playerNum)
+            -- a gun here: what fits it lit up, its panel above or below (KnoxLoad, 2026-10-30)
+            -- - with the quick items' key held; then no tooltip of its own over the panel's cells
+            KnoxTooltip.want(item, self.screen.playerNum,
+                KnoxLoad and KnoxLoad.tipQuiet(item, instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"))
+            if KnoxLoad then KnoxLoad.slotHover(self, item, self.screen:player(), self.screen.playerNum, self.label and "below" or "above") end
         else
             -- how many carried items can hang here; when some can, the quick pick
             -- panel opens: under the back slot, above the hotbar row
@@ -817,6 +825,7 @@ function KnoxScreen:prerender()
     self.pendingNow = KnoxGrid.pendingList()   -- read by the quick slots while they draw
     KnoxGrid.updateUse(self:player())          -- items the current action works with
     KnoxEquip.updateHints(self:player())       -- slots to light up
+    if KnoxLoad then KnoxLoad.sync() end     -- what fits the thing under the mouse, lit up
     KnoxSlotPicker.sync(self)                -- quick pick panel of an empty slot
     KnoxContainerWindow.updateAll()
     KnoxInspectWindow.updateAll()

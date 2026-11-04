@@ -75,6 +75,7 @@ local function screenFailed(err)
         pcall(function() s:removeFromUIManager() end)
     end
     if knoxSetScreenOpen then pcall(knoxSetScreenOpen, false) end
+    if KnoxRMenu then pcall(KnoxRMenu.abort) end
     if knoxViewpointCursor then pcall(knoxViewpointCursor, false, false) end
     local inv, loot = getPlayerInventory(0), getPlayerLoot(0)
     if inv then inv:setVisible(true) end

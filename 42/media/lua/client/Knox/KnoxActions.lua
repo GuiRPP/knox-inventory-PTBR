@@ -65,6 +65,14 @@ function A.activeContainer(player)
     return player:getInventory()
 end
 
+--- The bag chosen, the screen open or not (a magazine goes back to it from the world);
+--- nil: none chosen, or no longer on the character.
+function A.activeBag(player)
+    local active = activeOf(player)
+    if active and active:isInCharacterInventory(player) then return active end
+    return nil
+end
+
 function A.setActive(container, playerNum)
     A.active = container
     local player = getSpecificPlayer(playerNum)

@@ -3,6 +3,7 @@ package knox.java;
 import java.util.function.Consumer;
 
 import me.zed_0xff.zombie_buddy.Patch;
+import me.zed_0xff.zombie_buddy.Watermark;
 import se.krka.kahlua.integration.annotations.LuaMethod;
 import zombie.core.textures.Texture;
 import zombie.core.textures.TextureDraw;
@@ -29,6 +30,7 @@ public class KnoxUiFade {
     public static float alpha = 1f;
     public static boolean skip;
     public static long setAt;
+    private static final float WATERMARK_ALPHA = 0.4f;   // (ZombieBuddy's own)
 
     /** The menu's alpha now (1: as it is). */
     @LuaMethod(name = "knoxMenuUiAlpha", global = true)
@@ -41,6 +43,20 @@ public class KnoxUiFade {
     @LuaMethod(name = "knoxMenuUiSkip", global = true)
     public static void knoxMenuUiSkip(boolean on) {
         skip = on;
+    }
+
+    /**
+     * ZombieBuddy's line and icon at the top of the menu hidden with it, by H (the author,
+     * 2026-11-01). Its own alpha: they are drawn at the end of the frame, past the UI's
+     * elements. Another version of ZombieBuddy without the call: they stay.
+     */
+    @LuaMethod(name = "knoxMenuWatermark", global = true)
+    public static void knoxMenuWatermark(boolean hidden) {
+        try {
+            Watermark.setAlpha(hidden ? 0f : WATERMARK_ALPHA);
+        } catch (LinkageError e) {
+            // (as it was)
+        }
     }
 
     public static void off() {

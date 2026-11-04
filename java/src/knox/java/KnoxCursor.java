@@ -44,7 +44,7 @@ public class KnoxCursor {
             Cursor cursor = load(FILE);
             if (cursor == null) return false;
             set("defaultCursor", cursor);
-            org.lwjglx.input.Mouse.setNativeCursor(cursor);
+            if (!hidden) org.lwjglx.input.Mouse.setNativeCursor(cursor);
             Texture tex = texture(FILE);
             if (tex != null) set("mouseCursorTexture", tex);
             applied = true;
@@ -150,7 +150,7 @@ public class KnoxCursor {
             }
             Cursor cursor = on ? down : up;
             set("defaultCursor", cursor);
-            org.lwjglx.input.Mouse.setNativeCursor(cursor);
+            if (!hidden) org.lwjglx.input.Mouse.setNativeCursor(cursor);
             Texture tex = on ? downTex : upTex;
             if (tex != null) set("mouseCursorTexture", tex);
             pressed = on;
@@ -179,6 +179,36 @@ public class KnoxCursor {
         down = null;
         if (!applied || pressBroken) return false;
         return show(pressed);
+    }
+
+    // The cursor hidden while the menu on R is open (KnoxInput.knoxSetRMenuOpen, the author,
+    // 2026-10-31): the game's blank one as the system cursor and no drawn one; a press
+    // of the left button meanwhile changes only what comes back.
+    static boolean hidden, drawnWas = true;
+
+    static void hide(boolean on) {
+        if (hidden == on) return;
+        try {
+            if (on) {
+                Field f = Mouse.class.getDeclaredField("blankCursor");
+                f.setAccessible(true);
+                Cursor blank = (Cursor) f.get(null);
+                if (blank == null) return;
+                org.lwjglx.input.Mouse.setNativeCursor(blank);
+                drawnWas = Mouse.isCursorVisible();
+                Mouse.setCursorVisible(false);
+                hidden = true;
+            } else {
+                hidden = false;
+                Mouse.setCursorVisible(drawnWas);
+                Field f = Mouse.class.getDeclaredField("defaultCursor");
+                f.setAccessible(true);
+                Cursor back = (Cursor) f.get(null);
+                if (back != null) org.lwjglx.input.Mouse.setNativeCursor(back);
+            }
+        } catch (Exception | LinkageError e) {
+            System.out.println("[Knox] cursor hide: " + e);
+        }
     }
 
     static void set(String name, Object value) throws ReflectiveOperationException {

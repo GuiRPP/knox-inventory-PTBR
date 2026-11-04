@@ -124,7 +124,8 @@ KnoxTheme = {
     cell = 48, pad = 12, javaFonts = true, settings = {},
     color = {window = hex("#121414"), header = hex("#1a1d1d"), border = hex("#2a2e2e"), cell = hex("#0e1010"), tileEdge = hex("#3c4141"),
         hoverEdge = hex("#6a6f6a"), text = hex("#d9d6c8"), bright = hex("#ece8d8"), dim = hex("#8f9289"), accent = hex("#d4c38a"),
-        bad = hex("#be463c"), ok = hex("#6ca050"), good = hex("#9fb36a"), warn = hex("#c9a24a"), ink = hex("#141414"), screen = hex("#0b0c0c")},
+        bad = hex("#be463c"), ok = hex("#6ca050"), good = hex("#9fb36a"), warn = hex("#c9a24a"), ink = hex("#141414"), screen = hex("#0b0c0c"),
+        lit = hex("#e6ddb8"), digit = hex("#f2ecd8")},
 }
 local T = KnoxTheme
 function T.readyTex(path) return getTexture(path) end   -- (the real one: once read)

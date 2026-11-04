@@ -29,6 +29,12 @@ public class KnoxMusic {
 
     private static long sound;
     private static long channel;
+
+    /** What plays now: a new one, a new track (the bar's radio needle). */
+    static long channelNow() {
+        return channel;
+    }
+
     private static String current;
 
     /** Zomboid/knox_music, made with a note in it the first time. */

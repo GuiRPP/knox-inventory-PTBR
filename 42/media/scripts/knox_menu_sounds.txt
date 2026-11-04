@@ -11,6 +11,18 @@ module Base
 {
     /* the radio by the fire, while the music plays from it (KnoxMenuMusic):
        its speaker's hiss and crackle - made by Knox (knox_radio_static.wav) */
+    sound KnoxGarlandSwitch
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip
+        {
+            file = media/sound/lightswitch.wav,
+            volume = 0.45,
+        }
+    }
+
     sound KnoxRadioStatic
     {
         category = UI,

@@ -89,17 +89,17 @@ function B.capture(player)
             if not e.ghost and not e.reserved and e.item then
                 local it = e.item
                 local cond, meter, kind = -1, -1, ""
-                if instanceof(it, "HandWeapon") or (instanceof(it, "Clothing") and it:getConditionMax() > 0) then
-                    cond = it:getCondition() / math.max(1, it:getConditionMax())
-                end
+                -- (read as the grid reads it: T.levelKind)
+                local from = T.levelKind(it)
                 local broken = it:isBroken()
-                if it:IsDrainable() and not broken then
+                if from == "c" then
+                    cond = it:getCondition() / math.max(1, it:getConditionMax())
+                elseif from == "u" and not broken then
                     local sum = 0
                     for _, x in ipairs(e.items) do sum = sum + x:getCurrentUsesFloat() end
                     meter, kind = sum / math.max(1, #e.items), "u"
-                else
-                    local fluid = it:getFluidContainer()
-                    if fluid and fluid:getCapacity() > 0 then meter, kind = fluid:getAmount() / fluid:getCapacity(), "f" end
+                elseif from == "f" then
+                    meter, kind = T.itemLevel(it, "f"), "f"
                 end
                 local kg = 0
                 for _, x in ipairs(e.items) do kg = kg + KnoxGrid.weightOf(x) end
@@ -181,12 +181,6 @@ local function iconOf(name)
     if not name or name == "" then return nil end
     if texCache[name] == nil then texCache[name] = getTexture(name) or false end
     return texCache[name] or nil
-end
-
-local function condColor(f)
-    if f > 0.6 then return T.color.good end
-    if f > 0.25 then return T.color.warn end
-    return T.color.bad
 end
 
 -- The bag's sound, by what it is made of (the author, 2026-10-16: one zip
@@ -474,7 +468,9 @@ function BC:drawSection(b, a, mx, my)
             self:drawRect(tx + 2, ty2 + 3, pw - 2, ph - 2, 0.35 * a, 0, 0, 0)
             ty2 = ty2 - lp
         end
-        T.rect(self, tx, ty2, pw, ph, T.category[it.cat] or T.category.misc, ta)
+        -- (its state: the colour's height, as in the inventory - condition_v3, the author, 2026-10-31)
+        local level = it.broken and 0 or (it.cond >= 0 and it.cond) or (it.meter >= 0 and it.meter) or nil
+        T.tileFill(self, tx, ty2, pw, ph, level, T.category[it.cat] or T.category.misc, ta)
         if over then self:drawRect(tx, ty2, pw, ph, 0.06 * a, 1, 1, 1) end
         if taken then
             -- taken out (its likeness on its way to the camp): a sand frame, as a thing being moved
@@ -487,19 +483,11 @@ function BC:drawSection(b, a, mx, my)
         local tex = iconOf(it.tex)
         if tex then
             local side = math.floor(math.min(pw, ph) * 0.85)
-            self:drawTextureScaledAspect(tex, tx + math.floor((pw - side) / 2), ty2 + math.floor((ph - side) / 2), side, side, ia, 1, 1, 1)
+            local dim = it.broken and 0.2 or 1
+            self:drawTextureScaledAspect(tex, tx + math.floor((pw - side) / 2), ty2 + math.floor((ph - side) / 2), side, side, ia, dim, dim, dim)
         end
-        local level = 0
-        if it.cond >= 0 then
-            T.tileMeter(self, tx, ty2, pw, ph, it.cond, condColor(it.cond), ta, 0)
-            level = 1
-        end
-        if it.meter >= 0 then
-            T.tileMeter(self, tx, ty2, pw, ph, it.meter, it.kind == "f" and T.color.liquid or T.color.accent, ta, level)
-        end
-        if it.broken then
-            T.outlinedRight(self, "0%", tx + pw - 4, ty2 + ph - fh - 3, T.color.bad, f, ta)
-        elseif it.n > 1 then
+        if it.broken then T.brokenMark(self, tx, ty2, pw, ph, ta) end
+        if it.n > 1 then
             T.outlinedRight(self, tostring(it.n), tx + pw - 4, ty2 + ph - fh - 3, T.color.bright, f, ta)
         end
     end
@@ -581,6 +569,8 @@ end
 -- A thing pressed on is taken out to be put down in the camp - its likeness:
 -- the thing itself stays in the bag (KnoxMenuKeep); the card steps aside.
 function BC:onMouseDown(x, y)
+    -- (going dark to the other scene, the author's bar, 2026-10-31: it would land there)
+    if KnoxMenuScene and KnoxMenuScene.instance and KnoxMenuScene.instance.switchK then return true end
     local it = self.hovered
     if it and it.model and it.rect and KnoxMenuKeep and KnoxMenuKeep.beginDrag(it, self.hero, self.save) then
         -- held where it was taken, as in the inventory (KnoxDrag: grab point)

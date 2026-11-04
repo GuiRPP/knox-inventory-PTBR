@@ -240,6 +240,8 @@ local function recentSaves(count)
     end
     return out
 end
+-- (the winter bar seats the same heroes: KnoxMenuSceneBar, 2026-10-31)
+KnoxMenuScene.recentSaves = recentSaves
 
 --- A portrait of a save's hero for the hover card (nil without a snapshot).
 function M:makePortrait(save, zombie)
@@ -390,18 +392,20 @@ function M:tint(o, flick)
 end
 
 function M:yawOf(face)
-    return CFG.yawOffset + CFG.yawSign * face
+    return self.cfg.yawOffset + self.cfg.yawSign * face
 end
 
 function M:addCharacter(c)
     local j = self.scene.javaObject
     local ok = pcall(function()
         j:fromLua1("createCharacter", c.id)
-        j:fromLua2("setCharacterClearDepthBuffer", c.id, CFG.clearDepth)
+        j:fromLua2("setCharacterClearDepthBuffer", c.id, self.cfg.clearDepth)
     end)
     if not ok then return false end
     c.anim = c.anim or (c.zombie and "knoxmenu_zombie" or "knoxmenu_warm")   -- at the fire from the first frame
     knoxMenuAnim(j, c.id, c.anim)                               -- before dressing: applied with the model
+    -- (what the hand holds goes on with the model too: the bar's smoker, 2026-10-31)
+    if c.hand and knoxBarHand then knoxBarHand(j, c.id, c.hand) end
     -- (were the hero's clothes loaded before the hero was dressed? If not, it is
     -- dressed anew once they are: see M:watchPose)
     if knoxMenuClothesReady and knoxMenuClothesReady(c.save.rel) then c.clothesOk = true else c.clothesLate = true end
@@ -424,7 +428,8 @@ function M:addBag(c, slot)
     local ok, bag = pcall(KnoxMenuBag.read, rel)
     if not ok or not bag then return end
     c.bag = bag
-    local at, back = BAG_AT[slot], bag.back
+    -- (the bar has its own places, a bag can lie on a stool: {x, z, yaw, y} - 2026-10-31)
+    local at, back = (self.bagPlaces or BAG_AT)[slot], bag.back
     if not (at and back) then return end
     local sm = getScriptManager()
     local script = sm:getItem(back.type)
@@ -435,9 +440,9 @@ function M:addBag(c, slot)
     local ms = sm:getModelScript(wm) or sm:getModelScript("Base." .. wm)
     if not ms then return end
     if self:addModel({id = "km_bag" .. slot, model = ms:getFullType(), world = true,
-            x = at[1], z = at[2], yaw = at[3], lit = 0.6, near = 0.45}) then
+            x = at[1], y = at[4], z = at[2], yaw = at[3], lit = 0.6, near = 0.45}) then
         knoxMenuTakeOff(rel, back.type)
-        c.bagAt = {x = at[1], z = at[2]}
+        c.bagAt = {x = at[1], y = at[4] or 0, z = at[2]}
         -- its own colours (a model of clothes on the ground has no texture of
         -- its own) - asked again until they are there (M:skinBags)
         c.bagType = back.type
@@ -704,8 +709,8 @@ end
 --- units reached too far round it - the author, 2026-10-16).
 function M:bagRect(c)
     local p = c.bagAt
-    local bx, by = self:toScreen(p.x, 0, p.z)
-    local _, ty = self:toScreen(p.x, 0.3, p.z)
+    local bx, by = self:toScreen(p.x, p.y, p.z)
+    local _, ty = self:toScreen(p.x, p.y + 0.3, p.z)
     local ppu = math.abs(by - ty) / 0.3
     return {bx - 0.22 * ppu, by - 0.3 * ppu, 0.44 * ppu, 0.34 * ppu}
 end
@@ -904,7 +909,8 @@ function M:watchPose(o, t)
         o.posedAt = o.posedAt or t
         return
     end
-    local clip = CLIP[o.anim]
+    -- (the bar's own poses: its self.clips, 2026-10-31)
+    local clip = CLIP[o.anim] or (self.clips and self.clips[o.anim])
     if not clip then return end                     -- a one-shot (getting up, sitting down): left alone
     if (o.poseAsked or 0) > t then return end
     o.poseAsked = t + (o.shownAt and 0.5 or 0.05)
@@ -994,7 +1000,7 @@ end
 
 function M:watchReveal(t)
     self:hurryClips(t)
-    if self.revealAt or t < REVEAL_AT then return end
+    if self.revealAt or (t < REVEAL_AT and not self.swiped) then return end
     self.revealAt = t
 end
 
@@ -1012,7 +1018,7 @@ function M:hurryClips(t)
         self.hurryAt = 99
         return
     end
-    local n = knoxMenuHurryClips(MENU_CLIPS)
+    local n = knoxMenuHurryClips(self.menuClips or MENU_CLIPS)
     if n and n > 0 then print("[Knox] menu scene: " .. n .. " of its animations moved ahead in the game's loading at " .. string.format("%.1f", t) .. " s") end
 end
 
@@ -1038,7 +1044,7 @@ function M:watchHero(c, t)
             print("[Knox] menu scene: " .. c.id .. " not in after " .. at .. " s: clothes "
                 .. (c.clothesOk and "ok" or "waiting") .. ", pose " .. (c.posedAt and "ok" or "waiting")
                 .. ", reenters " .. (c.reenters or 0) .. " | "
-                .. tostring(knoxMenuWhy and knoxMenuWhy(j, c.id, CLIP[c.anim] or "", c.save and c.save.rel or nil)))
+                .. tostring(knoxMenuWhy and knoxMenuWhy(j, c.id, CLIP[c.anim] or (self.clips and self.clips[c.anim]) or "", c.save and c.save.rel or nil)))
         end
         return
     end
@@ -1047,8 +1053,15 @@ function M:watchHero(c, t)
     local lit = (self.revealAt or t) + REVEAL_FADE * math.min(1, (c.dist or 0) / 8)
     c.fadeAt = math.max(t, lit)
     self:place(c)
-    if knoxMenuAlpha then knoxMenuAlpha(j, c.id, 0) end
-    if c.shadow then j:fromLua1("getObjectScale", c.shadow.id):set(0.001, 0.001, 0.001) end
+    -- (a scene swiped in: they are there as it comes, no coming in - the author, 2026-11-02)
+    if self.swiped then
+        c.fadeAt = nil
+        if knoxMenuAlpha then knoxMenuAlpha(j, c.id, 1) end
+        if c.shadow then self:place(c.shadow) end
+    else
+        if knoxMenuAlpha then knoxMenuAlpha(j, c.id, 0) end
+        if c.shadow then j:fromLua1("getObjectScale", c.shadow.id):set(0.001, 0.001, 0.001) end
+    end
     local function s(v) return v and string.format("%.1f", v) or "-" end
     print("[Knox] menu scene: " .. c.id .. " in after " .. s(t) .. " s (" .. s((getTimestampMs() - self.startMs) / 1000)
         .. " s real; clothes " .. s(c.clothesAt) .. ", pose " .. s(c.posedAt) .. ")"
@@ -1115,7 +1128,7 @@ function M:addTrees()
     -- out: they washed out the sky and the moon)
     for r = #TREE_ROWS, 1, -1 do
         local row = TREE_ROWS[r]
-        local depth = CFG.eye[3] - row.z
+        local depth = self.cfg.eye[3] - row.z
         local half = depth * 0.5 + 2
         local x = -half + rnd() * 1.5
         while x < half do
@@ -1205,6 +1218,8 @@ function M:build()
     self.objects = {}
     self.chars = {}
     self.revealAt, self.revealDone = nil, nil   -- a camp built anew starts in the dark again
+    -- (but a camp swiped in comes lit, its light long spread: the author, 2026-11-02)
+    if KnoxMenuScene.swipe then self.revealAt = -REVEAL_FADE * 2 end
     self.memorials = {}
     self.empties = {}
     -- The latest saves. The three latest heroes still alive sit at the fire (a
@@ -1241,7 +1256,7 @@ function M:build()
                 -- each its own sway and gait (see M:zombieIdle)
                 local k = (n - 1) % #ZOMBIE_IDLES + 1
                 self:addCharacter({id = "km_dead" .. n, slot = n, save = save, zombie = true,
-                    x = g.x, y = 0, z = g.z, face = g.face, height = CFG.standHeight,
+                    x = g.x, y = 0, z = g.z, face = g.face, height = self.cfg.standHeight,
                     anim = ZOMBIE_IDLES[k], idleAnim = ZOMBIE_IDLES[k], walkAnim = ZOMBIE_WALKS[k], walkK = ZOMBIE_WALK_K[k], walkScale = ZOMBIE_WALK_SCALE[k],
                     nextAt = 4 + n * 3 + ZombRand(50) / 10})
             end
@@ -1250,7 +1265,7 @@ function M:build()
                 local seat = SEATS[slot]
                 do
                     local c = {id = "km_hero" .. slot, slot = slot, save = save, seat = seat,
-                        x = seat.x, y = 0, z = seat.z, face = seat.face, height = CFG.sitHeight,
+                        x = seat.x, y = 0, z = seat.z, face = seat.face, height = self.cfg.sitHeight,
                         nextAt = 7 + ZombRand(120) / 10}
                     if returned and returned == save.rel then
                         -- just left for the menu: walks in from where heroes walk off, and sits down
@@ -1260,7 +1275,7 @@ function M:build()
                         c.x, c.z = seat.x + c.dirX * 4.3, seat.z + c.dirZ * 4.3
                         c.face = math.deg(math.atan2(-c.dirX, -c.dirZ))
                         c.anim = "knoxmenu_walk"
-                        c.height = CFG.standHeight
+                        c.height = self.cfg.standHeight
                         c.entering = "walk"
                         c.clock = 0
                     end
@@ -1329,10 +1344,11 @@ end
 function M:aimCamera()
     local aspect = self.width / math.max(1, self.height)
     -- the menu's labels are on the left: the camp sits a little to the right
-    local shift = (aspect >= 2.1) and 0.3 or 0.6
+    -- (another scene says its own: KnoxMenuBar is laid out for the menu already)
+    local shift = (aspect >= 2.1) and (self.cfg.shiftWide or 0.3) or (self.cfg.shiftNarrow or 0.6)
     self.camShift = shift
-    knoxMenuCamera(self.scene.javaObject, CFG.fov, CFG.eye[1] - shift, CFG.eye[2], CFG.eye[3],
-        CFG.target[1] - shift, CFG.target[2], CFG.target[3])
+    knoxMenuCamera(self.scene.javaObject, self.cfg.fov, self.cfg.eye[1] - shift, self.cfg.eye[2], self.cfg.eye[3],
+        self.cfg.target[1] - shift, self.cfg.target[2], self.cfg.target[3])
 end
 
 -- The camera breathes and looks after the mouse (the author's wish, 2026-10-15):
@@ -1344,18 +1360,52 @@ local SWAY_X, SWAY_Y = 0.05, 0.03     -- scene units
 local LOOK_X, LOOK_Y = 0.34, 0.16     -- the look point at the screen's edge (about 2.3 and 1.1 degrees)
 local LOOK_EYE = 0.12                 -- the eye a little the other way: some depth to the turn
 local LOOK_EASE = 2.4                 -- how fast the turn catches up with the mouse (1/s)
+-- A scene swiped in has weight (the author, 2026-11-02): the view comes behind the swipe, swings
+-- past where it rests, a little, and settles. The eye and what it looks at go together, scene
+-- units: no turn, so the near things go and the sky and the forest far off stand, as they
+-- should (the author, 2026-11-02: with a turn they shook against the scene).
+local SWING_X = 0.5
+local SWING_EASE, SWING_RATE, SWING_FOR = 2.6, 4.2, 1.8
+
+--- Where the swing is now, 0 when it's over; towards the screen's right.
+function M:swingNow(dt)
+    -- (the camera exists after the first frame: nothing of this is on the screen before)
+    if not self.swingDir or self.frames < 3 then return 0 end
+    if self.swingGoes then self.swingT = (self.swingT or 0) + math.min(dt, 1 / 30) end
+    local s = self.swingT or 0
+    if s >= SWING_FOR then
+        self.swingDir = nil
+        return 0
+    end
+    -- (the scene moves against its dir; which way the scene's X runs on the screen: asked, it can be either)
+    local x0 = self:toScreen(0, 0, 0)
+    local x1 = self:toScreen(0.1, 0, 0)
+    local toRight = x1 >= x0 and 1 or -1
+    return -self.swingDir * toRight * math.exp(-SWING_EASE * s) * math.cos(SWING_RATE * s)
+end
 
 function M:updateCamera(t, dt)
     if not self.camShift or not self.scene or not self.scene.javaObject then return end
     local still = T.animOn ~= nil and not T.animOn()
     local wantX, wantY = 0, 0
     local main = MainScreen.instance
-    local free = self.mode == "idle" and main ~= nil and main.bottomPanel ~= nil and main.bottomPanel:getIsVisible()
-        and not (KnoxMenuNewsReader and KnoxMenuNewsReader.instance)
+    local free = (self.mode == "idle" or self.mode == "out") and main ~= nil and main.bottomPanel ~= nil and main.bottomPanel:getIsVisible()
+        and not (KnoxMenuNewsReader and KnoxMenuNewsReader.instance) and not self.walking
+    -- (the bar's narrator looking at his arm: the view is his - KnoxMenuSceneBar: viewOffset)
     if free and not still and not self.tuning then
         local w, h = math.max(1, self.width), math.max(1, self.height)
         wantX = math.max(-1, math.min(1, (getMouseX() - w / 2) / (w / 2)))
         wantY = math.max(-1, math.min(1, (getMouseY() - h / 2) / (h / 2)))
+    end
+    -- (while he looks, the turn after the mouse goes on to where the mouse was as he began: his head
+    -- comes back to the view the mouse has, nothing left to catch up as the mouse is given back - the
+    -- author, 2026-11-03: it came back a little to the left, then moved on; stopped where it was,
+    -- half way to the mouse, it went on after)
+    if self.lookHeld then
+        if not self.heldLook then self.heldLook, self.heldX, self.heldY = true, wantX, wantY end
+        wantX, wantY = self.heldX, self.heldY
+    else
+        self.heldLook = false
     end
     local k = 1 - math.exp(-dt * LOOK_EASE)
     self.lookX = (self.lookX or 0) + (wantX - (self.lookX or 0)) * k
@@ -1366,17 +1416,23 @@ function M:updateCamera(t, dt)
         sy = SWAY_Y * (math.sin(t * 0.51 + 0.6) + 0.3 * math.sin(t * 1.13 + 2.2))
     end
     local shift = self.camShift
-    local ex = CFG.eye[1] - shift + sx - self.lookX * LOOK_EYE
-    local ey = CFG.eye[2] + sy + self.lookY * LOOK_EYE * 0.5
-    local tx = CFG.target[1] - shift + sx * 0.5 + self.lookX * LOOK_X
-    local ty = CFG.target[2] + sy * 0.5 - self.lookY * LOOK_Y
-    knoxMenuCamera(self.scene.javaObject, CFG.fov, ex, ey, CFG.eye[3], tx, ty, CFG.target[3])
-    self.eyeX, self.eyeY, self.eyeZ = ex, ey, CFG.eye[3]   -- (where the heroes look up to: M:updateLooks)
+    local swing = self:swingNow(dt)
+    local ex = self.cfg.eye[1] - shift + sx - self.lookX * LOOK_EYE + swing * SWING_X
+    local ey = self.cfg.eye[2] + sy + self.lookY * LOOK_EYE * 0.5
+    local tx = self.cfg.target[1] - shift + sx * 0.5 + self.lookX * LOOK_X + swing * SWING_X
+    local ty = self.cfg.target[2] + sy * 0.5 - self.lookY * LOOK_Y
+    local ez, tz = self.cfg.eye[3], self.cfg.target[3]
+    self.eyeX, self.eyeY, self.eyeZ = ex, ey, ez   -- (where the heroes look up to: M:updateLooks)
+    -- (a scene's own turn of the view on top: the bar's narrator, 2026-11-02)
+    if self.viewOffset then ex, ey, ez, tx, ty, tz = self:viewOffset(ex, ey, ez, tx, ty, tz, dt) end
+    knoxMenuCamera(self.scene.javaObject, self.viewFov or self.cfg.fov, ex, ey, ez, tx, ty, tz)
+    -- (the view as drawn: what the bar's depth of field measures from - KnoxMenuSceneBar: updateFocus)
+    self.camEX, self.camEY, self.camEZ, self.camTX, self.camTY, self.camTZ = ex, ey, ez, tx, ty, tz
     -- how far the view has turned, in pixels at the sky (far away: rotation only)
-    local dist = math.max(1, CFG.eye[3] - CFG.target[3])
-    local ax = ((tx - ex) - (CFG.target[1] - CFG.eye[1])) / dist
-    local ay = ((ty - ey) - (CFG.target[2] - CFG.eye[2])) / dist
-    local ppr = self.height / math.rad(CFG.fov)
+    local dist = math.max(1, self.cfg.eye[3] - self.cfg.target[3])
+    local ax = ((tx - ex) - (self.cfg.target[1] - self.cfg.eye[1])) / dist
+    local ay = ((ty - ey) - (self.cfg.target[2] - self.cfg.eye[2])) / dist
+    local ppr = self.height / math.rad(self.cfg.fov)
     self.skyDX, self.skyDY = -ax * ppr, ay * ppr
 end
 
@@ -1474,7 +1530,7 @@ function M:hit(c, mx, my)
         return mx >= cx - hw and mx < cx + hw and my >= r[2] and my < r[2] + r[4]
     end
     -- a hero by the fire sits wide and low; a walking or risen one stands narrow
-    local standing = c.zombie or c.height > CFG.sitHeight + 0.01
+    local standing = c.zombie or c.height > self.cfg.sitHeight + 0.01
     local rx = (standing and 0.26 or 0.36) * ppu
     local top, bottom = r[2] + 0.06 * ppu, r[2] + r[4] - 0.1 * ppu
     local ry = (bottom - top) / 2
@@ -1484,7 +1540,11 @@ function M:hit(c, mx, my)
 end
 
 function M:menuIdle()
+    -- (walking about the bar the mouse is the head's)
+    if self.walking then return false end
     local main = MainScreen.instance
+    -- (the menu put away by H: only the cards over the scene can be in the way)
+    if self.uiOff then return knoxMenuMouseFree(self.javaObject, nil) == true end
     if not main or main.inGame or not main.javaObject or not main.bottomPanel then return false end
     if not main:getIsVisible() or not main.bottomPanel:getIsVisible() then return false end
     return knoxMenuMouseFree(self.javaObject, main.javaObject) == true
@@ -1561,7 +1621,7 @@ end
 
 --- How fast a risen one walks, units a second: as far as its walk clip carries
 --- the body in a cycle, over the cycle's time - measured against the hero's
---- walk, whose speed is set by hand (CFG.walkSpeed, feet seen right), so the
+--- walk, whose speed is set by hand (self.cfg.walkSpeed, feet seen right), so the
 --- clips' units need no guess. (A guessed speed "floated" them, 2026-10-16.)
 function M:zombieSpeed(c)
     local j = self.scene.javaObject
@@ -1573,7 +1633,7 @@ function M:zombieSpeed(c)
         local bs, bd = knoxMenuClipStride(j, c.id, "Bob_Walk"), knoxMenuClipSeconds(j, c.id, "Bob_Walk")
         if zs > 0 and zd > 0 and bs > 0 and bd > 0 then
             local hero = bs * 0.8 / bd   -- (knoxmenu_walk's m_SpeedScale: WALK_SPEED_SCALE below)
-            c.zData = CFG.walkSpeed * (zs * (c.walkScale or 0.55) / zd) / hero
+            c.zData = self.cfg.walkSpeed * (zs * (c.walkScale or 0.55) / zd) / hero
             print(string.format("[Knox] menu scene: %s walks at %.3f units/s (%s: %.3f per %.2f s; hero's %.3f per %.2f s)",
                 c.id, c.zData, clip, zs, zd, bs, bd))
         else
@@ -1595,7 +1655,7 @@ function M:zombieSpeed(c)
         end
     end
     -- 3. a guess
-    return CFG.zombieWalkSpeed * (c.walkK or 1)
+    return self.cfg.zombieWalkSpeed * (c.walkK or 1)
 end
 --- Turn a risen one towards `face` over `secs` (the short way round).
 function M:zombieTurn(c, face, secs)
@@ -1722,7 +1782,7 @@ function M:updateEntering(c, dt)
     if c.entering == "walk" then
         local dx, dz = c.seat.x - c.x, c.seat.z - c.z
         local d = math.sqrt(dx * dx + dz * dz)
-        local step = CFG.walkSpeed * dt
+        local step = self.cfg.walkSpeed * dt
         if d <= step then
             c.x, c.z = c.seat.x, c.seat.z
             c.entering = "sit"
@@ -1748,7 +1808,7 @@ function M:updateEntering(c, dt)
             c.face, c.faceNow = c.seat.face, nil
             c.yaw = self:yawOf(c.face)
             self:place(c)
-            c.height = CFG.sitHeight
+            c.height = self.cfg.sitHeight
             c.entering = nil
             self:setAnim(c, "knoxmenu_warm")
             c.nextAt = 8 + ZombRand(100) / 10
@@ -1828,7 +1888,7 @@ function M:updateLeaving(dt)
         local turn = math.min(1, c.clock / 0.4)
         c.faceNow = c.faceFrom + (c.faceTo - c.faceFrom) * turn
         c.yaw = self:yawOf(c.faceNow)
-        local speed = CFG.walkSpeed * math.min(1, c.clock / 0.3)
+        local speed = self.cfg.walkSpeed * math.min(1, c.clock / 0.3)
         self:steps(c)
         c.x = c.x + c.dirX * speed * dt
         c.z = c.z + c.dirZ * speed * dt
@@ -1957,18 +2017,243 @@ function M:render()
     if knoxMenuUiSkip then knoxMenuUiSkip(false) end
 end
 
+--- H puts the whole menu away and brings it back (the author, 2026-11-01): the game's items,
+--- the title, the news, the buttons of other mods - all but the scene and what comes up over
+--- it: a hero's card (the scene's own), the radio's, a bag's and a keepsake carried off it.
+--- It fades out first; then the elements are hidden for real (unseen, they still took the mouse
+--- and the clicks). Kept over Tab; the game started, it is shown again.
+local UI_HIDE_FADE = 0.35   -- s
+KnoxMenuScene.uiHidden = false
+
+local function keepsShown(self, el)
+    if el == self.javaObject or (self.fader and el == self.fader.javaObject) then return true end
+    for _, ui in ipairs({KnoxRadioCard, KnoxBagCard, KnoxKeepDragLayer}) do
+        if ui and ui.instance and ui.instance.javaObject == el then return true end
+    end
+    return false
+end
+
+--- Hide the menu's elements (show false) or show those hidden again. intoGame: the main
+--- screen's own is the game's (it hides it itself as a save loads).
+function M:menuElements(show, intoGame)
+    if show then
+        local main = MainScreen.instance and MainScreen.instance.javaObject
+        for _, el in ipairs(self.uiHid or {}) do
+            if not (intoGame and el == main) then el:setVisible(true) end
+        end
+        self.uiHid, self.uiOff = nil, false
+        return
+    end
+    local list = {}
+    local all = UIManager.getUI()
+    for i = 0, all:size() - 1 do
+        local el = all:get(i)
+        if el:isVisible() and not keepsShown(self, el) then table.insert(list, el) end
+    end
+    for _, el in ipairs(list) do el:setVisible(false) end
+    self.uiHid, self.uiOff = list, true
+end
+
+--- H pressed: the menu away or back. Not while a key may be typed or assigned, nor while
+--- something is opened over the menu (as Tab).
+function M:updateUiHide()
+    local down = isKeyDown(Keyboard.KEY_H) == true
+    local press = down and not self.hWas
+    self.hWas = down
+    if not press or self.mode ~= "idle" or self.ctxMenu or self.tuning or self.switchK or self.walking then return end
+    if isKeyDown(Keyboard.KEY_LMENU) or isKeyDown(Keyboard.KEY_RMENU) or isKeyDown(Keyboard.KEY_LSHIFT)
+        or isKeyDown(Keyboard.KEY_RSHIFT) or isKeyDown(Keyboard.KEY_LCONTROL) or isKeyDown(Keyboard.KEY_RCONTROL) then return end
+    if KnoxMenuKeep and KnoxMenuKeep.drag then return end
+    if not KnoxMenuScene.uiHidden then
+        local main = MainScreen.instance
+        if not main or main.inGame or not main.bottomPanel or not main:getIsVisible() or not main.bottomPanel:getIsVisible() then return end
+        if KnoxMenuNewsReader and KnoxMenuNewsReader.instance then return end
+        if (KnoxSettings and KnoxSettings.instance) or (KnoxEditor and KnoxEditor.instance) then return end
+    end
+    KnoxMenuScene.uiHidden = not KnoxMenuScene.uiHidden
+end
+
 --- The menu over the camp fades away with the music while a hero gets up and
 --- walks off (the author's wish, 2026-10-15), and comes back if he comes back.
+--- H puts it away the same way, quicker (see menuElements).
 function M:updateMenuFade(dt)
     if not knoxMenuUiAlpha then return end
-    local want = (self.mode == "leaving" or self.mode == "launched") and 0 or 1
+    local going = self.mode == "leaving" or self.mode == "launched"
+    local hide = KnoxMenuScene.uiHidden and not going
+    local want = (going or hide) and 0 or 1
     local k = self.menuK or 1
-    if k > want then k = math.max(want, k - dt / 1.5)
-    elseif k < want then k = math.min(want, k + dt / 0.6) end
+    local fast = KnoxMenuScene.uiHidden or self.uiOff or self.uiBack
+    if k > want then k = math.max(want, k - dt / (fast and not going and UI_HIDE_FADE or 1.5))
+    elseif k < want then k = math.min(want, k + dt / (fast and UI_HIDE_FADE or 0.6)) end
     self.menuK = k
+    -- (gone dark: hidden for real, and the cards over the scene drawn as they are; back, or a
+    -- hero leaving: shown again, still dark, to fade in or to go with the save)
+    if hide and k <= 0 and not self.uiOff then self:menuElements(false) end
+    if self.uiOff and not hide then
+        self:menuElements(true)
+        self.uiBack = true
+    end
+    if k >= 1 then self.uiBack = nil end
+    -- (ZombieBuddy's line and icon at the top: the game's frame draws them past the elements -
+    -- on the way they fade with everything, hidden they would be back; the author, 2026-11-01)
+    if knoxMenuWatermark and self.wmOff ~= (self.uiOff == true) then
+        self.wmOff = self.uiOff == true
+        knoxMenuWatermark(self.wmOff)
+    end
+    if self.uiOff then
+        if self.menuFaded then knoxMenuUiAlpha(1) end
+        self.menuFaded = false
+        return
+    end
     if k < 1 or self.menuFaded then
         knoxMenuUiAlpha(k * k * (3 - 2 * k))   -- (eased)
         self.menuFaded = k < 1
+    end
+end
+
+--- Tab: the menu's other scene, the camp or the bar (KnoxMenuPlace; the author,
+--- 2026-10-31). The other is built beside this one, both alive and drawn, and swipes in: the
+--- bar comes from the left, the camp from the right (the author, 2026-11-02: no picture
+--- standing still). This one goes when it's over. With
+--- the animations off, or if the video card refuses: this one goes dark, the other wakes up
+--- out of the dark as the menu's scene always does.
+local SWITCH_FADE = 0.35   -- s to dark
+local SWIPE_TIME = 0.85    -- s of the swipe
+-- (a frame of the new scene's own first: the camera comes after its first, the frame's targets on
+-- the video card after its third. The picture stands till then; a long frame doesn't jump: M:updateSwitch)
+local SWIPE_FROM = 6
+-- It waits for the heroes in their poses too, the old scene alive meanwhile, or they came in after the
+-- swipe (the author, 2026-11-02); clothes still being baked after a start aren't waited for, past this (s)
+local SWIPE_WAIT = 1.2
+
+--- Is everybody of this scene in a pose, to be shown as it comes?
+function M:heroesPosed()
+    for _, c in ipairs(self.chars) do
+        if not c.posedAt and not c.shownAt then return false end
+    end
+    return true
+end
+
+--- The swipe's way at its time, 0..1. It has weight (the author, 2026-11-02: at its start too, and
+--- not even in the middle): slow to gather speed, its fastest a moment, a longer way to a stop.
+local function swipeWay(s)
+    local k = math.max(0, math.min(1, s / SWIPE_TIME)) ^ 0.85
+    if k < 0.5 then return 8 * k * k * k * k end
+    return 1 - 8 * (1 - k) ^ 4
+end
+-- the motion blur: what the way takes in this time (s), of the screen's width; at most
+local SWIPE_SHUTTER, SWIPE_BLUR = 1 / 56, 0.078   -- (1/30, 0.14, then 1/50, 0.085 too strong: the author, 2026-11-02)
+
+--- The swipe has ended, or can't go on: this scene is just the menu's scene.
+function M:swipeOver()
+    local sw = KnoxMenuScene.swipe
+    KnoxMenuScene.swipe = nil
+    self.swipeIn, self.switchK = nil, nil
+    knoxMenuSwipeFree()
+    if sw then
+        -- (the one that went: not drawn from now on, whichever goes first this frame; off the UI outside of
+        -- drawing. The game's lights this one's: the last queued may be the other's.)
+        local old = sw.old
+        if self.lights then knoxMenuLightsQueued(self.lights, self.flick) end
+        if old then
+            old:setVisible(false)
+            local again
+            again = function()
+                Events.OnPreUIDraw.Remove(again)
+                old:retire()
+                if knoxBarPrepare then knoxBarPrepare() end
+            end
+            Events.OnPreUIDraw.Add(again)
+        end
+        print("[Knox] menu switch: Tab to the first move " .. ((sw.movedAt or getTimestampMs()) - sw.askedAt) .. " ms, the whole "
+            .. (getTimestampMs() - sw.askedAt) .. " ms")
+    end
+end
+
+function M:updateSwitch(dt)
+    if self.mode == "out" then return end
+    local down = isKeyDown(Keyboard.KEY_TAB) == true
+    local press = down and not self.tabWas
+    self.tabWas = down
+    if self.swipeIn then
+        local sw = KnoxMenuScene.swipe
+        knoxCampFades()
+        if not sw or knoxMenuSwipeFailed() or not T.animOn() then
+            self:swipeOver()
+        elseif self.frames >= SWIPE_FROM and (sw.t > 0 or self.clock >= SWIPE_WAIT or self:heroesPosed()) then
+            if not sw.movedAt then
+                sw.movedAt = getTimestampMs()
+                knoxCampSwipe(sw.dir)
+            end
+            sw.t = sw.t + math.min(dt, 1 / 30)
+            -- (the swing from when the scene starts to show: it gathers speed first)
+            if sw.t >= SWIPE_TIME * 0.25 then self.swingGoes = true end
+            if sw.t >= SWIPE_TIME then self:swipeOver() end
+        end
+        return
+    end
+    if self.switchK then
+        self.switchK = T.animOn() and math.min(1, self.switchK + dt / SWITCH_FADE) or 1
+        if self.switchK >= 1 and not self.switchQueued then
+            -- (built anew outside of drawing, as after a save is deleted)
+            self.switchQueued = true
+            local again
+            again = function()
+                Events.OnPreUIDraw.Remove(again)
+                -- (not if the game has started or the menu was built anew meanwhile)
+                if KnoxMenuScene.instance == self and knoxMenuInMenu() then
+                    if KnoxMenuScene.swipe then KnoxMenuScene.swipeBuild(self) else KnoxMenuScene.create() end
+                end
+            end
+            Events.OnPreUIDraw.Add(again)
+        end
+        return
+    end
+    if not press or not KnoxMenuPlace or not KnoxMenuBar or KnoxMenuScene.barFailed
+        or self.mode ~= "idle" or self.ctxMenu or self.tuning or self.walking then return end
+    -- (Alt+Tab leaves the game; Shift+Tab, Ctrl+Tab are not this key)
+    if isKeyDown(Keyboard.KEY_LMENU) or isKeyDown(Keyboard.KEY_RMENU) or isKeyDown(Keyboard.KEY_LSHIFT)
+        or isKeyDown(Keyboard.KEY_RSHIFT) or isKeyDown(Keyboard.KEY_LCONTROL) or isKeyDown(Keyboard.KEY_RCONTROL) then return end
+    -- (the menu's own items up, nothing opened over them: not while a screen,
+    -- a news post or a card is in front - the mouse can be anywhere)
+    local main = MainScreen.instance
+    if not main or main.inGame then return end
+    if not self.uiOff and (not main.bottomPanel or not main:getIsVisible() or not main.bottomPanel:getIsVisible()) then return end
+    if KnoxMenuNewsReader and KnoxMenuNewsReader.instance then return end
+    if KnoxMenuKeep and KnoxMenuKeep.drag then return end
+    -- (Knox's settings and the item editor leave the menu's items up: Tab can be
+    -- a key being assigned there)
+    if (KnoxSettings and KnoxSettings.instance) or (KnoxEditor and KnoxEditor.instance) then return end
+    if not pcall(KnoxMenuPlace.toggle) then return end
+    if T.animOn() and knoxMenuSwipeTake and not knoxMenuSwipeFailed() then
+        local ok, to = pcall(KnoxMenuPlace.current)
+        KnoxMenuScene.swipe = {dir = (ok and to == "bar") and -1 or 1, t = 0, askedAt = getTimestampMs()}
+        self.switchK = 1
+    else
+        self.switchK = 0
+    end
+end
+
+-- (a frame begins with neither of the two scenes drawn)
+Events.OnPostUIDraw.Add(function()
+    local sw = KnoxMenuScene.swipe
+    if sw then sw.drew = nil end
+end)
+
+--- Last of the scene's drawing, the menu's items still to come over it. Each of the two is kept as
+--- it's drawn, the second puts both up. Whichever: both are back-most, and the game swaps such
+--- ones every frame (the author, 2026-11-02: the old scene blinked over the swipe, every other frame).
+function M:drawSwitch(el)
+    local sw = KnoxMenuScene.swipe
+    if not sw then
+        if self.switchK then el:drawRect(0, 0, el.width, el.height, self.switchK, 0, 0, 0) end
+    elseif not sw.drew then
+        sw.drew = true
+        knoxMenuSwipeTake(self.swipeIn == true)
+    else
+        local k = swipeWay(sw.t)
+        local blur = math.min(SWIPE_BLUR, swipeWay(sw.t + SWIPE_SHUTTER / 2) - swipeWay(sw.t - SWIPE_SHUTTER / 2))
+        knoxMenuSwipeDraw(k, sw.dir, self.swipeIn == true, blur)
     end
 end
 
@@ -1985,13 +2270,19 @@ function M:frame()
 
     self.dt = dt
     self:updateCamera(t, dt)
-    self:updateSounds(t)
-    self:updateMenuFade(dt)
+    -- (the one going: only its picture is left to it)
+    if self.mode ~= "out" then
+        self:updateSounds(t)
+        self:updateUiHide()
+        self:updateMenuFade(dt)
+    end
+    self:updateSwitch(dt)
 
     if self.mode == "launched" then
         if not knoxMenuInMenu() then
             -- the game is loading: stay dark (the scene goes with OnGameStart)
             self.launchClock = 0
+            if self.restWhileLoading then self:restWhileLoading() end
             return
         end
         self.launchClock = self.launchClock + dt
@@ -2005,7 +2296,8 @@ function M:frame()
             -- Checked all the time, a few times a second: the model is rebuilt
             -- while its clothes load, and every rebuild drops it back to idle.
             if (o.animAsked or 0) <= t then
-                o.animAsked = t + 0.2
+                -- (a swipe waits for them: asked every frame)
+                o.animAsked = self.swipeIn and t or t + 0.2
                 knoxMenuAnim(self.scene.javaObject, o.id, o.anim)
             end
             self:watchPose(o, t)
@@ -2099,6 +2391,8 @@ function M:frame()
     local down, rdown = isMouseButtonDown(0), isMouseButtonDown(1)
     local clicked, rclicked = down and not self.wasDown, rdown and not self.wasRDown
     self.wasDown, self.wasRDown = down, rdown
+    -- (going dark to the other scene: nobody leaves, nothing is picked up any more)
+    if self.switchK then clicked, rclicked, hover = false, false, nil end
     -- keepsakes: carried, picked up, taken away - their clicks are their own
     if self:updateKeeps(down, clicked, rclicked) or (KnoxMenuKeep and KnoxMenuKeep.drag) then
         clicked, rclicked, hover = false, false, nil
@@ -2125,6 +2419,8 @@ function M:frame()
         end
         clicked, rclicked = false, false
     end
+    -- (the bar's garland: B:pressSwitch)
+    if self.pressSwitch and self:pressSwitch(clicked) then clicked = false end
     if self.ctxMenu then
         -- a hero's menu is open (right click): the clicks are its own
         if self.mode ~= "idle" or self.newsHold or not self:menuIdle() then
@@ -2168,6 +2464,8 @@ function M:frame()
     self:updateFader(dt)
     self:updateCard()
     self:updateTuner()
+    -- (two scenes on the screen, one set of the game's lights: each its own as it's drawn)
+    if KnoxMenuScene.swipe and self.lights then knoxMenuLightsQueued(self.lights, self.flick) end
     self:drawBackdrop()
 end
 
@@ -2343,6 +2641,7 @@ function M:drawFx(el)
     knoxMenuResetGL()
     if self.frames < 3 then
         el:drawRect(0, 0, el.width, el.height, 1, 0, 0, 0)
+        self:drawSwitch(el)
         return
     end
     local t, flick = self.clock, self.flick
@@ -2433,7 +2732,8 @@ function M:drawFx(el)
 
     -- waking up: the fire itself out of the dark in the first seconds
     local wake = 1 - math.min(1, math.max(0, (t - 0.4) / 1.6))
-    if wake > 0 then el:drawRect(0, 0, el.width, el.height, wake, 0, 0, 0) end
+    if wake > 0 and not self.swiped then el:drawRect(0, 0, el.width, el.height, wake, 0, 0, 0) end
+    self:drawSwitch(el)
 end
 
 -- Hover card ------------------------------------------------------------------
@@ -2712,7 +3012,8 @@ end
 function M:updateTuner()
     -- (a tool for laying the scene out: with the game's -debug only)
     if not isDebugEnabled() then return end
-    if pressed(self, Keyboard.KEY_F9) then
+    -- (the bar has no scene models to tune: its room is its own frame's)
+    if pressed(self, Keyboard.KEY_F9) and #self.objects > 0 then
         self.tuning = not self.tuning
         self.tuneIndex = self.tuneIndex or 1
     end
@@ -2789,12 +3090,15 @@ function M:new()
     o.sparks = {}
     o.keys = {}
     o.wasDown = true   -- a click that brought the menu up is not a click on a hero
+    o.wasRDown = true  -- (nor the right button held through a switch: it takes a keepsake away)
+    o.tabWas = true    -- nor is a Tab held then a switch of the scene
+    -- the scene's layout: the camp's (KnoxMenuBar puts its own here)
+    o.cfg = CFG
     return o
 end
 
--- (not "createChildren": ISUIElement:instantiate calls that name itself, and
--- the whole scene was built twice)
-function M:buildScene()
+--- The 2D art the scene draws around its 3D (KnoxMenuBar has its own).
+function M:loadTextures()
     self.tex = {
         sky = getTexture("media/ui/knoxmenu/sky.png"),
         trees = getTexture("media/ui/knoxmenu/treeline.png"),
@@ -2808,6 +3112,17 @@ function M:buildScene()
         local tex = getTexture(string.format("media/ui/knoxmenu/flame_%02d.png", i))
         if tex then table.insert(self.tex.flames, tex) end
     end
+end
+
+--- Was the scene built whole? (Without its art the camp is not shown at all.)
+function M:builtOk()
+    return self.tex ~= nil and #self.tex.flames > 0 and self.tex.sky ~= nil
+end
+
+-- (not "createChildren": ISUIElement:instantiate calls that name itself, and
+-- the whole scene was built twice)
+function M:buildScene()
+    self:loadTextures()
 
     local scene = ISUI3DScene:new(0, 0, self.width, self.height)
     scene.background = false
@@ -2856,13 +3171,43 @@ local function campTick()
     campTickEvent.Remove(campTick)
 end
 
+--- The scene that swiped out is done: off the screen. (Only its own: the menu's sounds, the
+--- look and the skin passed on when the other was built, KnoxMenuScene.swipeBuild.)
+function M:retire()
+    if self.retired then return end
+    self.retired = true
+    if self.walkOff then self:walkOff() end
+    if self.fader then self.fader:removeFromUIManager() end
+    if self.scene and self.scene.javaObject then knoxMenuCameraOff(self.scene.javaObject) end
+    if self.frameLoaded ~= nil then
+        if knoxBarStop then knoxBarStop() end
+    else
+        -- (the camp's tints; the scene that stays keeps its lights)
+        knoxMenuTintClear()
+        local now = KnoxMenuScene.instance
+        if now and now.lights then knoxMenuSceneLights(now.lights) end
+    end
+    self:removeFromUIManager()
+end
+
 function KnoxMenuScene.destroy(intoGame)
+    local sw = KnoxMenuScene.swipe
+    if sw then
+        KnoxMenuScene.swipe = nil
+        if sw.old then sw.old:retire() end
+        knoxMenuSwipeFree()
+    end
+    if intoGame == true and knoxBarForget then knoxBarForget() end
+    -- (the bar's look goes with the bar: its skin, the frost on the menu's items)
+    if T.barLook then T.barLook(false) end
     -- (the menu never left faded)
     if knoxMenuUiAlpha then knoxMenuUiAlpha(1) end
     if knoxMenuUiSkip then knoxMenuUiSkip(false) end
     -- the lights live in Java and outlive a Lua reset (joining a server): clear
     -- them even with no scene of this Lua's own
     if knoxMenuTintClear then knoxMenuTintClear() end
+    -- (and the bar's frame: all it holds off the video card, 2026-10-31)
+    if knoxBarStop then knoxBarStop() end
     -- (the game's menu ambience back, as it was before the camp)
     if knoxMenuMuteAmbience then knoxMenuMuteAmbience(false) end
     -- (a hero's way into the game ends with it: the steps stop, the camp's last
@@ -2875,8 +3220,14 @@ function KnoxMenuScene.destroy(intoGame)
         end
     end
     local self = KnoxMenuScene.instance
+    if intoGame == true then KnoxMenuScene.uiHidden = false end
+    if knoxMenuWatermark and not KnoxMenuScene.uiHidden then knoxMenuWatermark(false) end
     if not self then return end
     KnoxMenuScene.instance = nil
+    -- (the menu put away by H: to the scene built next, or back for the game)
+    if self.uiOff then
+        if intoGame == true then self:menuElements(true, true) else KnoxMenuScene.uiHidList = self.uiHid end
+    end
     self:stopSounds()
     if KnoxRadioCard then KnoxRadioCard.hide() end
     if KnoxBagCard then KnoxBagCard.hide() end
@@ -2889,6 +3240,50 @@ end
 
 function KnoxMenuScene.create()
     KnoxMenuScene.destroy()
+    -- (the menu's elements H hid under the scene before, if any: kept hidden under the next one,
+    -- or shown if none comes)
+    local hid = KnoxMenuScene.uiHidList
+    KnoxMenuScene.uiHidList = nil
+    if not KnoxMenuScene.createScene(hid) and hid then
+        for _, el in ipairs(hid) do el:setVisible(true) end
+        KnoxMenuScene.uiHidden = false
+        if knoxMenuWatermark then knoxMenuWatermark(false) end
+    end
+    -- (no scene came to swipe in)
+    if KnoxMenuScene.swipe and not KnoxMenuScene.instance then
+        KnoxMenuScene.swipe = nil
+        knoxMenuSwipeFree()
+    end
+end
+
+--- The other scene for a swipe, this one still alive under it (M:updateSwitch).
+function KnoxMenuScene.swipeBuild(old)
+    local sw = KnoxMenuScene.swipe
+    old.mode = "out"
+    sw.old = old
+    -- (what is the menu's, not the scene's, passes on now: as KnoxMenuScene.destroy. Its sounds die
+    -- out by themselves, the other's come up: the author, 2026-11-02)
+    knoxCampCrossfade()
+    old:stopSounds()
+    if KnoxRadioCard then KnoxRadioCard.hide() end
+    if KnoxBagCard then KnoxBagCard.hide() end
+    if T.barLook then T.barLook(false) end
+    if knoxMenuUiAlpha then knoxMenuUiAlpha(1) end
+    local hid = old.uiOff and old.uiHid or nil
+    old.uiOff = nil
+    local built = KnoxMenuScene.createScene(hid)
+    if not built then
+        -- (no scene came: KnoxMenuScene.destroy if the bar's failed; none at all, no menu scene)
+        KnoxMenuScene.create()
+        return
+    end
+    -- (it looks where this one looks: a new scene's view drifting to the mouse moved the sky)
+    local new = KnoxMenuScene.instance
+    new.lookX, new.lookY = old.lookX, old.lookY
+end
+
+--- The scene (create, above); true if one was built. hid: the menu's elements hidden by H.
+function KnoxMenuScene.createScene(hid)
     if not T.on("menu") or not knoxMenuInit then return end
     local main = MainScreen.instance
     if not main or main.inGame then return end
@@ -2900,23 +3295,46 @@ function KnoxMenuScene.create()
     -- the scene's first frame was too late - the author's test, 2026-10-15)
     if knoxMenuMuteAmbience then knoxMenuMuteAmbience(true) end
     T.ensure()
-    local scene = KnoxMenuScene:new()
-    scene:initialise()
-    scene:instantiate()
-    KnoxMenuScene.instance = scene
-    local builtMs = getTimestampMs()
-    local ok, err = pcall(scene.buildScene, scene)
-    builtMs = getTimestampMs() - builtMs
-    if not ok or not scene.tex or #scene.tex.flames == 0 or not scene.tex.sky then
-        print("[Knox] menu scene: not built: " .. tostring(err))
-        KnoxMenuScene.destroy()
-        return
+    -- the camp, or the bar in winter (KnoxMenuPlace; Tab switches them). A bar
+    -- that can't be built leaves the menu its camp.
+    local place = "camp"
+    if KnoxMenuPlace and KnoxMenuBar and not KnoxMenuScene.barFailed then
+        local okPlace, kept = pcall(KnoxMenuPlace.current)
+        if okPlace and kept then place = kept end
     end
-    scene:addToUIManager()
-    scene:backMost()
-    print("[Knox] menu scene: " .. #scene.chars .. " of the last saves' heroes, " .. #scene.objects .. " objects, built in "
-        .. builtMs .. " ms")
-    scene.startMs = getTimestampMs()
+    local cls = (place == "bar") and KnoxMenuBar or KnoxMenuScene
+    while true do
+        if cls == KnoxMenuScene and T.campLook then T.campLook() end
+        local scene = cls:new()
+        scene:initialise()
+        scene:instantiate()
+        KnoxMenuScene.instance = scene
+        local builtMs = getTimestampMs()
+        local ok, err = pcall(scene.buildScene, scene)
+        builtMs = getTimestampMs() - builtMs
+        if ok and scene:builtOk() then
+            scene:addToUIManager()
+            scene:backMost()
+            if hid then scene.uiHid, scene.uiOff, scene.menuK = hid, true, 0 end
+            -- (switchK: nothing is pointed at or pressed till it's in)
+            if KnoxMenuScene.swipe then
+                scene.swipeIn, scene.swiped, scene.switchK = true, true, 1
+                scene.swingDir = KnoxMenuScene.swipe.dir
+            end
+            print("[Knox] menu scene (" .. place .. "): " .. #scene.chars .. " of the last saves' heroes, " .. #scene.objects
+                .. " objects, built in " .. builtMs .. " ms")
+            scene.startMs = getTimestampMs()
+            -- (the bar's files in the background: the next switch to it doesn't wait for them)
+            if knoxBarPrepare then knoxBarPrepare() end
+            return true
+        end
+        print("[Knox] menu scene (" .. place .. "): not built: " .. tostring(err))
+        KnoxMenuScene.destroy()
+        if cls == KnoxMenuScene then return end
+        cls, place = KnoxMenuScene, "camp"
+        KnoxMenuScene.barFailed = true   -- (till the game is restarted: Tab has nothing to switch to)
+        if knoxMenuMuteAmbience then knoxMenuMuteAmbience(true) end
+    end
 end
 
 Events.OnMainMenuEnter.Add(KnoxMenuScene.create)

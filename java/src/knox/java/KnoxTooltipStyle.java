@@ -114,6 +114,7 @@ public class KnoxTooltipStyle {
         hideTitle = false;
         knownOnly = false;
         dropLabel = null;
+        fade = 1.0;
         if (saved == null) return;
         try {
             fLineSpacing.setInt(null, saved[0]);
@@ -131,6 +132,18 @@ public class KnoxTooltipStyle {
     @LuaMethod(name = "knoxTooltipWrapWidth", global = true)
     public static void knoxTooltipWrapWidth(double px) {
         maxWidth = Math.max(80, (int) Math.round(px));
+    }
+
+    /**
+     * How far the tooltip has faded in (0..1): every line, bar and badge drawn here
+     * takes it (the author, 2026-10-30: the tooltip came up at once). Set by Lua
+     * for the tooltip being drawn; 1 at its end.
+     */
+    public static double fade = 1.0;
+
+    @LuaMethod(name = "knoxTooltipFade", global = true)
+    public static void knoxTooltipFade(double k) {
+        fade = Math.max(0.0, Math.min(1.0, k));
     }
 
     @LuaMethod(name = "knoxTooltipHideTitle", global = true)
@@ -265,7 +278,7 @@ public class KnoxTooltipStyle {
             int w = f.getWidth(line);
             double ax = ax0;
             if (align == 1) ax -= w; else if (align == 2) ax -= w / 2.0;
-            f.drawString((float) ax, (float) ay, line, c[0], c[1], c[2], (float) a);
+            f.drawString((float) ax, (float) ay, line, c[0], c[1], c[2], (float) (a * fade));
             ay += lineNow;
         }
     }
@@ -290,7 +303,7 @@ public class KnoxTooltipStyle {
 
     static void rect(ObjectTooltip ui, int x, int y, int w, int h, float[] c, double a) {
         ui.DrawTextureScaledColor(null, (double) x, (double) y, (double) w, (double) h,
-                (double) c[0], (double) c[1], (double) c[2], a);
+                (double) c[0], (double) c[1], (double) c[2], a * fade);
     }
 
     /**
@@ -319,14 +332,14 @@ public class KnoxTooltipStyle {
         int h = f.getLineHeight();
         int bx = (int) x, by = (int) y;
         ui.DrawTextureScaledColor(null, (double) bx, (double) by, (double) w, (double) h,
-                (double) c[0], (double) c[1], (double) c[2], 0.16 * a);
+                (double) c[0], (double) c[1], (double) c[2], 0.16 * a * fade);
         rect(ui, bx, by, w, 1, c, 0.7 * a);
         rect(ui, bx, by + h - 1, w, 1, c, 0.7 * a);
         rect(ui, bx, by, 1, h, c, 0.7 * a);
         rect(ui, bx + w - 1, by, 1, h, c, 0.7 * a);
         double ax = bx + padX + ui.getAbsoluteX() + ui.getXScroll();
         double ay = by + ui.getAbsoluteY() + ui.getYScroll();
-        f.drawString((float) ax, (float) ay, text, c[0], c[1], c[2], (float) a);
+        f.drawString((float) ax, (float) ay, text, c[0], c[1], c[2], (float) (a * fade));
     }
 
     /** The game's bar colors (green ... yellow ... red) to the palette. */
@@ -404,6 +417,57 @@ public class KnoxTooltipStyle {
         }
     }
 
+    /**
+     * The hidden rounds (the author, 2026-10-31): how many rounds a magazine or a gun
+     * holds is not told; held R does. Set by Lua at the game's start, with the menu on R.
+     * In the game's own tooltips too, so with or without Knox's look. A jam and whether it
+     * has a magazine stay; "no round in the chamber" goes: it says there are rounds.
+     */
+    public static boolean hideRounds;
+
+    @LuaMethod(name = "knoxHideRounds", global = true)
+    public static void knoxHideRounds(boolean on) {
+        hideRounds = on;
+    }
+
+    /** The item whose tooltip is being laid out (InventoryItem.DoTooltipEmbedded), else null. */
+    public static zombie.inventory.InventoryItem tipItem;
+
+    /**
+     * Its lines that tell how many rounds: a gun's "rounds: 12+1 / 15", its spent rounds
+     * and "no round in the chamber"; a magazine's "Ammo Count: 7 / 15". (Both are laid out
+     * in DoTooltipEmbedded, the gun's in its DoTooltip called from there; the layout is
+     * rendered at its end.)
+     */
+    public static void hideRoundLines(zombie.inventory.InventoryItem item, ObjectTooltip.Layout layout) {
+        if (item.getMaxAmmo() <= 0) return;
+        String max = " / " + item.getMaxAmmo();
+        if (item instanceof zombie.inventory.types.HandWeapon gun) {
+            String count = gun.getCurrentAmmoCount() + (gun.isRoundChambered() ? "+1" : "") + max;
+            String spent = gun.getSpentRoundCount() + max;
+            String noRound = Translator.getText("Tooltip_weapon_NoRoundChambered", new Object[0]);
+            String spentRound = Translator.getText("Tooltip_weapon_SpentRoundChambered", new Object[0]);
+            String spentRounds = Translator.getText("Tooltip_weapon_SpentRounds", new Object[0]) + ":";
+            layout.items.removeIf(it -> count.equals(it.value) || (spent.equals(it.value) && spentRounds.equals(it.label))
+                    || noRound.equals(it.label) || spentRound.equals(it.label));
+            return;
+        }
+        String label = Translator.getText("Tooltip_weapon_AmmoCount", new Object[0]) + ":";
+        layout.items.removeIf(it -> label.equals(it.label));
+    }
+
+    @Patch(className = "zombie.inventory.InventoryItem", methodName = "DoTooltipEmbedded")
+    public static class TipItem {
+        @Patch.OnEnter
+        public static void enter(@Patch.This zombie.inventory.InventoryItem self) {
+            tipItem = self;
+        }
+
+        @Patch.OnExit
+        public static void exit() {
+            tipItem = null;
+        }
+    }
     private static String weightLabel;
     /** A line Knox draws itself (the item's description), left out of the game's part. */
     public static String dropLabel;
@@ -479,6 +543,7 @@ public class KnoxTooltipStyle {
         @Patch.OnEnter
         public static void enter(@Patch.This ObjectTooltip.Layout self) {
             if (active && hideTitle) dropDuplicates(self);
+            if (hideRounds && tipItem != null) hideRoundLines(tipItem, self);
         }
     }
 
@@ -540,7 +605,7 @@ public class KnoxTooltipStyle {
                     rect(ui, x, y, cell, cell, TILE_FRAME, 1.0);
                     rect(ui, x + frame, y + frame, cell - frame * 2, cell - frame * 2, TRACK, 1.0);
                 }
-                ui.DrawTextureScaledAspect(it.getTex(), x + pad, y + pad, icon, icon, 1.0, 1.0, 1.0, 1.0);
+                ui.DrawTextureScaledAspect(it.getTex(), x + pad, y + pad, icon, icon, 1.0, 1.0, 1.0, fade);
                 x += cell + gap;
                 any = true;
             }

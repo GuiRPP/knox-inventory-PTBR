@@ -172,6 +172,9 @@ function MainScreen:prerenderBottomPanelLabel()
         local pw = math.floor((w + pad * 2) * fe + 0.5)
         self:drawRect(-pad + dx, 3, pw, ph, f * ma, a.r, a.g, a.b)
         self:drawRect(-pad + dx, 3, 4, ph, f * ma, ink.r, ink.g, ink.b)
+        -- (the winter bar's menu: its edge cracks with the cold under the mouse)
+        local main = MainScreen.instance
+        T.frost(self, -pad + dx, 3, w + pad * 2, ph, main ~= nil and main.overBottomPanelButton == self, f * ma, true)
         r, g, b = r + (ink.r - r) * f, g + (ink.g - g) * f, b + (ink.b - b) * f
     end
     local y = math.floor((math.min(h, line) - T.fontH(font)) / 2)

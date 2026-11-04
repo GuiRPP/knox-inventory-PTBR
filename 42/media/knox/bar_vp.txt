@@ -1,0 +1,47 @@
+/* The winter bar's furniture from another mod (the author, 2026-10-31: wanted of every player,
+   their files stay theirs and are read where they are installed - PZVoxelStudioViewpoint,
+   Workshop 3810302175; without it the menu stays in the camp). The round tables and the chairs of the mockup of the last ones
+   leaving; the table shoved over in the smashed window. */
+
+module KnoxMenuBarVp
+{
+    model RoundTable
+    {
+        mesh = media/voxel-studio/80cb650d-c348-4e6a-b4f6-1c6a532f4a3a/r1-1790626250635/model.obj,
+        texture = media/voxel-studio/80cb650d-c348-4e6a-b4f6-1c6a532f4a3a/r1-1790626250635/model-rp-texture.png,
+        shader = knoxBar,
+        scale = 1.0,
+    }
+
+    model ChairA
+    {
+        mesh = media/voxel-studio/fd2ee5ca-869e-4efb-ab58-cdf0821134da/h-1d9782842a/i0-model.obj,
+        texture = media/voxel-studio/fd2ee5ca-869e-4efb-ab58-cdf0821134da/h-1d9782842a/i0-texture.png,
+        shader = knoxBar,
+        scale = 1.0,
+    }
+
+    model ChairB
+    {
+        mesh = media/voxel-studio/85a85211-a176-4e72-a7dd-01e11601bf5f/h-9cea87734a/i0-model.obj,
+        texture = media/voxel-studio/85a85211-a176-4e72-a7dd-01e11601bf5f/h-9cea87734a/i0-texture.png,
+        shader = knoxBar,
+        scale = 1.0,
+    }
+
+    model ChairC
+    {
+        mesh = media/voxel-studio/6181a97f-4e5d-44a2-adf3-2dc7009ee912/h-3c8a54e693/i0-model.obj,
+        texture = media/voxel-studio/6181a97f-4e5d-44a2-adf3-2dc7009ee912/h-3c8a54e693/i0-texture.png,
+        shader = knoxBar,
+        scale = 1.0,
+    }
+
+    model LongTable
+    {
+        mesh = media/voxel-studio/f72a2934-319e-44db-81b7-9c203d8a4b9c/r1-1790446920895/model.obj,
+        texture = media/voxel-studio/f72a2934-319e-44db-81b7-9c203d8a4b9c/r1-1790446920895/model-rp-texture.png,
+        shader = knoxBar,
+        scale = 1.0,
+    }
+}

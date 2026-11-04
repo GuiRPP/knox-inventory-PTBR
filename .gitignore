@@ -23,6 +23,7 @@
 # licence forbids handing the files out on their own (see 42/CREDITS.txt)
 /42/media/sound/knox_steps/boots_*.ogg
 /42/media/sound/knox_radio/press_*.ogg
+/42/media/sound/knox_page/*.ogg
 
 # --- Built: the Java part is built by java/build.ps1
 /42/media/java/client/*.jar

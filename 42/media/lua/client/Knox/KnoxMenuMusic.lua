@@ -1205,9 +1205,11 @@ local function look()
     if not main or main.inGame or not main.javaObject then return end
     if not T.on("menu") then return end
     if not MM.active then MM.start() end
-    -- (the menu's own screens over the camp, or no camp: no card)
+    -- (the menu's own screens over the camp, or no camp: no card; the menu put away by H is not
+    -- a screen over it - the author, 2026-11-01)
     local panel = main.bottomPanel
-    if (panel ~= nil and not panel:getIsVisible()) or not (KnoxMenuScene and KnoxMenuScene.instance) then RC.hide() end
+    local scene = KnoxMenuScene and KnoxMenuScene.instance
+    if (panel ~= nil and not panel:getIsVisible() and not (scene and scene.uiOff)) or not scene then RC.hide() end
 end
 
 Events.OnPreUIDraw.Add(look)

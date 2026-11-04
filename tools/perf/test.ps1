@@ -23,6 +23,7 @@ $fileLevel = @(
     'KnoxFootprint.lua: Events.OnTick.Add(function()',          # inside "if not the server" at file level
     'KnoxGenerator.lua: if Events.OnClientCommand then Events.OnClientCommand.Add(G.onClientCommand) end',
     'KnoxGenerator.lua: if Events.OnServerCommand then Events.OnServerCommand.Add(G.onServerCommand) end',
+    'KnoxRMenu.lua: Events.OnPressReloadButton.Add(function(player, gun)', # inside "if not wrapped yet" at file level
     'KnoxMenuScene.lua: Events.OnClothingUpdated.Add(function(player)', # inside "if Events.OnClothingUpdated" at file level
     'KnoxMenuScene.lua: Events.OnTick.Add(function()',          # the same
     'KnoxMusicNet.lua: if Events.OnClientCommand then Events.OnClientCommand.Add(MN.onClientCommand) end',

@@ -312,7 +312,7 @@ local function statsOf(item)
         row("Range", round(item:getMaxRange(), 2), math.min(1, item:getMaxRange() / 2))
         row("Speed", round(item:getBaseSpeed(), 2), math.min(1, item:getBaseSpeed() / 1.5))
         row("Crit", round(item:getCriticalChance()) .. "%", math.min(1, item:getCriticalChance() / 100))
-        if item:isRanged() and item:getMaxAmmo() > 0 then
+        if item:isRanged() and item:getMaxAmmo() > 0 and not (KnoxMagKnown and KnoxMagKnown.hide) then
             row("Ammo", item:getCurrentAmmoCount() .. " / " .. item:getMaxAmmo(), item:getCurrentAmmoCount() / item:getMaxAmmo())
         end
         condition()

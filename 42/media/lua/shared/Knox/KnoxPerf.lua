@@ -297,7 +297,7 @@ P.DETAIL = {
     {"KnoxGrid", "useOf"},
     {"KnoxTheme", "drawText"}, {"KnoxTheme", "measure"}, {"KnoxTheme", "upper"}, {"KnoxTheme", "fit"},
     {"KnoxTheme", "label"}, {"KnoxTheme", "plate"}, {"KnoxTheme", "inkCentre"}, {"KnoxTheme", "inkOrigin"},
-    {"KnoxTheme", "outlinedRight"}, {"KnoxTheme", "tileFrame"}, {"KnoxTheme", "tileMeter"}, {"KnoxTheme", "categoryOf"},
+    {"KnoxTheme", "outlinedRight"}, {"KnoxTheme", "tileFrame"}, {"KnoxTheme", "tileFill"}, {"KnoxTheme", "categoryOf"},
     {"KnoxTheme", "settleIn"}, {"KnoxTheme", "marquee"}, {"KnoxTheme", "iconButton"}, {"KnoxTheme", "button"},
 }
 P.DETAIL_GAME = {"getText"}   -- (the game's, by name: Knox looks it up when it calls it)

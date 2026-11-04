@@ -315,4 +315,90 @@ run("main menu: the modules first", function()
     W:close()
 end)
 
+-- the winter bar's look (the author, 2026-11-01): the ice skin second, worn in the bar unless a skin
+-- was chosen; the frost on a frame under the mouse
+do
+    local T = KnoxTheme
+    check("skins: the ice second", T.SKINS[2].id == "ice", T.SKINS[2].id)
+    local chosen = T.settings["skin"]
+    T.settings["skin"] = nil
+    local sand = T.color.accent.r
+    T.barLook(true)
+    check("bar: the ice", T.skin() == "ice" and T.color.accent.r ~= sand and math.abs(T.color.accent.b - 0xe0 / 255) < 0.001)
+    check("bar: the ice's own ink", math.abs(T.color.ink.b - 0x1b / 255) < 0.001)
+    local n, out = 0, 0
+    local ui = {drawRect = function(_, x, y, w, h, a)
+        n = n + 1
+        if x < -4 or y < -4 or x + w > 124 or y + h > 44 or not (a > 0) then out = out + 1 end
+    end}
+    local function frame(hot)
+        n = 0
+        T.frost(ui, 0, 0, 120, 40, hot, 1)
+        return n
+    end
+    check("frost: nothing without the mouse", frame(false) == 0)
+    local t0 = getTimestampMs()
+    clock = t0
+    local a0 = frame(true)
+    clock = t0 + 100
+    local a1 = frame(true)
+    clock = t0 + 400
+    local a2 = frame(true)
+    check("frost: it grows", a0 < a1 and a1 < a2, a0 .. " " .. a1 .. " " .. a2)
+    check("frost: chips and cracks", a2 > 25, a2)
+    check("frost: on and round its frame", out == 0, out)
+    clock = t0 + 500
+    check("frost: the mouse gone, still there", frame(false) == a2)
+    clock = t0 + 1000
+    check("frost: faded", frame(false) == 0)
+    check("frost: gone for good", frame(false) == 0)
+    -- (the menu's item: a wide plate, with more cracks, dark ones)
+    local darkR = {}
+    local plate = {drawRect = function(_, x, y, w, h, a, r)
+        n = n + 1
+        darkR[r] = true
+    end}
+    n = 0
+    clock = t0 + 2000
+    T.frost(plate, -20, 3, 520, 50, true, 1, true)
+    clock = t0 + 2400
+    n = 0
+    T.frost(plate, -20, 3, 520, 50, true, 1, true)
+    check("frost: more on a wide plate", n > a2 * 2, n)
+    check("frost: dark on a plate", darkR[T.color.ink.r] == true and darkR[T.color.bright.r] == nil)
+    -- (left while it faded, undrawn: grows anew when the mouse is back)
+    clock = t0 + 2500
+    T.frost(plate, -20, 3, 520, 50, false, 1, true)
+    clock = t0 + 3500
+    n = 0
+    T.frost(plate, -20, 3, 520, 50, true, 1, true)
+    check("frost: back after a while, from the start", n < a2, n)
+    -- (a small button)
+    for i = 1, 8 do T.frost(ui, 4 + i, 4, 24, 24, true, 0.5) end
+    T.barLook(false)
+    check("bar gone: the sand", T.skin() == "sand" and T.color.accent.r == sand)
+    n = 0
+    T.frost(ui, 0, 0, 120, 40, true, 1)
+    check("frost: off out of the bar", n == 0)
+    T.settings["skin"] = "blood"
+    T.barLook(true)
+    check("bar: a chosen skin stays", T.skin() == "blood")
+    T.campLook()
+    check("camp: a chosen skin stays", T.skin() == "blood")
+    T.barLook(false)
+    -- (the two main skins follow the place in the menu, whichever is saved; the game wears the saved one)
+    for _, saved in ipairs({"sand", "ice"}) do
+        T.settings["skin"] = saved
+        T.barLook(true)
+        check("place: the bar's ice on " .. saved, T.skin() == "ice" and T.skinChosen() == saved)
+        T.barLook(false)
+        T.campLook()
+        check("place: the camp's sand on " .. saved, T.skin() == "sand" and T.skinChosen() == saved)
+        T.barLook(false)
+        check("place: its own in the game, " .. saved, T.skin() == saved)
+    end
+    T.settings["skin"] = chosen
+    T.applySkin()
+end
+
 print(string.format("settings: %d pass, %d FAIL", pass, fail))

@@ -47,9 +47,34 @@ public class KnoxLook {
     public static void knoxMenuLookClear() {
         ON = false;
         LOOK.clear();
+        HOLD_ARMS.clear();
+        KnoxBite.knoxBiteStop();
     }
 
     static final float NECK_SHARE = 0.35f;
+
+    /**
+     * Who keeps their arms where the clip has them as the head turns. In the skeleton the
+     * collarbones hang from the neck, the hand's prop bone from the root: the neck's turn took the
+     * arm away from the cigarette in it (the author's screenshot, 2026-11-01).
+     */
+    static final java.util.Set<AnimationPlayer> HOLD_ARMS = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+
+    @LuaMethod(name = "knoxMenuLookHoldArms", global = true)
+    public static void knoxMenuLookHoldArms(UI3DScene scene, String id) {
+        AnimatedModel model = KnoxMenu.modelOf(scene, id);
+        AnimationPlayer player = model == null ? null : model.getAnimationPlayer();
+        if (player != null) HOLD_ARMS.add(player);
+    }
+
+    /** Back where it was in the model before the neck turned: made local to the neck as it is now. */
+    static void putBack(AnimationPlayer p, SkinningData d, Integer idx, Matrix4f was) {
+        if (idx == null || was == null || idx >= p.boneTransforms.length) return;
+        SkinningBone bone = d.getBoneAt(idx);
+        if (bone == null || bone.parent == null) return;
+        Matrix4f inv = Matrix4f.invert(p.getBoneModelTransform(bone.parent.index, new Matrix4f()), new Matrix4f());
+        if (inv != null) p.boneTransforms[idx].mul(was, inv);
+    }
 
     /**
      * Where a scene character looks, from its body's front: `yawDeg` to its
@@ -87,8 +112,14 @@ public class KnoxLook {
             // the way to look, in the model's space (+Z its front, +Y up)
             float cp = (float) Math.cos(v[1]);
             Vector3f want = new Vector3f(cp * (float) Math.sin(v[0]), (float) Math.sin(v[1]), cp * (float) Math.cos(v[0]));
+            boolean hold = HOLD_ARMS.contains(p);
+            Integer left = hold ? d.boneIndices.get("Bip01_L_Clavicle") : null, right = hold ? d.boneIndices.get("Bip01_R_Clavicle") : null;
+            Matrix4f leftWas = left == null ? null : p.getBoneModelTransform(left, new Matrix4f());
+            Matrix4f rightWas = right == null ? null : p.getBoneModelTransform(right, new Matrix4f());
             turn(p, d, neck, want, NECK_SHARE * v[2]);
             turn(p, d, head, want, v[2]);
+            putBack(p, d, left, leftWas);
+            putBack(p, d, right, rightWas);
         } catch (RuntimeException e) {
             // a skeleton not as expected: its own pose
         }
@@ -127,6 +158,8 @@ public class KnoxLook {
         @Patch.OnEnter
         public static void enter(@Patch.This AnimationPlayer self) {
             if (KnoxLook.ON) KnoxLook.apply(self);
+            // (the bar's narrator: his arms over his clip - KnoxBite, 2026-11-02)
+            if (KnoxBite.ON) KnoxBite.apply(self);
         }
     }
 }

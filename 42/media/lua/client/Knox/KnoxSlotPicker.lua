@@ -40,6 +40,10 @@ P.offerColor = nil   -- the offered tiles' frame: sand, or green (batteries for 
 P.request = nil
 P.lastWantMs = 0
 P.offered = {}   -- item -> true while the panel is up
+-- (they fade in, as the grids' green - the author, 2026-10-30: "слишком резко")
+P.offeredMs = 0  -- when what is offered last changed
+P.offerA = 1     -- how far it has faded in (0..1), once a frame by P.sync
+local OFFER_FADE_MS = 200
 P.dying = {}     -- closed panels still fading out
 
 --- A slot under the mouse offers `items`; `pick(item)` runs on a click.
@@ -76,6 +80,15 @@ function P.wantBattery(owner, title, battery, playerNum)
                  playerNum = playerNum, float = true}
 end
 
+--- A magazine or a gun under the mouse (the author, 2026-10-30; the mockup
+--- .claude/mockups/magazine_v2.html): the battery panel's kin - what is in it in
+--- the first cell, past the line what may go in (KnoxLoad.offer builds `load`:
+--- kind, inner, spares, total, jam, hint(i), act(i)).
+function P.wantLoad(owner, title, load, playerNum, side)
+    P.request = {owner = owner, title = title, items = {owner.item}, load = load, side = side or "right",
+                 playerNum = playerNum, float = true}
+end
+
 --- Is this item offered by the open panel? (its tile breathes)
 function P.isOffered(item)
     return P.instance ~= nil and P.offered[item] == true
@@ -86,12 +99,21 @@ function P.isOpenFor(owner)
     return P.instance ~= nil and P.instance.owner == owner
 end
 
+--- Closed on the player's word (the quick items' key pressed again): what was
+--- asked for this frame goes too - the thing's tile had asked for the panel
+--- before the key was seen, and it opened again at once (the author, 2026-10-30).
+function P.dismiss()
+    P.request = nil
+    P.close()
+end
+
 function P.close()
     local p = P.instance
     if not p then return end
     P.instance = nil
     P.offered = {}
     P.offerColor = nil
+    if KnoxLoad then KnoxLoad.picking, KnoxLoad.panelFor = false, nil end
     -- it fades out first (it takes no clicks meanwhile); P.sweep takes it away
     p.closeMs = getTimestampMs()
     table.insert(P.dying, p)
@@ -146,7 +168,7 @@ function P.sync(host)
             if host and not p.float then host:addChild(p) else p:addToUIManager() end
             P.instance = p
         else
-            p.groups, p.act, p.battery = req.groups, req.act, req.battery
+            p.groups, p.act, p.battery, p.load = req.groups, req.act, req.battery, req.load
             p:setItems(req.items)
             p.pick = req.pick
         end
@@ -154,6 +176,7 @@ function P.sync(host)
         P.lastWantMs = now
     end
     if P.instance and now - P.lastWantMs > GRACE_MS then P.close() end
+    P.offerA = math.max(0, math.min(1, (now - P.offeredMs) / OFFER_FADE_MS))
 end
 
 function P:new(host, req)
@@ -170,9 +193,11 @@ function P:new(host, req)
     o.background = false
     o.moveWithMouse = false
     o.openMs = getTimestampMs()
+    P.offeredMs = o.openMs
     o.groups = req.groups
     o.act = req.act
     o.battery = req.battery
+    o.load = req.load
     o:setItems(req.items)
     return o
 end
@@ -183,11 +208,11 @@ function P:setItems(items)
     for i = 1, math.min(#items, max) do self.items[i] = items[i] end
     -- (a stack's kinds lie in the hovered tile itself: nothing to point at; the
     -- battery panel points at batteries only while the mouse is on them - drawBattery)
-    if not self.battery then
+    if not self.battery and not self.load then
         P.offered = {}
         P.offerColor = nil
     end
-    if not self.groups and not self.battery then
+    if not self.groups and not self.battery and not self.load then
         for _, it in ipairs(items) do P.offered[it] = true end
     end
     self.total = #items
@@ -196,6 +221,13 @@ function P:setItems(items)
         local b = self.battery
         self.total = b.has and P.percent(b.power) or getText("IGUI_Knox_BatteryNone")
         local n = b.spares and #b.spares or 0
+        self.shown = n > BATTERY_CELLS and BATTERY_CELLS - 1 or n
+        self.more = n - self.shown
+    elseif self.load then
+        -- the header's right: the rounds in it of how many, none, or jammed (KnoxLoad)
+        local l = self.load
+        self.total = l.total
+        local n = #l.spares
         self.shown = n > BATTERY_CELLS and BATTERY_CELLS - 1 or n
         self.more = n - self.shown
     end
@@ -212,7 +244,7 @@ function P:layout()
     local cs, gap, pad = T.cell, 4, math.max(6, math.floor(T.pad / 2) + 2)
     self.cs, self.gap, self.pad = cs, gap, pad
     local bodyW
-    if self.battery then
+    if self.battery or self.load then
         -- (the character's batteries from sx on, past the line)
         local cells = self.shown + (self.more > 0 and 1 or 0)
         self.cols = math.max(1, math.min(BATTERY_COLS, cells))
@@ -231,6 +263,7 @@ function P:layout()
     local countW = T.measure(T.fontCaps, tostring(self.total or n))
     -- (as wide as the widest the header may say, so it doesn't jump under the mouse)
     if self.battery then countW = math.max(countW, P.batteryWords().width) end
+    if self.load then countW = math.max(countW, P.loadWords().width, T.measure(T.fontCaps, self.load.widest or "")) end
     local titleW = T.measure(T.fontCaps, T.upper(self.title)) + countW + pad * 3
     local w = math.max(bodyW, titleW)
     local h = self.headH + pad + self.rows * cs + (self.rows - 1) * gap + pad
@@ -270,7 +303,7 @@ function P:indexAt(mx, my)
     local cs, gap, pad = self.cs, self.gap, self.pad
     local lx, ly = mx - pad, my - self.headH - pad
     if lx < 0 or ly < 0 then return nil end
-    if self.battery then
+    if self.battery or self.load then
         -- 1: the one in it; k + 1: the character's k-th (not the "+N" cell)
         if lx < cs and ly < cs then return 1 end
         local sl = mx - self.sx
@@ -319,15 +352,24 @@ function P:prerender()
     T.inkLeft(self, T.upper(self.title), ox + pad, oy, self.headH, T.color.text, T.fontCaps, a)
     local count = tostring(self.total or #self.items)
     local over = not self.closeMs and self:isMouseOver()
+    -- (the quick items' key pressed again, the mouse on the panel: the tooltip
+    -- back - the author, 2026-10-30)
+    if over and (self.battery or self.load) and P.instance == self and KnoxLoad and KnoxLoad.keyHit() then
+        P.dismiss()
+        over = false
+    end
     -- (a battery under the mouse: what a click does, in place of the charge)
-    local hi = self.battery and over and self:indexAt(self:getMouseX(), self:getMouseY())
-    local hint = hi and self:batteryHint(hi)
-    if hint then count = hint end
+    local hi = (self.battery or self.load) and over and self:indexAt(self:getMouseX(), self:getMouseY())
+    local hint = hi and (self.battery and self:batteryHint(hi) or self.load and self:loadHint(hi))
+    local cc = T.color.dim
+    if hint then count = hint
+    elseif self.load and self.load.jam then count, cc = P.loadWords().jam, T.color.badText end   -- (jammed: in red)
     local cw = T.measure(T.fontCaps, count)
     local _, cy = T.inkOrigin(count, 0, oy, cw, self.headH, T.fontCaps)
-    T.textRight(self, count, ox + w - pad, cy, T.color.dim, T.fontCaps, a)
+    T.textRight(self, count, ox + w - pad, cy, cc, T.fontCaps, a)
 
     if self.battery then return self:drawBattery(ox, oy, a, hi, since) end
+    if self.load then return self:drawLoad(ox, oy, a, hi, since) end
     local hovered = over and self:cellAt(self:getMouseX(), self:getMouseY())
     for i, it in ipairs(self.items) do
         local c, r = (i - 1) % self.cols, math.floor((i - 1) / self.cols)
@@ -337,21 +379,25 @@ function P:prerender()
         local ta = a * tt
         if ta > 0.01 then
             y = y - math.floor(cs * 0.22 * (1 - tt) * (1 - tt) + 0.5)
-            T.rect(self, x, y, cs, cs, T.category[T.categoryOf(it)], ta)
+            local g = self.groups and self.groups[i]
+            -- its state: the colour's height (condition_v3, the author, 2026-10-31); a stack's
+            -- kind: the charge left in all of it (as a tile in the grid)
+            local level
+            if g and it:IsDrainable() and not it:isBroken() then
+                local sum = 0
+                for _, gi in ipairs(g) do sum = sum + gi:getCurrentUsesFloat() end
+                level = sum / #g
+            else
+                level = T.itemLevel(it)
+            end
+            T.tileFill(self, x, y, cs, cs, level, T.category[T.categoryOf(it)], ta)
             if it == hovered then self:drawRect(x, y, cs, cs, 0.08, 1, 1, 1) end
             local side = math.floor(cs * 0.8)
-            ISInventoryItem.renderItemIcon(self, it, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), ta, side, side)
-            local g = self.groups and self.groups[i]
-            if g then
-                -- a stack's kind: the charge left, how many of it (as a tile in the grid)
-                if it:IsDrainable() and not it:isBroken() then
-                    local sum = 0
-                    for _, gi in ipairs(g) do sum = sum + gi:getCurrentUsesFloat() end
-                    T.tileMeter(self, x, y, cs, cs, sum / #g, T.color.accent, ta, 0)
-                end
-                if #g > 1 then
-                    T.outlinedRight(self, tostring(#g), x + cs - 4, y + cs - T.fontTileH - 3, T.color.bright, T.fontTile, ta)
-                end
+            T.itemIcon(self, it, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), side, ta)
+            if it:isBroken() then T.brokenMark(self, x, y, cs, cs, ta) end
+            if g and #g > 1 then
+                -- how many of it
+                T.outlinedRight(self, tostring(#g), x + cs - 4, y + cs - T.fontTileH - 3, T.color.bright, T.fontTile, ta)
             end
             T.tileFrame(self, x, y, cs, cs, it == hovered and T.color.accent or T.color.tileFrame, ta)
         end
@@ -389,21 +435,22 @@ end
 
 --- The battery panel (P.wantBattery): the battery in the thing with its charge,
 --- or an empty slot with a faint battery in it; past a line, the character's
---- batteries. The mouse on one of them points at it in the grids; on the empty
---- slot it lights all of them up green (red frame: there are none).
+--- batteries. The mouse on one of them points at it in the grids; otherwise all
+--- of them are lit up green (the empty slot hovered with none: a red frame).
 local batteryTex = nil
-function P:batteryTile(x, y, p, hot, a)
+--- `own`: the one in the thing - framed in sand always, apart from those that may
+--- go in (the author, 2026-10-30)
+function P:batteryTile(x, y, p, hot, a, own)
     local cs = self.cs
     local side = math.floor(cs * 0.8)
-    T.rect(self, x, y, cs, cs, T.category.tool or T.color.cell, a)
+    p = math.max(0, math.min(1, p or 0))
+    T.tileFill(self, x, y, cs, cs, p, T.category.tool or T.color.cell, a)   -- (what is left: the colour's height, 2026-10-31)
     if hot then self:drawRect(x, y, cs, cs, 0.08 * a, 1, 1, 1) end
     if batteryTex then
         self:drawTextureScaledAspect(batteryTex, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), side, side, a, 1, 1, 1)
     end
-    p = math.max(0, math.min(1, p or 0))
-    T.tileMeter(self, x, y, cs, cs, p, p > 0.25 and T.color.accent or T.color.bad, a, 0)
     T.outlinedRight(self, P.percent(p), x + cs - 5, y + self.percentDy, T.color.bright, T.fontTile, a)
-    T.tileFrame(self, x, y, cs, cs, hot and T.color.accent or T.color.tileFrame, a)
+    T.tileFrame(self, x, y, cs, cs, (hot or own) and T.color.accent or T.color.tileFrame, a)
 end
 
 function P:drawBattery(ox, oy, a, hi, since)
@@ -414,21 +461,20 @@ function P:drawBattery(ox, oy, a, hi, since)
     if batteryTex == nil then batteryTex = getTexture("Item_Battery") or false end
     local side = math.floor(cs * 0.8)
     local inHot = hi == 1
-    -- what the grids point at: the battery hovered here (sand), or, the empty
-    -- slot hovered, every one that may go in (green) - set again only on a change
-    local want = (inHot and not b.has and "all") or (hi and hi > 1 and spares[hi - 1]) or nil
+    -- what the grids point at: the battery hovered here (sand); else every one
+    -- that fits is green - KnoxLoad's, from the moment the thing is hovered (the
+    -- author, 2026-10-30, "с фонариком делаем также") - set again only on a change
+    local want = hi and hi > 1 and spares[hi - 1] or nil
     if P.instance == self and (want ~= self.offeredFor or spares ~= self.offeredList) then
         self.offeredFor, self.offeredList = want, spares
         P.offered, P.offerColor = {}, nil
-        if want == "all" then
-            for _, it in ipairs(spares) do P.offered[it] = true end
-            P.offerColor = T.color.ok
-        elseif want then
-            P.offered[want] = true
-        end
+        if want then P.offered[want], P.offeredMs = true, getTimestampMs() end
+        if KnoxLoad then KnoxLoad.picking = want ~= nil end
     end
+    -- (the battery under the mouse: its tooltip - the thing's own is not shown, 2026-10-30)
+    if hi and hi > 1 and hi - 1 <= self.shown and spares[hi - 1] then KnoxTooltip.want(spares[hi - 1], self.playerNum) end
     if b.has then
-        self:batteryTile(x, y, b.power, inHot, a)
+        self:batteryTile(x, y, b.power, inHot, a, true)
     else
         T.rect(self, x, y, cs, cs, T.color.cell, a)
         if batteryTex then
@@ -501,9 +547,167 @@ function P:useBattery(i)
     b.act(what, spare)
 end
 
+-- The magazine and gun panel (P.wantLoad, the author, 2026-10-30) ------------------
+
+local loadWords = nil
+--- What the magazine / gun panel's header says under the mouse, in capitals,
+--- and the widest of it (measured again when the font changes).
+function P.loadWords()
+    if not loadWords or loadWords.font ~= T.fontCaps then
+        local w = {font = T.fontCaps}
+        for key, id in pairs({load = "Load", unload = "Unload", open = "Open", insert = "Insert", take = "Take",
+                              swap = "Swap", rack = "Rack", jam = "Jammed"}) do
+            w[key] = T.upper(getText("IGUI_Knox_Load" .. id))
+        end
+        local width = 0
+        for key, s in pairs(w) do
+            if key ~= "font" then width = math.max(width, T.measure(T.fontCaps, s)) end
+        end
+        w.width = width
+        loadWords = w
+    end
+    return loadWords
+end
+
+-- a magazine's rounds as its cell writes them ("12", "12+1": one in the chamber;
+-- "+1": only the one in the chamber), made once each: written every frame
+local roundsText = {}
+function P.rounds(n, plus)
+    local key = (n or -1) * 2 + (plus and 1 or 0)
+    local s = roundsText[key]
+    if not s then
+        s = (n and tostring(n) or "") .. (plus and "+1" or "")
+        roundsText[key] = s
+    end
+    return s
+end
+local counts = {}   -- a pile's count, made once each
+
+--- One cell of the panel: a magazine (its rounds at the top right as the
+--- battery's charge), a pile of rounds or of boxes (how many, at the
+--- bottom right as a stack's count in the grid). An action using it: as the grid
+--- shows a thing in use.
+--- `own`: what is in it (the first cell) - framed in sand always, apart from
+--- what may go in (the author, 2026-10-30)
+function P:loadTile(x, y, s, hot, a, own)
+    local cs = self.cs
+    local side = math.floor(cs * 0.8)
+    T.rect(self, x, y, cs, cs, T.category[T.categoryOf(s.item)] or T.color.cell, a)
+    if hot then self:drawRect(x, y, cs, cs, 0.08 * a, 1, 1, 1) end
+    ISInventoryItem.renderItemIcon(self, s.item, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), a, side, side)
+    if s.max then
+        -- (the hidden rounds, the author, 2026-10-31: none written; held R tells)
+        if not (KnoxMagKnown and KnoxMagKnown.hide) then
+            T.outlinedRight(self, P.rounds(s.n, s.plus), x + cs - 5, y + self.percentDy, T.color.bright, T.fontTile, a)
+        end
+    elseif (s.count or 0) > 1 then
+        local c = counts[s.count]
+        if not c then
+            c = tostring(s.count)
+            counts[s.count] = c
+        end
+        T.outlinedRight(self, c, x + cs - 4, y + cs - T.fontTileH - 3, T.color.bright, T.fontTile, a)
+    end
+    T.tileFrame(self, x, y, cs, cs, s.jam and T.color.bad or ((hot or own) and T.color.accent or T.color.tileFrame), a)
+    if s.busy then T.inUse(self, x, y, cs, cs, s.busy) end
+end
+
+--- The magazine / gun panel: what is in it (a magazine and its rounds, a gun's
+--- magazine or rounds), or an empty slot with a faint magazine; past the line,
+--- what may go in. The mouse on one of those points at it in the grids (sand),
+--- else everything that fits is lit up green (KnoxLoad.lit). A cell whose click
+--- would do nothing does not light up (a full magazine's rounds).
+function P:drawLoad(ox, oy, a, hi, since)
+    local cs, gap, pad = self.cs, self.gap, self.pad
+    local x, y = ox + pad, oy + self.headH + pad
+    local l = self.load
+    local spares, inner = l.spares, l.inner
+    -- what the grids point at - set again only on a change
+    local want = hi and hi > 1 and hi - 1 <= self.shown and l.hint(hi) and spares[hi - 1] or nil
+    if P.instance == self and (want ~= self.offeredFor or spares ~= self.offeredList) then
+        self.offeredFor, self.offeredList = want, spares
+        P.offered, P.offerColor = {}, nil
+        if want then
+            for _, it in ipairs(want.items) do P.offered[it] = true end
+            P.offeredMs = getTimestampMs()
+        end
+        if KnoxLoad then KnoxLoad.picking = want ~= nil end
+    end
+    -- (the magazine or rounds under the mouse: its tooltip - the thing's own is not
+    -- shown, 2026-10-30; the first cell's is a stand-in, it has none)
+    local sp = hi and hi > 1 and hi - 1 <= self.shown and spares[hi - 1]
+    if sp then KnoxTooltip.want(sp.item, self.playerNum) end
+    local inHint = hi == 1 and l.hint(1) ~= nil
+    if inner.empty then
+        local side = math.floor(cs * 0.8)
+        T.rect(self, x, y, cs, cs, T.color.cell, a)
+        ISInventoryItem.renderItemIcon(self, inner.item, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), 0.22 * a, side, side)
+        if inner.plus and not (KnoxMagKnown and KnoxMagKnown.hide) then T.outlinedRight(self, P.rounds(nil, true), x + cs - 5, y + self.percentDy, T.color.bright, T.fontTile, a) end
+        if hi == 1 then
+            local c = inHint and T.color.ok or T.color.bad
+            self:drawRect(x, y, cs, cs, 0.2 * a, c.r, c.g, c.b)
+            T.border(self, x, y, cs, cs, c, a)
+        else
+            T.border(self, x, y, cs, cs, T.color.tileEdge, a)
+        end
+    else
+        self:loadTile(x, y, inner, inHint, a, true)
+        -- (nothing to take out and nothing to put in: red, as the battery's empty slot)
+        if hi == 1 and not inHint and #spares == 0 then
+            local c = T.color.bad
+            self:drawRect(x, y, cs, cs, 0.2 * a, c.r, c.g, c.b)
+            T.tileFrame(self, x, y, cs, cs, c, a)
+        end
+    end
+    local cells = self.shown + (self.more > 0 and 1 or 0)
+    if cells == 0 then return end
+    T.rect(self, ox + pad + cs + BATTERY_SEP, y, 1, self.rows * cs + (self.rows - 1) * gap, T.color.tileEdge, a)
+    for k = 1, cells do
+        local c, r = (k - 1) % self.cols, math.floor((k - 1) / self.cols)
+        local tx, ty = ox + self.sx + c * (cs + gap), y + r * (cs + gap)
+        -- each tile drops into its place a little after the one before it (as the panel's other tiles)
+        local tt = T.anim(math.max(0, math.min(1, (since - TILE_WAIT_MS - k * TILE_STEP_MS) / TILE_MS)))
+        local ta = a * tt
+        if ta > 0.01 then
+            ty = ty - math.floor(cs * 0.22 * (1 - tt) * (1 - tt) + 0.5)
+            if k <= self.shown then
+                self:loadTile(tx, ty, spares[k], hi == k + 1 and l.hint(k + 1) ~= nil, ta)
+                -- (the empty slot hovered: the one a click puts in, framed green)
+                if k == 1 and inHint and inner.empty then T.tileFrame(self, tx, ty, cs, cs, T.color.ok, ta) end
+            else
+                local m = mores[self.more]
+                if not m then
+                    m = "+" .. self.more
+                    mores[self.more] = m
+                end
+                T.rect(self, tx, ty, cs, cs, T.color.cell, ta)
+                T.border(self, tx, ty, cs, cs, T.color.tileEdge, ta)
+                local d = T.color.dim
+                T.inkCentre(self, m, tx, ty, cs, cs, d.r, d.g, d.b, ta, T.fontCaps)
+            end
+        end
+    end
+end
+
+--- What a click on the magazine / gun panel's cell `i` does (its word), or nil.
+function P:loadHint(i)
+    local l = self.load
+    if not l or not i then return nil end
+    local key = l.hint(i)
+    return key and P.loadWords()[key] or nil
+end
+
+--- The magazine / gun panel's cell `i` clicked (or a gun's magazine dragged out).
+function P:useLoad(i)
+    local l = self.load
+    if not l or not i or not l.hint(i) then return end
+    P.close()
+    l.act(i)
+end
+
 function P:onMouseDown(x, y)
-    -- a stack's kind or the battery: a press may become a drag (see onMouseMove)
-    local i = (self.act or self.battery) and not self.closeMs and self:indexAt(x, y)
+    -- a stack's kind, the battery or a magazine: a press may become a drag (see onMouseMove)
+    local i = (self.act or self.battery or self.load) and not self.closeMs and self:indexAt(x, y)
     if i then self.press = {i = i, x = getMouseX(), y = getMouseY(), mods = KnoxControls.mods()} end
     return true
 end
@@ -520,6 +724,11 @@ function P:onMouseMove(dx, dy)
     -- (the battery in it dragged out of its slot: taken out, into the main inventory)
     if self.battery then
         if p.i == 1 and self.battery.has then self:useBattery(1) end
+        return
+    end
+    -- (a gun's magazine dragged out of it: taken out)
+    if self.load then
+        if p.i == 1 and self.load.hint(1) == "take" then self:useLoad(1) end
         return
     end
     local act, g = self.act, self.groups[p.i]
@@ -545,6 +754,12 @@ function P:onMouseUp(x, y)
         if p and self:indexAt(x, y) == p.i then self:useBattery(p.i) end
         return true
     end
+    if self.load then
+        local p = self.press
+        self.press = nil
+        if p and self:indexAt(x, y) == p.i then self:useLoad(p.i) end
+        return true
+    end
     if self.act then
         local p = self.press
         self.press = nil
@@ -568,6 +783,10 @@ end
 function P:onRightMouseUp(x, y)
     if self.battery then
         if not self.closeMs then self:useBattery(self:indexAt(x, y)) end
+        return true
+    end
+    if self.load then
+        if not self.closeMs then self:useLoad(self:indexAt(x, y)) end
         return true
     end
     local i = self.act and not self.closeMs and self:indexAt(x, y)
