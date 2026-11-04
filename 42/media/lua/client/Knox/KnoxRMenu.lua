@@ -34,7 +34,6 @@ local HINT_MS = 200
 local REFRESH_MS = 100            -- what is in the magazines, the rounds carried
 local RECOUNT_MS = 500            -- a magazine come or gone
 local MAX_ROWS = 8
-local SHELLS = "Base.ShotgunShells"
 -- (the crosshair panel's and the context menu's colours)
 local BLACK = {r = 0, g = 0, b = 0}
 local EDGE = {r = 74 / 255, g = 79 / 255, b = 79 / 255}
@@ -259,7 +258,7 @@ function M.rowsOf(player)
     end
     if gun:haveChamber() and not jam then
         local at = gun:getAmmoType()
-        local shells = at and at:getItemKey() == SHELLS
+        local shells = at and at:getItemKey() == L.SHELLS
         table.insert(rows, newRow("rack", gun, shells and s.pump or s.bolt))
     end
     return rows, gun

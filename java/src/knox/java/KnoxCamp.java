@@ -309,11 +309,6 @@ public class KnoxCamp {
 
     // ---------------------------------------------------------------- from Lua
 
-    /**
-     * The camp's loops on (started where not playing, at their volumes; called every
-     * frame - the cricket's song comes and goes) or off.
-     * Ignored once a hero has gone or the camp is ending: the loops are this side's then.
-     */
     // A swipe to the other scene (the author, 2026-11-02: the sound of the place changed at once): what
     // plays dies out by itself, the other's comes up meanwhile (the bar's: KnoxBarSound's START_S). From
     // when the picture moves (knoxCampSwipe), the new scene's long first frame no jump in the volume;
@@ -359,6 +354,11 @@ public class KnoxCamp {
         play(dir < 0 ? "media/sound/knox_swipe_ltr.wav" : "media/sound/knox_swipe_rtl.wav", SWIPE_VOL, 1f, false);
     }
 
+    /**
+     * The camp's loops on (started where not playing, at their volumes; called every
+     * frame - the cricket's song comes and goes) or off.
+     * Ignored once a hero has gone or the camp is ending: the loops are this side's then.
+     */
     @LuaMethod(name = "knoxCampLoops", global = true)
     public static void knoxCampLoops(boolean on) {
         if (departAt != 0L || endAt != 0L) return;

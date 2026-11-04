@@ -9,8 +9,6 @@
    game hung (seen 2026-10-15). */
 module Base
 {
-    /* the radio by the fire, while the music plays from it (KnoxMenuMusic):
-       its speaker's hiss and crackle - made by Knox (knox_radio_static.wav) */
     sound KnoxGarlandSwitch
     {
         category = UI,
@@ -23,6 +21,8 @@ module Base
         }
     }
 
+    /* the radio by the fire, while the music plays from it (KnoxMenuMusic):
+       its speaker's hiss and crackle - made by Knox (knox_radio_static.wav) */
     sound KnoxRadioStatic
     {
         category = UI,

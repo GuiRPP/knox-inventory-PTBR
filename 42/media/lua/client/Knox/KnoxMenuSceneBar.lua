@@ -1,14 +1,13 @@
--- The main menu's winter scene (the author, 2026-10-31): a bar in a blizzard, the last
--- ones leaving (the mockup's variant B, .claude/mockups/bar_final.html). No light in the
+-- The main menu's winter scene (the author, 2026-10-31): a bar in a blizzard, a forced
+-- stop, no shelter (the mockup's variant B, .claude/mockups/bar_final.html). No light in the
 -- room but the storm's, cold, through the three openings in the back wall - a boarded
 -- window, a smashed one, the door torn open - and, later, the ember of a cigarette.
 -- At the counter a hero of the latest save sits with a bottle of whiskey, the head down;
 -- at a table the second smokes; the third stands at the door with a pack, about to go.
--- A glass is poured at an empty stool, a note under it for whoever comes next (a new
--- game); the music comes out of a broken radio on the counter. A dead man lies under a
--- blanket near the smoker, the days cut into the wall over him; a cold fire on a sheet
--- of iron, the map of the way north on the other table. Shown from November to February,
--- or when Tab chose it (KnoxMenuPlace).
+-- A journal lies at an empty place on the counter for whoever comes next (a new game); the
+-- music comes out of a broken radio there. The days are cut into the wall; a cold fire on a
+-- sheet of iron, the map of the way north on the other table. Shown from November to
+-- February, or when Tab chose it (KnoxMenuPlace).
 --
 -- It is the camp's scene (KnoxMenuScene) in another place: what the camp does with its
 -- heroes (their cards, a save loaded, the right-click menu) the bar does the same way;
@@ -52,11 +51,10 @@ local CFG = {
 -- The cold fire: where its soot is baked into the floor (MenuGen.java: BAR_FIRE_X, _Z)
 local FIRE_X, FIRE_Z = -0.3, -5.55
 
--- The room and what is in it, as the mockup of the last ones leaving has it, with the
--- author's changes (2026-10-31): the radio broken, no candle by the cans, a bottle for
--- the hero at the counter, the dead lying out from the wall near the smoker, the fire a
--- little left and nearer, no empty bed, the table in the smashed window one that reads
--- as a table. x and z in metres; y in units, ym in metres. A tint darkens what is dead
+-- The room and what is in it, as the mockup has it, with the author's changes
+-- (2026-10-31): the radio broken, no candle by the cans, a bottle for the hero at the
+-- counter, the fire a little left and nearer, no empty bed, the table in the smashed
+-- window one that reads as a table. x and z in metres; y in units, ym in metres. A tint darkens what is dead
 -- (the jukebox, the garland, the lamps); s is a scale. moves: what the wind moves
 -- (KnoxBarFrame: 1 the door, 2 a lamp, 3 a loose sheet, 4 the radio's needle, 5 a journal's page, 6 the garland's bulbs, 7 its switch, 8 the pencil, 9 a sheet on its pin, 10 the whiskey bottle swatted off, 11 the garland's wire in the draught).
 local PROPS = {
@@ -145,7 +143,7 @@ local PROPS = {
     {id = "kb_drift_window", model = "KnoxMenuBar.Drift", x = 1.5, ym = 0.006, z = -7.7, sx = 0.9, sy = 0.16, sz = 0.55, tint = {1.24, 1.16, 0.99}},
 
     -- on the walls, dead: the lamps, the jukebox, the antlers, the clock stopped, the
-    -- garland, the wall of the missing; the stove gone cold
+    -- garland, the wall of the missing
     {id = "kb_lamp1", model = "KnoxMenuBar.Lamp", x = -1.25, ym = 3.2, z = -5.0, tint = {0.33, 0.33, 0.33}, moves = 2},
     {id = "kb_lamp2", model = "KnoxMenuBar.Lamp", x = 1.7, ym = 3.2, z = -4.3, rz = 12.6, tint = {0.33, 0.33, 0.33}, moves = 2},
     {id = "kb_lamp3", model = "KnoxMenuBar.Lamp", x = -1.75, ym = 3.2, z = 0.2, tint = {0.33, 0.33, 0.33}, moves = 2},
@@ -213,8 +211,8 @@ local COLD = {dir = {-0.155, 0.384, -0.91}, light = {0.25, 0.32, 0.38}}
 -- hips lifted onto the stool); face as the camp's (0 to the camera); height and head over
 -- the floor, units (the mouse, the look); amb, sky: how much of the room's dark and of the
 -- storm's light reaches the place (as the frame lights a grey stand-in there:
--- tools\barframe); look: where the head is held (yaw, pitch; the first's own is the clip's - its
--- -28 threw the head back in the game, the author 2026-11-01); lookBack: at the camera; still: no head turned to the mouse over it
+-- tools\barframe); lookBack: the head held at the camera (the first's is the clip's own: held
+-- at -28 it was thrown back in the game, the author 2026-11-01); still: no head turned to the mouse over it
 -- (the first, asleep over its bottle - the author, 2026-11-01); hoverLook: where the head goes
 -- with the mouse over it, x y z in metres, instead of to the camera (the third, to the way out:
 -- the middle of the door's opening, MenuGen's BAR_BACK_HOLES - the author, 2026-11-01); hitFrom:
@@ -542,14 +540,13 @@ function B:updateDead()
     end
 end
 
---- The heroes at their places, each with its bag; the empty stool's glass for a new game.
+--- The heroes at their places, each with its bag; the journal at the empty place for a new game.
 function B:addHeroes()
     self.clips = CLIPS
     self.menuClips = MENU_CLIPS
     self.bagPlaces = {}
     for i, b in ipairs(BAGS) do self.bagPlaces[i] = {b[1] * U, b[2] * U, b[3], b[4]} end
     self.heroAt = {}
-    self.doorOpen = 0
     local saves = {}
     for _, save in ipairs(KnoxMenuScene.recentSaves(12)) do
         if not save.dead and #saves < #SEATS then table.insert(saves, save) end
@@ -710,8 +707,8 @@ function B:lightCharacter(c, flick)
 end
 
 -- Where they look (KnoxLook): the first with the head down, the third back over the shoulder
--- at the room; the mouse on one, and the head comes up to the camera. Walking off: the walk's
--- own head.
+-- at the room; the mouse on one, and the head comes up to the camera. The one whose save was
+-- picked: its own head, the screen going black.
 local LOOK_IN, LOOK_OUT = 2.6, 1.6        -- of the way a second, as the camp's
 local LOOK_EASE = 3                       -- 1/s, the head going from one look to the other
 local LOOK_MAX_YAW, LOOK_MAX_PITCH = 65, 30
@@ -747,8 +744,6 @@ function B:updateLooks(dt)
                 else
                     ty, tp = lookAtEye(self, c)
                 end
-            elseif s.look then
-                ty, tp = s.look[1], s.look[2]
             elseif s.lookBack then
                 ty, tp = lookAtEye(self, c)
             end
@@ -780,7 +775,6 @@ function B:leave(c)
     self.mode = "leaving"
     self.leaving = c
     self.hover = nil
-    c.clock = 0
     c.phase = "fade"
     self:showFader()
     self.fader.target = 1
@@ -788,18 +782,15 @@ function B:leave(c)
     if knoxMusicDuck then knoxMusicDuck(0.4, 1500) end
 end
 
-function B:updateLeaving(dt)
-    local c = self.leaving
-    c.clock = c.clock + dt
+function B:updateLeaving()
     self.fader.target = 1
-    if self.fader.alpha >= 0.99 then self:launch(c) end
+    if self.fader.alpha >= 0.99 then self:launch(self.leaving) end
 end
 
 --- Loading didn't start: back to the place, as it was.
 function B:comeBack()
     local c = self.leaving
     KnoxMenuScene.comeBack(self)
-    self.doorOpen = 0
     if c and c.seat then
         c.y = c.seat.y
         self:place(c)
@@ -1074,7 +1065,7 @@ function B:viewOffset(ex, ey, ez, tx, ty, tz, dt)
 end
 
 --- For the frame, each frame: the heroes' shadows from their bones, the ember in the smoker's
---- hand (and how hard it draws: its light on the face), the door.
+--- hand (and how hard it draws: its light on the face).
 function B:updateHeroes()
     self:updateDead()
     self:updateEyes(self.clock)
@@ -1089,7 +1080,6 @@ function B:updateHeroes()
             knoxBarHero(j, nil, slot - 1, 0, 0, 0, 0, false)
         end
     end
-    knoxBarDoor(self.doorOpen or 0)
 end
 
 -- The bar's sounds (stage 6, the author 2026-10-31): the storm and the door are the Java part's
@@ -1179,30 +1169,27 @@ end
 
 -- The journal for a new game on the counter (kb_journal): its own small place
 -- for the mouse (QA, 2026-10-31: the camp's place of a hero at the stool took in the smoker's
--- table and the boarded window, and the glass lit up there).
-local PINT_X, PINT_Y, PINT_Z = -2.86 * U, 1.1 * U, 0.68 * U
-function B:glassRect()
-    local r = self.glassBox
-    if r and self.glassAt == self.frames then return r end
-    local bx, by = self:toScreen(PINT_X, PINT_Y, PINT_Z)
-    local _, ty = self:toScreen(PINT_X, PINT_Y + METRE_UP, PINT_Z)
+-- table and the boarded window, and it lit up there).
+local JOURNAL_X, JOURNAL_Y, JOURNAL_Z = -2.86 * U, 1.1 * U, 0.68 * U
+function B:journalRect()
+    local r = self.journalBox
+    if r and self.journalAt == self.frames then return r end
+    local bx, by = self:toScreen(JOURNAL_X, JOURNAL_Y, JOURNAL_Z)
+    local _, ty = self:toScreen(JOURNAL_X, JOURNAL_Y + METRE_UP, JOURNAL_Z)
     local m = math.abs(by - ty) / 0.3
     if not r then
         r = {0, 0, 0, 0}
-        self.glassBox = r
+        self.journalBox = r
     end
     r[1], r[2], r[3], r[4] = bx - 0.26 * m, by - 0.13 * m, 0.52 * m, 0.24 * m
-    self.glassAt = self.frames
+    self.journalAt = self.frames
     return r
 end
 
---- The empty stool's place on the screen is its glass: its card comes up over the glass, not
+--- The empty place on the screen is its journal: its card comes up over it, not
 --- over a hero's height at the stool (QA, 2026-10-31: it hung over the smoker's head).
 function B:rectOf(c)
-    if c.empty then
-        local r = self:glassRect()
-        return r, r[3] / 0.26 / U
-    end
+    if c.empty then return self:journalRect() end
     if c.sheet then
         -- (a sheet of the missing: asked for each under the mouse, once a frame)
         local r = c.box
@@ -1233,12 +1220,12 @@ end
 --- shape, and a hero under the mouse keeps the radio's card down): where the radio is, it's the radio.
 function B:hit(c, mx, my)
     if T.inRect(mx, my, self:radioRect()) or T.inRect(mx, my, self:switchRect()) then return false end
-    if c.empty then return T.inRect(mx, my, self:glassRect()) end
+    if c.empty then return T.inRect(mx, my, self:journalRect()) end
     if c.sheet then return T.inRect(mx, my, (self:rectOf(c))) end
     return KnoxMenuScene.hit(self, c, mx, my)
 end
 
--- (stage 7, 2026-10-31) The glass, the radio and a hero's bag under the mouse: a soft light, cold
+-- (stage 7, 2026-10-31) The journal, the radio and a hero's bag under the mouse: a soft light, cold
 -- as the room (the camp's is sand, by its fire; here only the ember is warm). A hero's is his own:
 -- lightCharacter. (The bag's as the camp's drawFx has it, which the bar's own drawFx stands in
 -- for - QA, 2026-11-01.)
@@ -1249,7 +1236,7 @@ function B:drawPointed(el)
     local cx, cy, size
     local h = self.hover
     if h and h.empty then
-        local r = self:glassRect()
+        local r = self:journalRect()
         cx, cy, size = r[1] + r[3] / 2, r[2] + r[4] / 2, r[3] * 2.7
     elseif h and h.sheet then
         local r = self:rectOf(h)
@@ -1362,9 +1349,9 @@ function B:restWhileLoading()
     knoxBarRest()
 end
 
--- The depth of field (the author, 2026-11-03: "при наведении на персонажей ... и к сцене в
--- принципе, там, где это логично"): a hero under the mouse in focus, the room before and behind
--- him soft - so too the glass, the radio, the garland's switch, a bag; the narrator's arm before
+-- The depth of field (the author, 2026-11-03: "on hovering over the heroes ... and over the
+-- scene in general, where it makes sense"): a hero under the mouse in focus, the room before and behind
+-- him soft - so too the journal, the radio, the garland's switch, a bag; the narrator's arm before
 -- his eyes while he looks at it (the frame focuses on what is at the middle of the view, as an
 -- eye would). Eased in and out; the frame eases the focus itself (KnoxBarFrame.focus).
 local FOCUS_IN, FOCUS_OUT = 3.0, 2.2          -- 1/s
@@ -1379,7 +1366,7 @@ function B:focusPoint()
     if eyes and eyes.busy then return "arm" end
     if self.mode ~= "idle" or self.ctxMenu or self.tuning then return nil end
     local c = self.hover
-    if c and c.empty then return PINT_X, PINT_Y, PINT_Z end
+    if c and c.empty then return JOURNAL_X, JOURNAL_Y, JOURNAL_Z end
     if c and c.sheet then return c.wx * U, c.wy * U, c.wz * U end
     if c then
         -- a hero: his chest and face, not the floor between his feet

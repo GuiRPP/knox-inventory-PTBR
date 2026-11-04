@@ -76,7 +76,6 @@ public final class KnoxBarFrame {
         GLOSS.put("KnoxMenuBar.CounterThings", 0.5f);
         GLOSS.put("KnoxMenuBar.SmokerThings", 0.5f);
         GLOSS.put("KnoxMenuBar.Jukebox", 0.5f);
-        GLOSS.put("KnoxMenuBar.Stove", 0.3f);
         GLOSS.put("KnoxMenuBar.Lamp", 0.35f);
         GLOSS.put("KnoxMenuBar.Radio", 0.25f);
         GLOSS.put("KnoxMenuBar.Floor", 0.12f);
@@ -241,9 +240,8 @@ public final class KnoxBarFrame {
     private final Matrix3f capsuleNormal = new Matrix3f();
     private final Vector3f capA = new Vector3f(), capB = new Vector3f(), capD = new Vector3f();
     private final org.joml.Quaternionf capTurn = new org.joml.Quaternionf();
-    // the cigarette's ember: where, and how it glows (-1: none); the door: 0 as the wind has it, 1 open
+    // the cigarette's ember: where, and how it glows (-1: none)
     private float emberX, emberY, emberZ, emberGlow = -1, emberShown = 1;
-    private float doorOpen;
     private static final float[] EMBER_COLOR = {0xff / 255f, 0x7a / 255f, 0x30 / 255f};
 
     // --- what lives (stage 5, the author 2026-10-31): the door, the snow blown in, the smoke, the
@@ -855,12 +853,7 @@ public final class KnoxBarFrame {
     /** How far the door lets the storm in now, 0..1 (for the sound, on the main thread). */
     public float doorLetsIn() {
         float time = lastTime;
-        return Math.max(doorOpen, life.doorLetsIn(time, gustAt(time)));
-    }
-
-    /** 0: the door as the wind has it; 1: open wide (a hero going out). */
-    public void door(float open) {
-        doorOpen = open;
+        return life.doorLetsIn(time, gustAt(time));
     }
 
     /** tools\barframe: the heroes' stand-ins drawn too, as grey figures in the room's light. */
@@ -1047,7 +1040,7 @@ public final class KnoxBarFrame {
         emberNow[1] = emberY;
         emberNow[2] = emberZ;
         emberNow[3] = emberShown > 0 ? emberGlow : -1;
-        life.step(dt, time, emberNow, mouths, doorOpen);
+        life.step(dt, time, emberNow, mouths);
 
         moveThings(time, gust);
         mark("start");
@@ -1079,7 +1072,7 @@ public final class KnoxBarFrame {
         lampCol.clear();
         int lamps = FILLS.length;
         // (the door shut: the floor before it has no light to give back; QA, 2026-10-31)
-        float doorFill = 0.15f + 0.85f * Math.max(doorOpen, life.doorLetsIn(lastTime, gust));
+        float doorFill = 0.15f + 0.85f * life.doorLetsIn(lastTime, gust);
         for (float[] f : FILLS) {
             lampPos.put(f[0] * U).put(f[1] * U).put(f[2] * U).put(f[4] * U);
             float k = f[3] * (1f + 0.14f * gust);
@@ -1399,7 +1392,7 @@ public final class KnoxBarFrame {
      * eyes; `power` 0..1, 0 all sharp (and nothing of it drawn); `band` how far off the focus
      * (|1 - focus / distance|) stays sharp; `depth` how far ahead the thing is when it is known (scene
      * units along the view; 0: the depth at the point - the author, 2026-11-03: the one asleep at the
-     * counter, the point over his back fell on the far wall). Main thread, at the frame's end; the
+     * counter, the point over his back fell on the far wall). Render thread, just before end(); the
      * frame eases the focus itself.
      */
     public void focus(float u, float v, float power, float band, float depth) {
@@ -1417,7 +1410,7 @@ public final class KnoxBarFrame {
             focusFresh = true;
             return pictureTex;
         }
-        // (it starts with the first hover over a hero, a glass, a sheet, the radio, the switch or a bag, or
+        // (it starts with the first hover over a hero, the journal, a sheet, the radio, the switch or a bag, or
         // with the narrator's look - mostly after the first frames' watch: its own two. What the game or
         // our unwatched passes left on the card meanwhile isn't its to answer for: the released game never
         // asks the card itself, one wrong call anywhere waits for whoever asks first - QA, 2026-11-04)
@@ -1523,7 +1516,7 @@ public final class KnoxBarFrame {
             } else if (p.moves == PAGE) {
                 movePage(p, time, gust);
             } else if (p.moves == DOOR) {
-                p.now.rotateY((float) Math.toRadians(life.doorAngle(time, gust) * (1 - doorOpen) - OPEN_WIDE * doorOpen));
+                p.now.rotateY((float) Math.toRadians(life.doorAngle(time, gust)));
             }
             p.now.normal(p.normalNow);
         }
@@ -1866,9 +1859,6 @@ public final class KnoxBarFrame {
             out[5] += g[5] * w;
         }
     }
-
-    // (it stands at 71.6 degrees in: 90 leaves 1 m to go out by - ROADMAP, the bar's animation)
-    private static final float OPEN_WIDE = 90f - 71.6f;
 
     private void updateShadow() {
         glDisable(GL_BLEND);

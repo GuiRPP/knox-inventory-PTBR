@@ -109,7 +109,7 @@ b:restWhileLoading()
 check("back: can rest again", calls.rested == 2, calls.rested)
 
 -- the heroes (stage 4, 2026-10-31): the three latest alive at their places, a dead one not
--- among them; their bags; the empty stool's glass
+-- among them; their bags; the journal at the empty place
 local U = 1 / 1.22
 testSaves = {
     {rel = "a", dead = false, bag = {back = {type = "Base.Bag_ALICEpack"}}},
@@ -134,7 +134,7 @@ check("hero 2's bag on the floor", h2.bagAt and h2.bagAt.y == 0)
 check("hero 3 keeps the pack on", h3.bagAt == nil and h3.pack == true)
 check("hero 1 has no pack drawn", h1.pack == false)
 check("the poses' clips known", h.clips.knoxbar_stool == "Knox_BarStool" and h.clips.knoxbar_smoke == "Knox_BarSmoke")
-check("the glass is a new game", #h.empties == 1 and h.empties[1].empty and h.empties[1].mat.tinted == nil)
+check("the journal is a new game", #h.empties == 1 and h.empties[1].empty and h.empties[1].mat.tinted == nil)
 
 -- before they come in: no shadows, no light; then by light, alpha 1 at once
 h.width, h.height, h.frames, h.clock, h.dt = 1920, 1080, 10, 5, 0.016
@@ -155,7 +155,6 @@ check("shadows: from the stool's height", near(calls.hero[1].y, 0.2))
 check("shadows: the pack", calls.hero[3].pack == true and calls.hero[1].pack == false)
 check("ember: the smoker's", calls.ember == h2.id and h2.emberGlow == 0.5)
 check("ember: as far as the smoker is shown", calls.emberShown == h2.lightK)
-check("door: as the wind has it", calls.door == 0)
 h:lightCharacter(h3, 1)
 local l3 = calls.lights[h3.id]
 check("hero 3: the storm's light", l3 and l3[4] > 0.2 and l3[12] == 0)
@@ -208,14 +207,9 @@ for _, c in ipairs({h1, h3}) do
     check("leave: launched, " .. c.id, calls.launched == c.id)
     h:comeBack()
     check("back: at its place, " .. c.id, c.x == x and c.z == z and c.anim == c.seat.s.anim)
-    check("back: door as the wind has it, " .. c.id, h.doorOpen == 0)
 end
 h1.y = h1.seat.y
 check("back: on the stool again", near(h1.y, 0.2) and h1.anim == "knoxbar_stool" and near(h1.x, -1.75 * U))
-h.doorOpen = 1
-h:updateHeroes()
-check("door: told to the frame", calls.door > 0.9)
-h.doorOpen = 0
 
 -- a file missing: not built, the game not told
 barLoads = false
@@ -277,14 +271,14 @@ do
     check("radio: wins over the hero behind it", s:hit({}, r[1] + r[3] / 2, r[2] + r[4] / 2) == false)
     check("radio: a hero elsewhere still", s:hit({}, r[1] - 50, r[2]) == true)
 
-    -- the glass: only round itself (QA, 2026-10-31: the stool's whole place took in the smoker's table)
-    local g = s:glassRect()
+    -- the journal: only round itself (QA, 2026-10-31: the stool's whole place took in the smoker's table)
+    local g = s:journalRect()
     local gx, gy = -2.86 * 100 / 1.22, 500 - 1.1 * 100 / 1.22
-    check("glass: over the glass", g[1] < gx and g[1] + g[3] > gx and g[2] < gy and g[2] + g[4] > gy)
-    check("glass: hit on it", s:hit({empty = true}, gx, gy - 5) == true)
-    check("glass: not a metre off", s:hit({empty = true}, gx - 100, gy - 5) == false)
-    check("glass: not over the radio", g[1] + g[3] < r[1])
-    check("glass: its card over it", s:rectOf({empty = true}) == g)
+    check("journal: over it", g[1] < gx and g[1] + g[3] > gx and g[2] < gy and g[2] + g[4] > gy)
+    check("journal: hit on it", s:hit({empty = true}, gx, gy - 5) == true)
+    check("journal: not a metre off", s:hit({empty = true}, gx - 100, gy - 5) == false)
+    check("journal: not over the radio", g[1] + g[3] < r[1])
+    check("journal: its card over it", s:rectOf({empty = true}) == g)
 
     -- what can be pointed at has a soft cold light under the mouse (stage 7), nothing else has;
     -- the light's middle on the thing
@@ -295,7 +289,7 @@ do
     check("pointed: nothing under the mouse, no light", drawn == 0)
     s.hover = {empty = true}
     s:drawPointed(e)
-    check("pointed: the glass", drawn == 1 and math.abs(lx - (g[1] + g[3] / 2)) < 1 and math.abs(ly - (g[2] + g[4] / 2)) < 1, lx)
+    check("pointed: the journal", drawn == 1 and math.abs(lx - (g[1] + g[3] / 2)) < 1 and math.abs(ly - (g[2] + g[4] / 2)) < 1, lx)
     s.hover = {save = {}}
     s:drawPointed(e)
     check("pointed: not a hero (his own light)", drawn == 1)

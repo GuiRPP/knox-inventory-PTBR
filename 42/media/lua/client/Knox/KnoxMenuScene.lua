@@ -1458,13 +1458,6 @@ local NOW_AND_THEN = {
     {name = "KnoxCampWolf", min = 60, max = 150},
 }
 
-function M:hasRisen()
-    for _, c in ipairs(self.chars or {}) do
-        if c.zombie then return true end
-    end
-    return false
-end
-
 function M:updateSounds(t)
     if not self.ambienceMuted then
         self.ambienceMuted = true
@@ -1489,11 +1482,9 @@ function M:updateSounds(t)
     local sm = getSoundManager()
     self.soundNext = self.soundNext or {}
     for _, s in ipairs(NOW_AND_THEN) do
-        if not s.risen or self:hasRisen() then
-            local at = self.soundNext[s.name]
-            if at and t >= at then sm:playUISound(s.name) end
-            if not at or t >= at then self.soundNext[s.name] = t + s.min + ZombRandFloat(0, s.max - s.min) end
-        end
+        local at = self.soundNext[s.name]
+        if at and t >= at then sm:playUISound(s.name) end
+        if not at or t >= at then self.soundNext[s.name] = t + s.min + ZombRandFloat(0, s.max - s.min) end
     end
 end
 

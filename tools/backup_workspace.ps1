@@ -3,7 +3,8 @@
 # .claude (skills, agents, Claude's memory, mockups, perf), the Artlist sounds, tools\art.
 # The list is git's own "ignored" list, so a new ignored file is backed up without
 # touching this script. Left out: the Steam login (stays on this PC only - the author),
-# the jar and java\build (rebuilt by java\build.ps1), the report.txt files (regenerated).
+# the jar and java\build (rebuilt by java\build.ps1), the report.txt files and Python's
+# __pycache__ (regenerated).
 #
 # The copy goes to a mirror folder with its own git (default Zomboid\knox-workspace) and
 # is pushed to the PRIVATE repository github.com/SVNTHETIK/knox-workspace when the mirror
@@ -19,7 +20,7 @@ $git = "C:\Program Files\Git\cmd\git.exe"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $remote = "https://github.com/SVNTHETIK/knox-workspace.git"
 
-$skip = @('^\.claude/steam_login\.txt$', '\.jar$', '^java/build/', '/report\.txt$')
+$skip = @('^\.claude/steam_login\.txt$', '\.jar$', '^java/build/', '/report\.txt$', '/__pycache__/')
 $files = & $git -C $root -c core.quotepath=off ls-files --others --ignored --exclude-standard |
     Where-Object { $p = $_; -not ($skip | Where-Object { $p -match $_ }) }
 if (-not $files) { throw "git listed no ignored files - wrong folder?" }

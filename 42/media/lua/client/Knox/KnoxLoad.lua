@@ -25,7 +25,7 @@ local T = KnoxTheme
 local HOVER_MS = 120     -- (not for a mouse just passing over the grid: as a stack's kinds)
 local GRACE_MS = 220     -- the mouse on its way from the thing to its panel
 local REFRESH_MS = 500   -- what fits and what may go in, looked for again (containers change)
-local SHELLS = "Base.ShotgunShells"
+L.SHELLS = "Base.ShotgunShells"
 -- the game's recipes that open a box of rounds (recipes_ammunition.txt)
 local OPEN_BOX = {"OpenBoxOfBullets50", "OpenBoxOfBullets20", "OpenBoxOfShotgunShells"}
 
@@ -36,11 +36,6 @@ L.picking = false    -- the mouse on a cell of the panel: the grids point at tha
 L.shown = EMPTY      -- what the grids draw green: L.lit, or the last of it while it fades out
 L.litA = 0           -- how strongly (0..1)
 local FADE_MS = 200
-
---- Lit up green in the grids? (a table look-up: asked for every tile every frame)
-function L.isLit(item)
-    return not L.picking and L.lit[item] == true
-end
 
 --- Is the quick items' key held (Shift by default)?
 function L.held()
@@ -714,7 +709,7 @@ local function loadOf(ref, item, player)
             local key = g and g.ammo or m.ammo
             l.kind = "rounds"
             l.key = key
-            l.title = getText(key == SHELLS and "IGUI_Knox_LoadShells" or "IGUI_Knox_LoadRounds")
+            l.title = getText(key == L.SHELLS and "IGUI_Knox_LoadShells" or "IGUI_Knox_LoadRounds")
             l.inner.item = g and (sampleOf(key) or item) or item
         end
         ref.load = l

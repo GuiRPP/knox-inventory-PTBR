@@ -13,9 +13,7 @@ import numpy as np
 from PIL import Image
 from xmesh import XMesh
 import slim_arms
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "barframe"))
-import bite   # noqa: E402
+import drawing
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BODY = slim_arms.BODY_OUT
@@ -148,15 +146,15 @@ def skinned(m, P):
 
 
 def tile(pts, faces, n_body, eye, at, w, h, focal):
-    r, u, f = bite.basis(eye, at)
+    r, u, f = drawing.basis(eye, at)
     fn = np.cross(pts[faces[:, 1]] - pts[faces[:, 0]], pts[faces[:, 2]] - pts[faces[:, 0]])
     fn /= np.linalg.norm(fn, axis=1)[:, None] + 1e-12
     back = ((pts[faces].mean(1) - eye) * fn).sum(1) > 0
-    lit = 0.35 + 0.65 * np.abs(fn @ bite.LIGHT)
+    lit = 0.35 + 0.65 * np.abs(fn @ drawing.LIGHT)
     base = np.vstack([np.tile([200, 160, 135], (n_body, 1)), np.tile([128, 26, 36], (len(faces) - n_body, 1))])
     cols = lit[:, None] * base
     cols[back] = (255, 0, 255)
-    return bite.raster(Image.new("RGB", (w, h), (30, 30, 34)), pts, faces, cols, eye, r, u, f, focal)
+    return drawing.raster(Image.new("RGB", (w, h), (30, 30, 34)), pts, faces, cols, eye, r, u, f, focal)
 
 
 def draw(body, jacket, out):

@@ -16,8 +16,7 @@ final class KnoxBarSound {
     private static final float SHUT_VOL = 0.55f, SHUT_LOWPASS = 0.3f, IN_LOWPASS = 0.6f;
     private static final float START_S = 2f;
     private static final long EVERY_MS = 50L;
-    private static final String BANG = "media/sound/doorclose.wav", LATCH = "media/sound/doorlocked.wav",
-        OPENS = "media/sound/dooropen.wav";
+    private static final String BANG = "media/sound/doorclose.wav", LATCH = "media/sound/doorlocked.wav";
     // A richer storm (the author, 2026-11-01: "the boards of the house creak, the storm howls more"):
     // the howl through the boards (windowwind, rms 477), the old house creaking on and on
     // (wooddoorcreaks, 25), the boarded window rattling in a gust (windowrattle, 66); now and then
@@ -306,10 +305,5 @@ final class KnoxBarSound {
         } catch (Throwable t) {
             // gone
         }
-    }
-
-    /** One going out pushes the door open. */
-    static void doorOpens() {
-        KnoxCamp.play(OPENS, 0.3f * sfx(), 0.85f, false);
     }
 }

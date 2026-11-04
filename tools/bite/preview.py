@@ -7,7 +7,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "barframe"))
 import sheet as body_sheet   # noqa: E402
-import bite                  # noqa: E402
+import drawing               # noqa: E402
 
 
 def shade(p, faces, base):
@@ -31,13 +31,13 @@ def sheet(m, rolled, out, skin=None):
         pts = np.vstack([body.verts, jacket])
         nb = len(body.verts)
         faces = np.vstack([body.faces, m.faces + nb])
-        cols = np.vstack([shade(pts, body.faces, bite.SKIN), shade(pts, m.faces + nb, (70, 90, 120))])
+        cols = np.vstack([shade(pts, body.faces, drawing.SKIN), shade(pts, m.faces + nb, (70, 90, 120))])
         row = []
         for d in ([0, 0.3, 1], [0, 1, 0.15], [0.2, -0.4, 1]):
             d = np.array(d, float) / np.linalg.norm(d)
             eye = c + d * 0.45
-            r, u, f = bite.basis(eye, c)
-            row.append(bite.raster(Image.new("RGB", (360, 260), (30, 30, 34)), pts, faces, cols, eye, r, u, f, 600))
+            r, u, f = drawing.basis(eye, c)
+            row.append(drawing.raster(Image.new("RGB", (360, 260), (30, 30, 34)), pts, faces, cols, eye, r, u, f, 600))
         rows.append(row)
     img = Image.new("RGB", (360 * 3, 260 * 3))
     for j, row in enumerate(rows):

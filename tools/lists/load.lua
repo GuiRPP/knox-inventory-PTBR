@@ -69,12 +69,13 @@ local function frame(item, ms)
     L.sync()
 end
 frame(mag)
-check("not at once (the mouse passing over)", not L.isLit(loose[1]))
+local function isLit(item) return not L.picking and L.lit[item] == true end
+check("not at once (the mouse passing over)", not isLit(loose[1]))
 frame(mag, 130)
-check("after a moment: its rounds", L.isLit(loose[1]) and L.isLit(bagged[30]) and L.isLit(floorRounds))
-check("the box and the gun", L.isLit(box) and L.isLit(pistol))
-check("not the .308, the beans, itself", not L.isLit(r308) and not L.isLit(beans) and not L.isLit(mag))
-check("not another magazine", not L.isLit(full))
+check("after a moment: its rounds", isLit(loose[1]) and isLit(bagged[30]) and isLit(floorRounds))
+check("the box and the gun", isLit(box) and isLit(pistol))
+check("not the .308, the beans, itself", not isLit(r308) and not isLit(beans) and not isLit(mag))
+check("not another magazine", not isLit(full))
 local was = L.lit
 frame(mag)
 check("not looked for again every frame", L.lit == was)
@@ -82,34 +83,34 @@ local looks, allViews = 0, KnoxActions.allViews
 KnoxActions.allViews = function(...) looks = looks + 1 return allViews(...) end
 frame(mag, 600)
 KnoxActions.allViews = allViews
-check("looked for again after a while", looks > 0 and L.isLit(loose[1]), looks)
+check("looked for again after a while", looks > 0 and isLit(loose[1]), looks)
 -- (the same ones found: the same table, a calm grid keeps its ready list - QA, 2026-11-04)
 check("the same ones: the same table", L.lit == was)
 frame(nil, 100)
-check("the mouse off it: still lit for a moment", L.isLit(loose[1]))
+check("the mouse off it: still lit for a moment", isLit(loose[1]))
 frame(nil, 200)
-check("then not", not L.isLit(loose[1]))
+check("then not", not isLit(loose[1]))
 
 frame(pistol)
 frame(pistol, 130)
-check("a pistol: its magazines and the laser", L.isLit(mag) and L.isLit(full) and L.isLit(laser))
-check("a pistol: not loose rounds", not L.isLit(loose[1]))
+check("a pistol: its magazines and the laser", isLit(mag) and isLit(full) and isLit(laser))
+check("a pistol: not loose rounds", not isLit(loose[1]))
 pistol.parts = {Laser = newItem("Base.Laser")}
 frame(pistol, 600)
-check("its laser's place taken: the laser not lit", not L.isLit(laser) and L.isLit(mag))
+check("its laser's place taken: the laser not lit", not isLit(laser) and isLit(mag))
 pistol.parts = nil
 frame(laser)
 frame(laser, 130)
-check("a laser: the pistol", L.isLit(pistol) and not L.isLit(mag))
+check("a laser: the pistol", isLit(pistol) and not isLit(mag))
 laser.broken = true
 frame(laser, 600)
-check("a broken laser: nothing", not L.isLit(pistol))
+check("a broken laser: nothing", not isLit(pistol))
 laser.broken = false
 frame(loose[1])
 frame(loose[1], 130)
-check("rounds: the magazines and the pistol", L.isLit(mag) and L.isLit(full) and L.isLit(pistol))
+check("rounds: the magazines and the pistol", isLit(mag) and isLit(full) and isLit(pistol))
 L.picking = true
-check("the mouse on a cell of the panel: green off", not L.isLit(mag))
+check("the mouse on a cell of the panel: green off", not isLit(mag))
 L.picking = false
 frame(nil, 400)
 

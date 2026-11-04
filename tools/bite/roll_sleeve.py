@@ -1,7 +1,7 @@
-# The padded down jacket whose left sleeve can be rolled up: the game's own model (Bob_JacketPaddedDOWN.x)
+# The jacket whose left sleeve can be rolled up: the game's own model (Bob_Jacket.x)
 # with the sleeve's last rings put on two bones of their own that nothing else is worn on (the props'),
 # bound as the forearm is. Unrolled they ride the forearm as before; KnoxBite.java slides them up it -
-# the cuff to the middle of the forearm, the padding bunched into a roll above - while the right hand
+# the cuff to the middle of the forearm, the sleeve bunched into a roll above - while the right hand
 # pulls (the author 2026-11-01: "look at the arm", the game's jacket rather than our own; the game skins
 # each mesh by its own offsets - AnimationPlayer.getSkinTransforms - so a prop bound as the forearm is
 # the forearm until moved).

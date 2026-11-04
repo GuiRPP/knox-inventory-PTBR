@@ -26,7 +26,7 @@ foreach ($l in 'EN', 'RU', 'CN') {
 }
 foreach ($s in 'footprint', 'order', 'search', 'saveguard', 'net', 'carradio', 'dash', 'menu', 'gen', 'perf', 'crosshair', 'settings', 'editor', 'pinned', 'lists', 'place', 'bar', 'barwalk', 'scene') {
     $out = & (Join-Path $mod "tools\$s\test.ps1") 2>&1 | Out-String
-    $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' }
+    $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' -and $_ -notmatch 'NativeCommandError' }   # (not a JVM's warning on stderr as PowerShell 5.1 wraps it)
     "${s}: " + ($lines -join ' | ')
 }
 "uilint: " + ((& (Join-Path $mod 'tools\uilint\uilint.ps1') 2>&1 | Select-Object -Last 1) -join ' ')

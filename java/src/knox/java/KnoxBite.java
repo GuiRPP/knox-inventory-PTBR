@@ -56,7 +56,7 @@ public class KnoxBite {
     // His left wrist's places (his own space; Bob_Idle's shoulder at 0.151 1.107 -0.05, arm 0.205
     // + 0.207, the eyes at 1.37 - the body's nose tip 1.34 0.086): on the way up, clear of the jacket;
     // across before the chest for the sleeve, low and near level - the right hand comes to it from below
-    // and doesn't cross it (the author's video, 2026-11-02: the arms made a cross; tools/bite/arms_check.py);
+    // and doesn't cross it (the author's video, 2026-11-02: the arms made a cross);
     // up across the chest, palm up, to look; nearer at the sight of it; let
     // down a little at the breath out; on the way down. (Eyes 0.26 over the shoulder, the arm 0.25
     // before them: the head bows some 30-35 degrees to it, as one does.)
@@ -127,7 +127,6 @@ public class KnoxBite {
     private static float wL, wR;                 // the arms' weights over the clip's own, 0..1
     private static boolean rightOn;              // the right hand at the sleeve
     private static float[] wristGoal = RAISE;    // where the left wrist goes now
-    private static float grip;                   // where on the forearm, 0 the wrist .. 1 the elbow
     private static int palmMode;                 // the left palm: 0 the clip's own, 1 down, 2 to the eyes
     private static float twistRate = 6.5f;       // how fast the forearms turn (the hook's springs), 1/s
 
@@ -830,7 +829,7 @@ public class KnoxBite {
             for (int i = 0; i < 3; i++) PN[i] -= (E[i] + W[i]) * 0.5f;
             palm = PN;
         }
-        twist(p, d, L_FORE, L_HAND, palm, twistL, 1f, 0f, dt);
+        twist(p, d, L_FORE, L_HAND, palm, twistL, 1f, dt);
         straighten(p, d, L_HAND, L_FORE, 0.8f * wl);
 
         // what the eyes go to: the forearm a little up from its middle, towards the grip while the
@@ -850,7 +849,7 @@ public class KnoxBite {
         // the right hand: on the forearm's near top side, whichever way it is turned - it comes from
         // below, his right, the fingers along the forearm to the elbow and over it, the wrist near
         // straight (the author's video, 2026-11-02: the hand bent hard down over the top, its forearm
-        // across the left one; tools/bite/arms_check.py)
+        // across the left one)
         sub(WL, EL, F1);
         norm(F1);
         G[0] = 0f;
@@ -919,7 +918,7 @@ public class KnoxBite {
         // 2026-11-04; and as quick in the slow quiet one)
         float turnRate = twistRate;
         twistRate = Math.max(turnRate, R_TURN_RATE);
-        twist(p, d, R_FORE, R_HAND, rightOn || hold > 0.05f ? palmR : null, twistR, -1f, 0f, dt);
+        twist(p, d, R_FORE, R_HAND, rightOn || hold > 0.05f ? palmR : null, twistR, -1f, dt);
         twistRate = turnRate;
         straighten(p, d, R_HAND, R_FORE, 0.6f * wr);
         if (hold > 0f) {
@@ -1261,16 +1260,16 @@ public class KnoxBite {
 
     /**
      * A forearm turned about itself so its palm (the hand's z) faces `want` (skeleton's space; null:
-     * `rest` radians from the clip's own), on a spring; never further than a forearm turns (side +1
+     * as the clip has it), on a spring; never further than a forearm turns (side +1
      * the left, -1 the right).
      */
     private static void twist(AnimationPlayer p, SkinningData d, int fore, int hand, float[] want, float[] state, float side,
-                              float rest, float dt) {
+                              float dt) {
         at(p, fore, E);
         at(p, hand, W);
         sub(W, E, F1);
         norm(F1);
-        float goal = rest;
+        float goal = 0f;
         if (want != null) {
             // (want may be PN itself: taken first)
             G[0] = want[0]; G[1] = want[1]; G[2] = want[2];

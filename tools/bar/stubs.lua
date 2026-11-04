@@ -59,7 +59,6 @@ testSaves = nil
 function KnoxMenuScene.recentSaves() return testSaves or {} end
 function KnoxMenuScene:yawOf(face) return -face end
 function KnoxMenuScene:place(o) o.placed = (o.placed or 0) + 1 end
-function KnoxMenuScene:steps(c) calls.steps = (calls.steps or 0) + 1 end
 function KnoxMenuScene:hit(c, mx, my) return true end
 function KnoxMenuScene:rectOf(c) return {0, 0, 1, 1}, 1 end
 KnoxTheme.inRect = function(x, y, r) return x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end
@@ -97,13 +96,9 @@ function knoxBarHero(scene, id, slot, x, y, z, face, pack)
     calls.hero[slot + 1] = id and {id = id, x = x, y = y, z = z, face = face, pack = pack} or false
 end
 function knoxBarEmber(scene, id, x, y, z, face, shown) calls.ember = id; calls.emberShown = shown; return 0.5 end
-function knoxBarDoor(v) calls.door = v end
-function knoxBarCandle() return 0.8 end
 function knoxBarSounds() calls.sounds = (calls.sounds or 0) + 1 end
-function knoxBarDoorOpens() calls.doorOpens = (calls.doorOpens or 0) + 1 end
 function knoxCampTick() calls.campTick = (calls.campTick or 0) + 1; return true end
 function knoxCampMoan() calls.moans = (calls.moans or 0) + 1 end
-function knoxCampStep() calls.steps = (calls.steps or 0) + 1 end
 function knoxMenuLight(j, id, ar, ag, ab, tr) calls.light[id] = {ar, ag, ab, tr} end
 function knoxBarHeroLights(j, id, ...) calls.lights[id] = {...} end
 function knoxMenuLook(j, id, yaw, pitch, w) calls.look[id] = {yaw, pitch, w} end

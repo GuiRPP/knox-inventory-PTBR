@@ -43,8 +43,7 @@ public class KnoxRadioFx {
     static final Random rnd = new Random();
     static final double p1 = rnd.nextDouble() * 6.28, p2 = rnd.nextDouble() * 6.28, p3 = rnd.nextDouble() * 6.28;
     static long dropAt, dropLen, nextDrop;
-    // the winter bar's radio is smashed (KnoxBarSound, 2026-10-31): it cuts out more often, for
-    // a moment or longer
+    // the winter bar's radio is smashed (KnoxBarSound, 2026-10-31): it cuts out for a moment or longer
     static boolean broken;
 
     static int f(long d, int i, float v) {
@@ -326,7 +325,7 @@ public class KnoxRadioFx {
             double p = (now - dropAt) / (double) dropLen;
             if (p >= 1.0) {
                 dropAt = 0L;
-                nextDrop = now + (broken ? 15000L + rnd.nextInt(30000) : 15000L + rnd.nextInt(30000));
+                nextDrop = now + 15000L + rnd.nextInt(30000);
             } else {
                 // (in over a third, eased; out slower)
                 double q = p < 0.33 ? p / 0.33 : 1.0 - (p - 0.33) / 0.67;

@@ -36,13 +36,13 @@ public final class KnoxBarLua {
 
     // The heroes as the frame has them (stage 4 of the plan, 2026-10-31), set from Lua each
     // frame on the main thread and copied into each End: capsules along their bones (their
-    // shadows), the ember of the smoker's cigarette, the door opened by the one going out.
+    // shadows), the ember of the smoker's cigarette.
     private static final int HEROES = KnoxBarFrame.HEROES, CAPSULES = KnoxBarFrame.CAPSULES, CAPSULE = KnoxBarFrame.CAPSULE;
     private static final float[] CAPS = new float[HEROES * CAPSULES * CAPSULE];
     private static final int[] COUNT = new int[HEROES];
     // (stage 5) where each breathes from and which way: x y z, then the way; 0 0 0: not there
     private static final float[] MOUTHS = new float[HEROES * 6];
-    private static float emberX, emberY, emberZ, emberGlow = -1, emberShown, doorOpen;
+    private static float emberX, emberY, emberZ, emberGlow = -1, emberShown;
 
     // While the frame is open the game may bake a hero's clothes (AnimatedModel.DoRender:
     // ModelInstanceTextureCreator, into its own FBO): its endDrawing() binds back
@@ -287,12 +287,6 @@ public final class KnoxBarLua {
         return om != null && !om.isLoadingClothingItems();
     }
 
-    /** The one going out pushes the door open: its sound. */
-    @LuaMethod(name = "knoxBarDoorOpens", global = true)
-    public static void knoxBarDoorOpens() {
-        KnoxBarSound.doorOpens();
-    }
-
     /** A new frame for the room to be listed into; the one before goes. */
     @LuaMethod(name = "knoxBarStart", global = true)
     public static void knoxBarStart() {
@@ -310,7 +304,6 @@ public final class KnoxBarLua {
         java.util.Arrays.fill(COUNT, 0);
         java.util.Arrays.fill(MOUTHS, 0f);
         emberGlow = -1;
-        doorOpen = 0;
     }
 
     /** Degrees and scene units; moves: KnoxBarFrame.STILL, DOOR, LAMP, PAPER, NEEDLE, PAGE, GARLAND, SWITCH, PENCIL, PINNED, BOTTLE, SWAG. */
@@ -376,7 +369,6 @@ public final class KnoxBarLua {
         e.ember[2] = emberZ;
         e.ember[3] = emberGlow;
         e.ember[4] = emberShown;
-        e.door = doorOpen;
         System.arraycopy(FOCUS, 0, e.focus, 0, 5);
         SpriteRenderer.instance.drawGeneric(e);
     }
@@ -547,12 +539,6 @@ public final class KnoxBarLua {
         } catch (RuntimeException e) {
             return -1;
         }
-    }
-
-    /** 0: the door as the wind has it; 1: held open wide (a hero going out). */
-    @LuaMethod(name = "knoxBarDoor", global = true)
-    public static void knoxBarDoor(double open) {
-        doorOpen = (float) Math.max(0, Math.min(1, open));
     }
 
     /** What scene character `id` holds in its other hand (Bip01_Prop2): set before it is dressed. */
@@ -841,7 +827,6 @@ public final class KnoxBarLua {
         final int[] count = new int[HEROES];
         final float[] mouths = new float[MOUTHS.length];
         final float[] focus = new float[5];
-        float door;
 
         End(KnoxBarFrame frame) {
             this.frame = frame;
@@ -854,7 +839,6 @@ public final class KnoxBarLua {
             frame.heroes(caps, count);
             frame.mouths(mouths);
             frame.ember(ember[0], ember[1], ember[2], ember[3], ember[4]);
-            frame.door(door);
             frame.focus(focus[0], focus[1], focus[2], focus[3], focus[4]);
             frame.end(animated ? (System.nanoTime() - START) / 1e9f : 12f);
         }

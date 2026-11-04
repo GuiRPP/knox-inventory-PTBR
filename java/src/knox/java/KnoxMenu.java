@@ -1337,7 +1337,7 @@ public class KnoxMenu {
         float w = scene.getWidth().floatValue();
         float h = scene.getHeight().floatValue();
         if (w < 1f || h < 1f) return;
-        projection.setPerspective((float) Math.toRadians(c[0]), w / h, c.length > 7 && c[7] > 0f ? c[7] : 0.5f, 200f);
+        projection.setPerspective((float) Math.toRadians(c[0]), w / h, c[7] > 0f ? c[7] : 0.5f, 200f);
         modelView.setLookAt(c[1], c[2], c[3], c[4], c[5], c[6], c[8], c[9], c[10]);
     }
 

@@ -76,21 +76,21 @@ final class KnoxBarLife {
     /**
      * A step of `dt` s at the frame's `time`: the door, the snow, the smoke, the breath. ember: x y
      * z (units), its glow (below 0: none); mouths: HEROES of x y z, then which way the breath
-     * goes (units; none: 0 0 0); doorOpen: 1 held wide by one going out. The first step fills
+     * goes (units; none: 0 0 0). The first step fills
      * the room as it would be after a few seconds (animations off: it stays so, and those who
      * come in later bring their smoke and breath at once: QA, 2026-10-31).
      */
-    void step(float dt, float time, float[] ember, float[] mouths, float doorOpen) {
+    void step(float dt, float time, float[] ember, float[] mouths) {
         if (!started) {
             started = true;
             // (no sound for a slam nobody saw: the sound asks on the main thread, even meanwhile)
             warming = true;
-            for (int i = 0; i < 150; i++) advance(1 / 30f, time - 5f + i / 30f, ember, mouths, doorOpen);
+            for (int i = 0; i < 150; i++) advance(1 / 30f, time - 5f + i / 30f, ember, mouths);
             warming = false;
             warmed = people(ember, mouths);
         }
         if (dt > 0) {
-            advance(dt, time, ember, mouths, doorOpen);
+            advance(dt, time, ember, mouths);
             // (they came in with the time going: a frame without time is nothing new to them)
             warmed = Math.max(warmed, people(ember, mouths));
         } else {
@@ -127,14 +127,14 @@ final class KnoxBarLife {
         return shown;
     }
 
-    private void advance(float dt, float time, float[] ember, float[] mouths, float doorOpen) {
+    private void advance(float dt, float time, float[] ember, float[] mouths) {
         clock += dt;
         float gust = KnoxBarFrame.gustAt(time);
-        stepDoor(dt, time, gust, doorOpen);
+        stepDoor(dt, time, gust);
 
         // the snow: more in a gust; through the door as far as it stands open
         float rate = 38f * (0.2f + 1.4f * gust * gust);
-        float open = Math.max(doorOpen, doorLetsIn(time, gust));
+        float open = doorLetsIn(time, gust);
         windowDue += rate * dt;
         doorDue += rate * open * dt;
         gapsDue += 7f * (0.15f + gust * gust) * dt;
@@ -246,7 +246,7 @@ final class KnoxBarLife {
         }
     }
 
-    private void stepDoor(float dt, float time, float gust, float doorOpen) {
+    private void stepDoor(float dt, float time, float gust) {
         float target = PUSH * gust * gust * gust * (0.82f + 0.22f * (float) Math.sin(time * 0.117f + 2f))
             + 1.2f * (float) Math.sin(time * 0.9f);
         // (in steps of 1/120 s at most: a long frame doesn't fling it)
@@ -258,8 +258,7 @@ final class KnoxBarLife {
             if (door > SHUT) {
                 door = SHUT;
                 if (doorSpeed > 0) {
-                    // (held wide by one going out, it slams only here)
-                    if (doorSpeed > 8f && doorOpen < 0.05f && !warming) {
+                    if (doorSpeed > 8f && !warming) {
                         bangPower = Math.min(1f, doorSpeed / 120f);
                         bangs++;
                     }
