@@ -338,7 +338,7 @@
     "IGUI_Knox_Module_rmenu": "Menu on R",
     "IGUI_Knox_Module_rmenu_Info": "Holding the reload key shows Knox's menu in place of the game's round one: magazines, rounds, the bolt. A short press reloads as ever. Numbers of rounds in magazines and guns are hidden: a spare magazine becomes known once it was inserted, loaded or unloaded. Off: the game's round menu and numbers stay.",
     "IGUI_Knox_RMenu_LoadMagazine": "Load Magazine",
-    "IGUI_Knox_RMenu_LoadAll": "Load all magazines",
+    "IGUI_Knox_RMenu_LoadAll": "Load All Magazines",
     "IGUI_Knox_RMenu_LoadGun": "Load %1",
     "IGUI_Knox_RMenu_Wheel": "Wheel",
     "IGUI_Knox_RMenu_Pick": "Select",
