@@ -2,7 +2,7 @@
 -- rmenu_pre: the scales, the rows for each gun, the hints, the keys and the mouse,
 -- what is queued. What it looks like in the game this cannot say.
 local T, M, K = KnoxTheme, KnoxRMenu, KnoxMagKnown
-T.active, T.modules.rmenu = true, true
+T.active, T.modules.rmenu, T.modules.inventory = true, true, true
 local pass, fail = 0, 0
 local function check(name, ok, info)
     if ok then pass = pass + 1 else fail = fail + 1 print("FAIL " .. name .. (info and (": " .. tostring(info)) or "")) end
@@ -757,6 +757,36 @@ CHOSEN = pack
 local m5 = loaded(pack)
 looks()
 check("not moved to the pockets: stays", m5.container == pack)
+-- out of a bag: the transfer to the pockets is queued, and the first look comes before it (QA, 2026-11-04)
+local mq = loaded(pack)
+QUEUE[1] = {Type = "ISInventoryTransferAction"}
+looks()
+INV:add(mq)
+QUEUE[1] = nil
+looks()
+check("still in the bag, the transfer in the queue: not forgotten, goes back", mq.container == rig)
+local mc = loaded(pack)
+QUEUE[1] = {Type = "ISInventoryTransferAction"}
+looks()
+QUEUE[1] = nil
+looks()
+INV:add(mc)
+looks()
+check("the transfer given up: forgotten, not taken back later", mc.container == INV)
+local mh = loaded(pack)
+QUEUE[1] = {Type = "ISInventoryTransferAction"}
+rig:add(mh)
+looks()
+QUEUE[1] = nil
+INV:add(mh)
+looks()
+check("carried off somewhere else meanwhile: forgotten", mh.container == INV)
+-- the game's own inventory: the game's way (the author, 2026-11-04)
+T.modules.inventory = false
+local mo = loaded(INV)
+looks()
+check("no Knox inventory: stays in the pockets", mo.container == INV)
+T.modules.inventory = true
 m5 = loaded(pack)
 INV:add(m5)
 QUEUE[1] = {Type = "ISInsertMagazine"}

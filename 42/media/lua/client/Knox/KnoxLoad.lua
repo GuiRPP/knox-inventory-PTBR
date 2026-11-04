@@ -494,10 +494,15 @@ local function sendHome(player, mag, homes, layouts)
     return false
 end
 
+--- Anything in the queue of actions?
+local function isBusy(player)
+    local q = ISTimedActionQueue.queues and ISTimedActionQueue.queues[player]
+    return q ~= nil and q.queue ~= nil and #q.queue > 0
+end
+
 --- Nothing to do and not aiming or running (those stop a transfer)?
 local function isFree(player)
-    local q = ISTimedActionQueue.queues and ISTimedActionQueue.queues[player]
-    if q and q.queue and #q.queue > 0 then return false end
+    if isBusy(player) then return false end
     return not (player:isAiming() or player:isRunning() or player:isSprinting())
 end
 
@@ -508,8 +513,14 @@ local function lookBack()
     local layouts, free, askedOf
     for mag, w in pairs(waiting) do
         local player = w.player
-        if player:isDead() or mag:getContainer() ~= player:getInventory() then
+        local at = mag:getContainer()
+        if player:isDead() then
             waiting[mag] = nil
+        elseif at ~= player:getInventory() then
+            -- (still in the rig or the bag it was asked out of: the transfer to the pockets is in the
+            -- queue, the first look comes before it - QA, 2026-11-04. Anywhere else, or nothing queued:
+            -- the player took it somewhere, or changed their mind)
+            if at ~= w.from or not isBusy(player) then waiting[mag] = nil end
         else
             if askedOf ~= player then askedOf, free = player, isFree(player) end
             if free then
@@ -532,7 +543,8 @@ L.lookBack = lookBack
 
 --- Loading of `mag` was asked for: remembered, with where it is now.
 local function noteLoading(player, mag)
-    if not T.active or not mag or waiting[mag] or not instanceof(player, "IsoPlayer") then return end
+    -- (with the game's own inventory the game's way stands: the author, 2026-11-04)
+    if not T.on("inventory") or not mag or waiting[mag] or not instanceof(player, "IsoPlayer") then return end
     waiting[mag] = {player = player, from = mag:getContainer(), tries = 0}
     if not looking then
         looking = true

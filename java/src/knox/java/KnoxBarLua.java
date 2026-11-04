@@ -6,6 +6,7 @@ import se.krka.kahlua.integration.annotations.LuaMethod;
 import zombie.ZomboidFileSystem;
 import zombie.core.Core;
 import zombie.core.SpriteRenderer;
+import zombie.core.opengl.RenderThread;
 import zombie.core.skinnedmodel.advancedanimation.AnimatedModel;
 import zombie.core.skinnedmodel.animation.AnimationPlayer;
 import zombie.core.skinnedmodel.model.SkinningData;
@@ -603,12 +604,35 @@ public final class KnoxBarLua {
         }
     }
 
-    private static final TextureDraw.GenericDrawer SWIPE_FREE = new TextureDraw.GenericDrawer() {
+    // What has to reach the video card whatever happens (QA, 2026-11-04). A drawer queued between two
+    // frames - the game starting, a new resolution, a Lua reset - goes out with the state the next frame
+    // clears, never drawn: the bar's ~40 MB of pictures, buffers and programs stayed on the card for the
+    // rest of the game. Such a state calls postRender on the main thread though, drawn or not.
+    private abstract static class Sure extends TextureDraw.GenericDrawer {
+        private volatile boolean done;
+
+        abstract void job();
+
         @Override
         public void render() {
-            KnoxMenuSwipe.free();
+            done = true;
+            job();
         }
-    };
+
+        @Override
+        public void postRender() {
+            if (done) return;
+            done = true;
+            RenderThread.queueInvokeOnRenderContext(() -> {
+                try {
+                    job();
+                } catch (Throwable t) {
+                    System.out.println("[Knox] the bar's frame: " + t);
+                }
+            });
+        }
+    }
+
     // (the states the game's renderer has queued, as End's; two a frame)
     private static final Swipe[] SWIPES = new Swipe[12];
     static {
@@ -636,7 +660,13 @@ public final class KnoxBarLua {
 
     @LuaMethod(name = "knoxMenuSwipeFree", global = true)
     public static void knoxMenuSwipeFree() {
-        SpriteRenderer.instance.drawGeneric(SWIPE_FREE);
+        // (a new one each time: a Sure is good for one job)
+        SpriteRenderer.instance.drawGeneric(new Sure() {
+            @Override
+            void job() {
+                KnoxMenuSwipe.free();
+            }
+        });
     }
 
     private static final class Lights extends TextureDraw.GenericDrawer {
@@ -754,7 +784,7 @@ public final class KnoxBarLua {
         }
     }
 
-    private static final class Release extends TextureDraw.GenericDrawer {
+    private static final class Release extends Sure {
         private final KnoxBarFrame frame;
 
         Release(KnoxBarFrame frame) {
@@ -762,7 +792,7 @@ public final class KnoxBarLua {
         }
 
         @Override
-        public void render() {
+        void job() {
             giveBackLastId();
             frame.release();
         }

@@ -552,14 +552,17 @@ public final class KnoxBarFrame {
             // (what a switch to the bar waits for, measured in the console: the author, 2026-11-02)
             long startedAt = System.nanoTime();
             boolean gl = !glReady;
-            if (gl) buildGL();
-            long glAt = System.nanoTime();
             int quality = high ? 1 : 0;
             boolean targets = w != width || h != height || quality != builtQuality;
+            if (gl || targets) forgetCardErrors();
+            if (gl) buildGL();
+            long glAt = System.nanoTime();
             if (targets) buildTargets(w, h, quality);
             if (gl || targets) {
                 System.out.println("[Knox] the bar's frame: video card " + (glAt - startedAt) / 1000000 + " ms, targets "
                     + (System.nanoTime() - glAt) / 1000000 + " ms");
+                cardOk("the build");
+                watchFrames = WATCH_FRAMES;
             }
             glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
             boolean scissor = glIsEnabled(GL_SCISSOR_TEST);
@@ -827,6 +830,49 @@ public final class KnoxBarFrame {
         standInsShown = shown;
     }
 
+    // The first frames of anything new on the card are watched: each pass asks it whether it took that
+    // pass, and the last frame looks at the picture itself. A card that compiles every shader and then
+    // draws nothing gave a black menu with no word said (QA, 2026-11-04: none of the GLSL has been on
+    // AMD, Intel or Mesa). What's wrong goes through fail(), and Lua takes the player to the camp. Only
+    // the first frames: asking the card makes the driver wait.
+    private static final int WATCH_FRAMES = 8;
+    // (linear, before the glow; the room at its darkest stands far above it: tools/barframe, both
+    // qualities, 2026-11-04)
+    private static final float ALIVE = 0.02f;
+    private int watchFrames, watchFbo;
+    private boolean dofWatched;
+    private FloatBuffer watchRow;
+
+    private static void forgetCardErrors() {
+        // (bounded: a lost context can answer for ever)
+        for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) { }
+    }
+
+    private static void cardOk(String what) {
+        int e = glGetError();
+        if (e != GL_NO_ERROR) throw new IllegalStateException("the video card refused " + what + ": 0x" + Integer.toHexString(e));
+    }
+
+    /** The last watched frame: a look along three rows of what goes to the screen. */
+    private void lookAtPicture() {
+        int pack = glGetInteger(GL_PIXEL_PACK_BUFFER_BINDING);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, watchFbo);
+        int need = width * 4;
+        if (watchRow == null || watchRow.capacity() < need) watchRow = BufferUtils.createFloatBuffer(need);
+        boolean alive = false;
+        for (int r = 1; r <= 3 && !alive; r++) {
+            watchRow.clear();
+            glReadPixels(0, height * r / 4, width, 1, GL_RGBA, GL_FLOAT, watchRow);
+            for (int x = 0; x < width && !alive; x += 4) {
+                alive = watchRow.get(x * 4) + watchRow.get(x * 4 + 1) + watchRow.get(x * 4 + 2) > ALIVE;
+            }
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, pack);
+        cardOk("the look at the picture");
+        if (!alive) throw new IllegalStateException("the picture stayed black");
+    }
+
     /** The room around the heroes, the air, the picture: onto whatever was the target at begin(). */
     public void end(float time) {
         if (!began) return;
@@ -847,6 +893,8 @@ public final class KnoxBarFrame {
         int blendEq = glGetInteger(GL_BLEND_EQUATION_RGB);
         glGetBooleanv(GL_COLOR_WRITEMASK, savedMask);
         try {
+            // (what the game's own drawing left behind isn't ours to answer for)
+            if (watchFrames > 0) forgetCardErrors();
             glDisable(GL_BLEND);
             glDisable(GL_CULL_FACE);
             glDisable(GL_SCISSOR_TEST);
@@ -858,6 +906,10 @@ public final class KnoxBarFrame {
             glColorMask(true, true, true, true);
             glBlendEquation(GL_FUNC_ADD);
             render(time);
+            if (watchFrames > 0) {
+                cardOk("the frame");
+                if (--watchFrames == 0) lookAtPicture();
+            }
         } catch (Throwable t) {
             fail(t);
         }
@@ -1259,6 +1311,7 @@ public final class KnoxBarFrame {
         }
 
         int shown = depthOfField(dt);
+        watchFbo = shown == dofTex ? dofFbo : pictureFbo;
 
         // the glow
         glUseProgram(pBloomDown.id);
@@ -1325,6 +1378,15 @@ public final class KnoxBarFrame {
         if (power < 0.002f) {
             focusFresh = true;
             return pictureTex;
+        }
+        // (it starts with the first hover over a hero, a glass, a sheet, the radio, the switch or a bag, or
+        // with the narrator's look - mostly after the first frames' watch: its own two. What the game or
+        // our unwatched passes left on the card meanwhile isn't its to answer for: the released game never
+        // asks the card itself, one wrong call anywhere waits for whoever asks first - QA, 2026-11-04)
+        if (!dofWatched) {
+            dofWatched = true;
+            if (watchFrames == 0) forgetCardErrors();
+            watchFrames = Math.max(watchFrames, 2);
         }
         glBindVertexArray(noMeshVao);
         // where the eye is focused: the depth there, eased from the last (an eye takes ~0.3 s)
@@ -2026,6 +2088,7 @@ public final class KnoxBarFrame {
     }
 
     private void mark(String name) {
+        if (watchFrames > 0) cardOk(name);
         if (!profile || queryCount >= queries.length) return;
         if (queries[queryCount] == 0) queries[queryCount] = glGenQueries();
         glQueryCounter(queries[queryCount], GL_TIMESTAMP);
@@ -2412,7 +2475,7 @@ public final class KnoxBarFrame {
         glReady = false;
         freeTargets();
         freePhotos();
-        Program[] all = {pRoom, pGlass, pShadow, pSky, pAo, pBlur, pAir, pTone, pMotes, pBloomDown, pBloomUp, pFinal, pWalker, pEmber, pBulb, pSnow, pPuff};
+        Program[] all = {pRoom, pGlass, pShadow, pSky, pAo, pBlur, pAir, pTone, pMotes, pBloomDown, pBloomUp, pFinal, pWalker, pEmber, pBulb, pSnow, pPuff, pFocus, pDof};
         for (Program p : all) if (p != null) glDeleteProgram(p.id);
         for (int id : textures.values()) glDeleteTextures(id);
         textures.clear();

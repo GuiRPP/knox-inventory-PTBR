@@ -549,9 +549,10 @@ end
 
 -- The game's own item tooltip of a hotbar slot (ISHotbar:update) lay right
 -- under Knox's: Knox's went for the gun's panel, the game's stayed over it (the
--- author's bench, 2026-10-30). Knox shows the slot's tooltip itself (render).
+-- author's bench, 2026-10-30). Knox shows the slot's tooltip itself (render) - only with its tooltips
+-- on: off, the game's is the only one there is (QA, 2026-11-04).
 local knoxUpdate = ISHotbar.update
 function ISHotbar:update()
     knoxUpdate(self)
-    if self.toolRender and self.toolRender:getIsVisible() then self.toolRender:setVisible(false) end
+    if T.on("tooltips") and self.toolRender and self.toolRender:getIsVisible() then self.toolRender:setVisible(false) end
 end

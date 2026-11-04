@@ -601,7 +601,7 @@ function M:updateKeeps(down, clicked, rclicked)
         end
         return true
     end
-    if self.mode ~= "idle" or self.ctxMenu or (KnoxBagCard and KnoxBagCard.isUp()) or not self:menuIdle() then return false end
+    if self.mode ~= "idle" or self.ctxMenu or self.uiAway or (KnoxBagCard and KnoxBagCard.isUp()) or not self:menuIdle() then return false end
     local k = self:keepAtMouse()
     if not k then return false end
     self.keepHover = k
@@ -2060,7 +2060,7 @@ function M:updateUiHide()
     local down = isKeyDown(Keyboard.KEY_H) == true
     local press = down and not self.hWas
     self.hWas = down
-    if not press or self.mode ~= "idle" or self.ctxMenu or self.tuning or self.switchK or self.walking then return end
+    if not press or self.mode ~= "idle" or self.ctxMenu or self.tuning or self.switchK or self.walking or self.uiAway then return end
     if isKeyDown(Keyboard.KEY_LMENU) or isKeyDown(Keyboard.KEY_RMENU) or isKeyDown(Keyboard.KEY_LSHIFT)
         or isKeyDown(Keyboard.KEY_RSHIFT) or isKeyDown(Keyboard.KEY_LCONTROL) or isKeyDown(Keyboard.KEY_RCONTROL) then return end
     if KnoxMenuKeep and KnoxMenuKeep.drag then return end
@@ -2075,14 +2075,15 @@ end
 
 --- The menu over the camp fades away with the music while a hero gets up and
 --- walks off (the author's wish, 2026-10-15), and comes back if he comes back.
---- H puts it away the same way, quicker (see menuElements).
+--- H puts it away the same way, quicker (see menuElements), and so does the narrator's look at his
+--- arm while it lasts (uiAway; the author, 2026-11-04).
 function M:updateMenuFade(dt)
     if not knoxMenuUiAlpha then return end
     local going = self.mode == "leaving" or self.mode == "launched"
-    local hide = KnoxMenuScene.uiHidden and not going
+    local hide = (KnoxMenuScene.uiHidden or self.uiAway) and not going
     local want = (going or hide) and 0 or 1
     local k = self.menuK or 1
-    local fast = KnoxMenuScene.uiHidden or self.uiOff or self.uiBack
+    local fast = KnoxMenuScene.uiHidden or self.uiAway or self.uiOff or self.uiBack
     if k > want then k = math.max(want, k - dt / (fast and not going and UI_HIDE_FADE or 1.5))
     elseif k < want then k = math.min(want, k + dt / (fast and UI_HIDE_FADE or 0.6)) end
     self.menuK = k
@@ -2263,6 +2264,10 @@ function M:frame()
     self.lastMs = now
     self.clock = self.clock + dt
     self.frames = self.frames + 1
+    -- (the narrator's look keeps the menu away only while it says so frame by frame: a frame failing every
+    -- time before it gets that far must not leave the menu away and H dead; one failing alone doesn't
+    -- flash the menu - QA, 2026-11-04)
+    if self.uiAway and (self.uiAwayAt or 0) < self.frames - 2 then self.uiAway = false end
     local t = self.clock
     local flick = 1 + 0.07 * math.sin(t * 11.3) + 0.045 * math.sin(t * 23.7 + 1.3) + 0.04 * math.sin(t * 5.1 + 0.4)
     self.flick = flick
@@ -2325,7 +2330,7 @@ function M:frame()
 
     -- mouse (nobody to point at while the camp is in the dark)
     local hover = nil
-    if self.mode == "idle" and self.frames > 3 and not self.tuning and self:campShown() and self:menuIdle() then
+    if self.mode == "idle" and self.frames > 3 and not self.tuning and not self.uiAway and self:campShown() and self:menuIdle() then
         local mx, my = getMouseX(), getMouseY()
         for _, c in ipairs(self.chars) do
             -- (only someone who has come in)
@@ -2349,7 +2354,7 @@ function M:frame()
     self.radioHover = false
     if KnoxRadioCard and self.revealAt then
         local r = self:radioRect()
-        local idle = self.mode == "idle" and self.frames > 3 and not self.tuning and self:campShown()
+        local idle = self.mode == "idle" and self.frames > 3 and not self.tuning and not self.uiAway and self:campShown()
         -- (a keepsake being carried: the radio keeps quiet, it must not get in the way)
         local carrying = KnoxMenuKeep ~= nil and KnoxMenuKeep.drag ~= nil
         if idle and not carrying and not hover and self:menuIdle() and T.inRect(getMouseX(), getMouseY(), r) then self.radioHover = true end
@@ -2360,7 +2365,7 @@ function M:frame()
     -- mouse alone as the radio's card). See the clicks below.
     self.bagHover = nil
     local bagIdle = KnoxBagCard ~= nil and self.revealAt ~= nil and self.mode == "idle" and self.frames > 3
-        and not self.tuning and self:campShown()
+        and not self.tuning and not self.uiAway and self:campShown()
     if bagIdle and not hover and not self.radioHover and self:menuIdle() and not (KnoxMenuKeep and KnoxMenuKeep.drag) then
         local mx, my = getMouseX(), getMouseY()
         for _, c in ipairs(self.chars) do
@@ -2391,8 +2396,9 @@ function M:frame()
     local down, rdown = isMouseButtonDown(0), isMouseButtonDown(1)
     local clicked, rclicked = down and not self.wasDown, rdown and not self.wasRDown
     self.wasDown, self.wasRDown = down, rdown
-    -- (going dark to the other scene: nobody leaves, nothing is picked up any more)
-    if self.switchK then clicked, rclicked, hover = false, false, nil end
+    -- (going dark to the other scene: nobody leaves, nothing is picked up any more; and the
+    -- narrator's look: a click only cuts it short - the author, 2026-11-04)
+    if self.switchK or self.uiAway then clicked, rclicked, hover = false, false, nil end
     -- keepsakes: carried, picked up, taken away - their clicks are their own
     if self:updateKeeps(down, clicked, rclicked) or (KnoxMenuKeep and KnoxMenuKeep.drag) then
         clicked, rclicked, hover = false, false, nil
@@ -3222,6 +3228,7 @@ function KnoxMenuScene.destroy(intoGame)
     local self = KnoxMenuScene.instance
     if intoGame == true then KnoxMenuScene.uiHidden = false end
     if knoxMenuWatermark and not KnoxMenuScene.uiHidden then knoxMenuWatermark(false) end
+    if knoxMenuLookClear then knoxMenuLookClear() end   -- (the look hook idle again in the game)
     if not self then return end
     KnoxMenuScene.instance = nil
     -- (the menu put away by H: to the scene built next, or back for the game)
@@ -3231,7 +3238,6 @@ function KnoxMenuScene.destroy(intoGame)
     self:stopSounds()
     if KnoxRadioCard then KnoxRadioCard.hide() end
     if KnoxBagCard then KnoxBagCard.hide() end
-    if knoxMenuLookClear then knoxMenuLookClear() end   -- (the look hook idle again in the game)
     if self.fader then self.fader:removeFromUIManager() end
     if self.scene and self.scene.javaObject then knoxMenuCameraOff(self.scene.javaObject) end
     knoxMenuTintClear()

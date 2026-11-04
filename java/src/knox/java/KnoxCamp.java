@@ -73,8 +73,11 @@ public class KnoxCamp {
         return i == CRICKET ? cricket(now) : 1f;
     }
     // seconds each dies out in once the hero has gone: the fire left behind
-    // first, then the cricket, the forest, the wind last
-    static final float[] LOOP_FADE_S = {7f, 18f, 26f, 12f, 16f, 26f};
+    // first, then the cricket, the forest, the wind last; the bar's howl, creaks
+    // and rattle as its wind outside (one per loop - six for nine threw in tick()
+    // every frame, the catch there swallowed it, and they never died out on the
+    // loading screen: QA, 2026-11-04)
+    static final float[] LOOP_FADE_S = {7f, 18f, 26f, 12f, 16f, 26f, 16f, 16f, 16f};
     // once the world has loaded, what is left of them goes in this long
     static final float LOADED_FADE_S = 2.5f;
     // the camp's end in the game: what is left dies out in this long (cut at

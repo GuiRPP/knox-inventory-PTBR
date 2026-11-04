@@ -800,10 +800,13 @@ end
 -- looks down at his left forearm, rolls the warm jacket's sleeve up, turns the arm - a bite - and
 -- yanks the sleeve down; or nothing there, and he lets it down slowly. The Java part has the moment
 -- and his arms (KnoxBite); here he is stood where the camera is, and the view turns with his head.
--- It comes of itself, rarely: the bar left alone a while, the mouse still. B starts it too for now,
--- the bite and the quiet one by turns (the author: "on B, even without the developer mode; we'll take
--- it away later"). A click or a key cuts it short. He is dressed for the next one in advance - with
--- the bite under the sleeve or without - so the room isn't dressed anew in sight.
+-- It comes of itself, rarely: the bar left alone a while, the mouse still, nothing open over the menu.
+-- The menu goes away for it, the hints too, and comes back after (the author, 2026-11-04); a click or a
+-- key only cuts it short. B starts it too, the bite and the quiet one by turns, on the author's PC alone:
+-- the file below lies in Zomboid\Lua there and is shipped with nothing (the author, 2026-11-04: "only for
+-- me, even without the debug mode"). He is dressed for the next one in advance - with the bite under
+-- the sleeve or without - so the room isn't dressed anew in sight.
+local AUTHOR_FILE = "knox_author.txt"
 local EYES_UP, EYES_AHEAD = 1.40, -0.32   -- the camera in his body, units: behind him (KnoxBite.EYE_Y, EYE_Z)
 local EYES_SEAT = {amb = 0.12, sky = 0.8, head = 1.37}
 local EYES_EVERY_MIN, EYES_EVERY_MAX = 240, 480   -- s between the looks
@@ -813,7 +816,11 @@ local EYES_BITE = 65                     -- % of them a bite
 function B:addEyes()
     self.eyes = nil
     self.lookHeld = false
+    self.uiAway = false
     if not (knoxBiteStart and knoxBiteDress and knoxBiteHold) then return end
+    local marker = getFileReader and getFileReader(AUTHOR_FILE, false)
+    self.eyesKey = marker ~= nil
+    if marker then marker:close() end
     knoxBiteStop()
     local j = self.scene.javaObject
     local c = {id = "kb_eyes", x = 0, y = 0, z = 0, face = 0, s = 0.001, anim = "knoxmenu_stand", lightK = 1,
@@ -857,15 +864,24 @@ local function walkSave()
     w:close()
 end
 
+--- Something open over the menu, or the menu busy with itself? The look at the arm waits for that, and
+--- gives way to it in the middle (QA, 2026-11-04).
+function B:menuTaken()
+    if self.mode ~= "idle" or self.ctxMenu or self.tuning or self.switchK or self.walking or UIManager.isModalVisible() then return true end
+    if (KnoxMenuKeep and KnoxMenuKeep.drag) or (KnoxBagCard and KnoxBagCard.isUp()) then return true end
+    -- (the radio's card stays up by itself while the mouse is on it: QA, 2026-11-04)
+    local radio = KnoxRadioCard and KnoxRadioCard.instance
+    if radio and radio:getIsVisible() then return true end
+    if KnoxMenuNewsReader and KnoxMenuNewsReader.instance then return true end
+    return (KnoxSettings ~= nil and KnoxSettings.instance ~= nil) or (KnoxEditor ~= nil and KnoxEditor.instance ~= nil)
+end
+
 --- Nothing in the way of it: as for H (and no typing, no card, no look at the arm, no dialog).
 function B:walkFree()
-    if self.mode ~= "idle" or self.frames <= 3 or self.ctxMenu or self.tuning or self.switchK or self.swipeIn then return false end
-    if not self:campShown() or (self.eyes and self.eyes.busy) or UIManager.isModalVisible() then return false end
+    if self.frames <= 3 or self.swipeIn or self:menuTaken() then return false end
+    if not self:campShown() or (self.eyes and self.eyes.busy) then return false end
     if isKeyDown(Keyboard.KEY_LMENU) or isKeyDown(Keyboard.KEY_RMENU) or isKeyDown(Keyboard.KEY_LSHIFT)
         or isKeyDown(Keyboard.KEY_RSHIFT) or isKeyDown(Keyboard.KEY_LCONTROL) or isKeyDown(Keyboard.KEY_RCONTROL) then return false end
-    if (KnoxMenuKeep and KnoxMenuKeep.drag) or (KnoxBagCard and KnoxBagCard.isUp()) then return false end
-    if KnoxMenuNewsReader and KnoxMenuNewsReader.instance then return false end
-    if (KnoxSettings and KnoxSettings.instance) or (KnoxEditor and KnoxEditor.instance) then return false end
     if KnoxMenuScene.uiHidden then return true end
     local main = MainScreen.instance
     return main ~= nil and not main.inGame and main.bottomPanel ~= nil and main:getIsVisible() and main.bottomPanel:getIsVisible()
@@ -931,6 +947,8 @@ end
 function B:updateEyes(t)
     local c = self.eyes
     if not c then return end
+    -- (down until it's known again below: a call here failing every frame must not keep the menu away)
+    self.uiAway = false
     local j = self.scene.javaObject
     if not c.dressed then
         -- (the game's wardrobe read first, as the dead's)
@@ -957,17 +975,21 @@ function B:updateEyes(t)
     if mx ~= c.mouseX or my ~= c.mouseY then
         c.mouseX, c.mouseY, c.stillSince = mx, my, t
     end
-    local down = isKeyDown(Keyboard.KEY_B) == true
-    local press = down and not c.bWas
-    c.bWas = down
-    local free = c.posedAt and self.mode == "idle" and not self.ctxMenu and not self.tuning and not self.switchK and not self.walking
+    local press = false
+    if self.eyesKey then
+        local down = isKeyDown(Keyboard.KEY_B) == true
+        press = down and not c.bWas
+        c.bWas = down
+    end
     if c.busy then
-        if not c.hurried and (not free or isMouseButtonDown(0) or isMouseButtonDown(1) or isKeyDown(Keyboard.KEY_TAB)
-            or isKeyDown(Keyboard.KEY_ESCAPE)) then
+        if not c.hurried and (not c.posedAt or self:menuTaken() or isMouseButtonDown(0) or isMouseButtonDown(1)
+            or isKeyDown(Keyboard.KEY_TAB) or isKeyDown(Keyboard.KEY_ESCAPE)) then
             c.hurried = true
             knoxBiteHurry()
         end
-    elseif free and (press or not self.hover and t >= c.nextAt and t - (c.stillSince or t) >= EYES_STILL) then
+    elseif c.posedAt and (press or not self.hover and not self.radioHover and not self.bagHover and not self.switchHover
+        and not self.keepHover and t >= c.nextAt and t - (c.stillSince or t) >= EYES_STILL and self:menuIdle())
+        and self:walkFree() then
         c.byKey = press
         c.bitten = c.nextBite == true
         c.hurried = false
@@ -975,6 +997,8 @@ function B:updateEyes(t)
         c.wasBusy = c.busy
     end
     self.lookHeld = c.busy == true
+    self.uiAway = self.lookHeld and self.mode == "idle"
+    self.uiAwayAt = self.frames   -- (M:frame: said this frame)
 end
 
 --- The view as his head has it (M:updateCamera): he stands with his eyes at the camera, facing its
@@ -1093,7 +1117,7 @@ end
 function B:pressSwitch(clicked)
     local was = self.switchHover
     self.switchHover = false
-    if self.mode ~= "idle" or self.frames <= 3 or self.tuning or not self.revealAt or not self:campShown()
+    if self.mode ~= "idle" or self.frames <= 3 or self.tuning or self.uiAway or not self.revealAt or not self:campShown()
         or not self:menuIdle() or self.ctxMenu or (KnoxMenuKeep and KnoxMenuKeep.drag) then
         if was and knoxBarSwitchLit then knoxBarSwitchLit(false) end
         return false
