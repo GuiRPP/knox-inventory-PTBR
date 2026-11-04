@@ -1186,7 +1186,9 @@ function T.frost(ui, x, y, w, h, hot, a, onPlate)
         mine = {}
         frostState[ui] = mine
     end
-    local key = x * 8192 + y
+    -- (one per size: an item sliding in moves, its cracks with it - keyed by where it was, they started
+    -- anew every frame, flickering, and piled up: overhaul, 2026-11-04)
+    local key = w * 8192 + h
     local e = mine[key]
     if not hot and not e then return end
     local now = getTimestampMs() / 1000

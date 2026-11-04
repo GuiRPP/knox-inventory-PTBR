@@ -391,6 +391,16 @@ function M:tint(o, flick)
     end
 end
 
+--- Every tinted thing's light given again (knoxMenuTintClear took all the scenes' at once). The heroes
+--- are lit every frame anyway (M:lightCharacter).
+function M:retint()
+    -- (a bar whose build failed at its start has none yet, and the way back to the camp goes on from here)
+    if not self.objects then return end
+    for _, o in ipairs(self.objects) do
+        if o.tinted and not o.height then self:tint(o, self.flick or 1) end
+    end
+end
+
 function M:yawOf(face)
     return self.cfg.yawOffset + self.cfg.yawSign * face
 end
@@ -2003,6 +2013,8 @@ end)
 
 -- Frame -----------------------------------------------------------------------
 
+local FRAME_ERRORS = 60   -- frames failing one after another before the bar goes back to the camp
+
 function M:prerender()
     -- (the camp is never faded with the menu over it: KnoxUiFade, till M:render)
     if knoxMenuUiSkip then knoxMenuUiSkip(true) end
@@ -2010,6 +2022,14 @@ function M:prerender()
     if not ok and self.frameError ~= tostring(err) then
         self.frameError = tostring(err)
         print("[Knox] menu scene frame error: " .. tostring(err))
+    end
+    -- (failing frame after frame: the bar gives up for the camp, as when its picture fails; the camp
+    -- has nothing to fall back on - overhaul, 2026-11-04)
+    if ok then
+        self.frameErrors = nil
+    else
+        self.frameErrors = (self.frameErrors or 0) + 1
+        if self.frameErrors == FRAME_ERRORS and self.backToCamp then self:backToCamp("its frame fails every time") end
     end
 end
 
@@ -2084,7 +2104,9 @@ function M:updateMenuFade(dt)
     local want = (going or hide) and 0 or 1
     local k = self.menuK or 1
     local fast = KnoxMenuScene.uiHidden or self.uiAway or self.uiOff or self.uiBack
-    if k > want then k = math.max(want, k - dt / (fast and not going and UI_HIDE_FADE or 1.5))
+    -- (H with the animations off: at once - overhaul, 2026-11-04)
+    if fast and not going and not T.animOn() then k = want
+    elseif k > want then k = math.max(want, k - dt / (fast and not going and UI_HIDE_FADE or 1.5))
     elseif k < want then k = math.min(want, k + dt / (fast and UI_HIDE_FADE or 0.6)) end
     self.menuK = k
     -- (gone dark: hidden for real, and the cards over the scene drawn as they are; back, or a
@@ -2162,7 +2184,8 @@ function M:swipeOver()
             again = function()
                 Events.OnPreUIDraw.Remove(again)
                 old:retire()
-                if knoxBarPrepare then knoxBarPrepare() end
+                -- (not if the game has come in meanwhile: the files would stay read in it - overhaul, 2026-11-04)
+                if knoxBarPrepare and KnoxMenuScene.instance and knoxMenuInMenu() then knoxBarPrepare() end
             end
             Events.OnPreUIDraw.Add(again)
         end
@@ -2480,6 +2503,15 @@ function M:newGame()
     local main = MainScreen.instance
     if not main or not main.soloScreen then return end
     getSoundManager():playUISound("UIActivateMainMenuItem")
+    -- (the menu put away by H: the new game's screen is in it - opened hidden, the menu looked dead;
+    -- overhaul, 2026-11-04)
+    if KnoxMenuScene.uiHidden or self.uiOff then
+        KnoxMenuScene.uiHidden = false
+        if self.uiOff then
+            self:menuElements(true)
+            self.uiBack = true
+        end
+    end
     local ok, err = pcall(function()
         ActiveMods.getById("currentGame"):copyFrom(ActiveMods.getById("default"))
         main.bottomPanel:setVisible(false)
@@ -3098,6 +3130,7 @@ function M:new()
     o.wasDown = true   -- a click that brought the menu up is not a click on a hero
     o.wasRDown = true  -- (nor the right button held through a switch: it takes a keepsake away)
     o.tabWas = true    -- nor is a Tab held then a switch of the scene
+    o.hWas = true      -- (nor H held then the menu put away or back: overhaul, 2026-11-04)
     -- the scene's layout: the camp's (KnoxMenuBar puts its own here)
     o.cfg = CFG
     return o
@@ -3187,11 +3220,15 @@ function M:retire()
     if self.scene and self.scene.javaObject then knoxMenuCameraOff(self.scene.javaObject) end
     if self.frameLoaded ~= nil then
         if knoxBarStop then knoxBarStop() end
+        -- (and the narrator's look: the Java part kept him and the hook on - overhaul, 2026-11-04)
+        if self.eyes and knoxBiteStop then knoxBiteStop() end
     else
-        -- (the camp's tints; the scene that stays keeps its lights)
+        -- (the camp's tints; the scene that stays keeps its lights, and its own tints - they all went at
+        -- once: a bag put down after the bar's light had spread stayed in full light - overhaul, 2026-11-04)
         knoxMenuTintClear()
         local now = KnoxMenuScene.instance
         if now and now.lights then knoxMenuSceneLights(now.lights) end
+        if now and now ~= self and now.retint then now:retint() end
     end
     self:removeFromUIManager()
 end
@@ -3279,7 +3316,10 @@ function KnoxMenuScene.swipeBuild(old)
     old.uiOff = nil
     local built = KnoxMenuScene.createScene(hid)
     if not built then
-        -- (no scene came: KnoxMenuScene.destroy if the bar's failed; none at all, no menu scene)
+        -- (no scene came: KnoxMenuScene.destroy if the bar's failed; none at all, no menu scene. The
+        -- menu put away by H goes to create, shown there if nothing comes: it stayed hidden for good -
+        -- overhaul, 2026-11-04)
+        KnoxMenuScene.uiHidList = hid
         KnoxMenuScene.create()
         return
     end
@@ -3338,7 +3378,9 @@ function KnoxMenuScene.createScene(hid)
         KnoxMenuScene.destroy()
         if cls == KnoxMenuScene then return end
         cls, place = KnoxMenuScene, "camp"
-        KnoxMenuScene.barFailed = true   -- (till the game is restarted: Tab has nothing to switch to)
+        -- (Tab has nothing to switch to till the menu's Lua is loaded anew: a game's start and the way
+        -- back from it try the bar again)
+        KnoxMenuScene.barFailed = true
         if knoxMenuMuteAmbience then knoxMenuMuteAmbience(true) end
     end
 end

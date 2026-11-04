@@ -28,6 +28,7 @@ require "Knox/KnoxMenuScene"
 KnoxMenuBar = KnoxMenuScene:derive("KnoxMenuBar")
 local B = KnoxMenuBar
 local T = KnoxTheme
+B.noKeeps = true   -- (nothing is taken out of a bag here: the keepsakes are the camp's - the author, 2026-11-04)
 
 local U = 1 / 1.22   -- scene units per metre (a standing character is 1.47 units)
 
@@ -595,11 +596,21 @@ local function restState(c)
     return code == "a" and "knoxbar_stool" or ("knoxbar_stool_" .. code)
 end
 
+--- The game's sound slider, 0..1: the bar's sounds go by it (the author, 2026-11-04; the camp's stay as
+--- they were). At its top, as the author set and heard them. (KnoxBarSound.sfx has the Java part's.)
+local function barSfx()
+    return math.max(0, math.min(1, (getCore():getOptionSoundVolume() or 10) / 10))
+end
+
+function B:sfxK()
+    return barSfx()
+end
+
 --- One of the hero's sex's recordings of a sound ("hic", "snore", "smack"), played straight.
 local function heroVoice(c, what)
     local snap = c.save and c.save.snap
     local set = SLEEP_VOICE[snap and snap.female == true and "female" or "male"][what]
-    if #set > 0 and knoxCampSoundCut then knoxCampSoundCut(set[ZombRand(#set) + 1], SLEEP_VOICE_VOL, 0) end
+    if #set > 0 and knoxCampSoundCut then knoxCampSoundCut(set[ZombRand(#set) + 1], SLEEP_VOICE_VOL * barSfx(), 0) end
 end
 
 function B:stir(c, t)
@@ -648,7 +659,7 @@ function B:updateSleeper(c)
     -- straight: its FMOD events are kept silent in the menu - the author heard none, 2026-11-02)
     if c.bottleOff and not c.bottleHeard and knoxBarBottleBreaks and knoxBarBottleBreaks() > c.bottleBreaksWas then
         c.bottleHeard = true
-        if knoxCampSoundCut then knoxCampSoundCut("media/sound/bottlesmash.ogg", BOTTLE_SMASH_VOL, 0) end
+        if knoxCampSoundCut then knoxCampSoundCut("media/sound/bottlesmash.ogg", BOTTLE_SMASH_VOL * barSfx(), 0) end
     end
 end
 
@@ -792,7 +803,22 @@ function B:comeBack()
     if c and c.seat then
         c.y = c.seat.y
         self:place(c)
-        self:setAnim(c, c.seat.s.anim)
+        if c.slot == 1 then
+            -- (the one asleep: back in his rest as it is now, not the room's first - the head on its
+            -- side, the hand empty once the bottle is off. A stir the click came in ends here, behind
+            -- the black: left for later, it went on with no pose, the bottle swatted off by nobody -
+            -- overhaul, 2026-11-04)
+            local st = c.stir
+            if st then
+                c.stir = nil
+                c.stirReady = self.clock + SLEEP_AGAIN
+                if st.kind == "shift" then c.sleepSide = c.sleepSide == "b" and "a" or "b" end
+                if st.knocked then c.sleepEmpty = true end
+            end
+            self:setAnim(c, restState(c))
+        else
+            self:setAnim(c, c.seat.s.anim)
+        end
     end
 end
 
@@ -807,6 +833,20 @@ end
 -- me, even without the debug mode"). He is dressed for the next one in advance - with the bite under
 -- the sleeve or without - so the room isn't dressed anew in sight.
 local AUTHOR_FILE = "knox_author.txt"
+-- His clothes are his alone: with All Clothes Unlocked the character creation asks the game for all the
+-- clothes of a body location, and that list doesn't look at `hidden` (overhaul, 2026-11-04).
+local allForLocation = getAllItemsForBodyLocation
+if allForLocation then
+    function getAllItemsForBodyLocation(location)
+        local items = allForLocation(location)
+        if items then
+            for i = #items, 1, -1 do
+                if string.sub(tostring(items[i]), 1, 9) == "KnoxBite." then table.remove(items, i) end
+            end
+        end
+        return items
+    end
+end
 local EYES_UP, EYES_AHEAD = 1.40, -0.32   -- the camera in his body, units: behind him (KnoxBite.EYE_Y, EYE_Z)
 local EYES_SEAT = {amb = 0.12, sky = 0.8, head = 1.37}
 local EYES_EVERY_MIN, EYES_EVERY_MAX = 240, 480   -- s between the looks
@@ -833,6 +873,7 @@ function B:addEyes()
     if not ok then return end
     knoxMenuAnim(j, c.id, c.anim)
     self:place(c)
+    c.bWas = true   -- (B held through a rebuild is not a press: overhaul, 2026-11-04)
     self.eyes = c
 end
 
@@ -1070,7 +1111,7 @@ function B:updateSounds(t)
     if self.frames < 3 then return end
     knoxBarSounds()
     local at = self.moanAt
-    if at and t >= at then knoxCampMoan(ZombRand(2) == 0, 1) end
+    if at and t >= at then knoxCampMoan(ZombRand(2) == 0, barSfx()) end
     if not at or t >= at then self.moanAt = t + MOAN_MIN + ZombRandFloat(0, MOAN_MAX - MOAN_MIN) end
 end
 
@@ -1255,22 +1296,26 @@ function B:watchStall()
         ago(now, self.photoMs), ago(now, self.photoTakenMs)))
 end
 
+--- The bar can't be: back to the camp, Tab with nothing to switch to till the menu's Lua is
+--- loaded anew (a game's start and the way back from it try again), built anew outside of drawing.
+function B:backToCamp(why)
+    if self.goingBack then return end
+    self.goingBack = true
+    KnoxMenuScene.barFailed = true
+    print("[Knox] menu scene (bar): " .. why .. ", back to the camp")
+    local again
+    again = function()
+        Events.OnPreUIDraw.Remove(again)
+        if KnoxMenuScene.instance == self and knoxMenuInMenu() then KnoxMenuScene.create() end
+    end
+    Events.OnPreUIDraw.Add(again)
+end
+
 --- The frame opens: the heroes the scene draws next land in it. The room, the sky and all
---- the rest are the frame's (KnoxBarFrame). A video card that can't do it: back to the camp,
---- for good (till the game is restarted), built anew outside of drawing.
+--- the rest are the frame's (KnoxBarFrame). A video card that can't do it: back to the camp.
 function B:drawBackdrop()
     knoxMenuResetGL()
-    if knoxBarFailed() and not self.goingBack then
-        self.goingBack = true
-        KnoxMenuScene.barFailed = true
-        print("[Knox] menu scene (bar): its frame failed, back to the camp")
-        local again
-        again = function()
-            Events.OnPreUIDraw.Remove(again)
-            if KnoxMenuScene.instance == self and knoxMenuInMenu() then KnoxMenuScene.create() end
-        end
-        Events.OnPreUIDraw.Add(again)
-    end
+    if knoxBarFailed() then self:backToCamp("its frame failed") end
     -- Continue, Load, a new game (QA, 2026-10-31): the game fades the menu out over at least
     -- 250 ms (MainScreenState.exit), then no more frames till the save is in. So the targets go
     -- near the end of the fade, about 12% of the picture left, by the clock: a long frame's dt

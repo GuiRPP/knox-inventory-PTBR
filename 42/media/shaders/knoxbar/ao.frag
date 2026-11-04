@@ -38,7 +38,10 @@ void main()
 	vec3 dy1 = viewAt(vUv + vec2(0.0, uTexel.y)) - p, dy2 = p - viewAt(vUv - vec2(0.0, uTexel.y));
 	vec3 dx = abs(dx1.z) < abs(dx2.z) ? dx1 : dx2;
 	vec3 dy = abs(dy1.z) < abs(dy2.z) ? dy1 : dy2;
-	vec3 n = normalize(cross(dx, dy));
+	// (nothing to normalize where the depth stands still: NaN on some cards - overhaul, 2026-11-04)
+	vec3 n = cross(dx, dy);
+	float nLen = length(n);
+	n = nLen > 0.0000001 ? n / nLen : vec3(0.0, 0.0, 1.0);
 
 	float screen = RADIUS * uProj[1][1] * 0.5 / max(-p.z, 0.5);   // the radius in uv height
 	vec2 scale = vec2(screen * uTexel.x / uTexel.y, screen);

@@ -176,7 +176,7 @@ function P.sync(host)
         P.lastWantMs = now
     end
     if P.instance and now - P.lastWantMs > GRACE_MS then P.close() end
-    P.offerA = math.max(0, math.min(1, (now - P.offeredMs) / OFFER_FADE_MS))
+    P.offerA = T.anim(math.max(0, math.min(1, (now - P.offeredMs) / OFFER_FADE_MS)))
 end
 
 function P:new(host, req)
@@ -807,6 +807,10 @@ function P:onMouseWheel(del) return true end
 -- frame, 2026-10-20)
 Events.OnPreUIDraw.Add(function()
     if KnoxScreen and KnoxScreen.instance then return end
+    -- (a magazine's or gun's panel from the hotbar: its bar of rounds going in follows the action -
+    -- the screen, which keeps it, is shut; it stood still - QA, 2026-11-04)
+    local open = P.instance
+    if open and open.load and KnoxGrid then pcall(KnoxGrid.updateUse, getSpecificPlayer(open.playerNum or 0)) end
     if T.on("hotbar") and (P.request or P.instance or #P.dying > 0) then P.sync(nil) end
     local K = KnoxTooltip
     if T.on("tooltips") and (K.wanted or K.lastHover or K.fold or (K.tip and K.tip.knoxShown)) then K.apply() end

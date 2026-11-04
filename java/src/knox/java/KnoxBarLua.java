@@ -10,6 +10,7 @@ import zombie.core.opengl.RenderThread;
 import zombie.core.skinnedmodel.advancedanimation.AnimatedModel;
 import zombie.core.skinnedmodel.animation.AnimationPlayer;
 import zombie.core.skinnedmodel.model.SkinningData;
+import zombie.core.textures.Texture;
 import zombie.core.textures.TextureDraw;
 import zombie.core.textures.TextureFBO;
 import zombie.iso.IsoGridSquare;
@@ -54,7 +55,76 @@ public final class KnoxBarLua {
 
     private static File find(String relative) {
         File f = new File(ZomboidFileSystem.instance.getString(relative));
-        return f.isFile() ? f : null;
+        return f.isFile() ? f : packFile(packRoots, relative);
+    }
+
+    // The furniture pack (media/knox/bar_vp.txt): media/voxel-studio/<model>/<its revision>/<file>. The
+    // revision's folder is renamed by every update of the pack, the file sometimes too (model.obj,
+    // i0-model.obj), and then the bar went to the camp for everybody, without a word (the author, 2026-11-04:
+    // look for it at the start). Found through the mod's own folder, so it is read wherever it is installed,
+    // whether it is on in the mod list or not. No `require` (its versionMin = versionMax): ROADMAP.
+    private static final String PACK_ID = "PZVoxelStudioViewpoint", PACK_MEDIA = "media/voxel-studio/";
+    private static volatile File[] packRoots = new File[0];
+    private static boolean packAsked, packMoved;
+
+    /** Where the pack's models are. The main thread (the game's list of mods), once: the read ahead has its own. */
+    private static void findPack() {
+        if (packAsked) return;
+        packAsked = true;
+        try {
+            zombie.gameStates.ChooseGameInfo.Mod mod = zombie.gameStates.ChooseGameInfo.getModDetails(PACK_ID);
+            if (mod == null) {
+                System.out.println("[Knox] bar: the furniture pack " + PACK_ID + " isn't installed");
+                return;
+            }
+            java.util.ArrayList<File> roots = new java.util.ArrayList<>();
+            for (String dir : new String[] {mod.getVersionDir(), mod.getCommonDir(), mod.getDir()}) {
+                if (dir == null) continue;
+                File root = new File(dir, PACK_MEDIA);
+                if (root.isDirectory()) roots.add(root);
+            }
+            packRoots = roots.toArray(new File[0]);
+        } catch (RuntimeException | LinkageError e) {
+            System.out.println("[Knox] bar: the furniture pack not looked for: " + e);
+        }
+    }
+
+    /** A file of the pack (`relative`: as bar_vp.txt has it): where it says, or its model's newest revision. */
+    static File packFile(File[] roots, String relative) {
+        if (!relative.startsWith(PACK_MEDIA)) return null;
+        String rest = relative.substring(PACK_MEDIA.length());
+        int a = rest.indexOf('/'), b = rest.lastIndexOf('/');
+        if (a <= 0 || b <= a) return null;
+        String model = rest.substring(0, a), name = rest.substring(b + 1);
+        int dot = name.lastIndexOf('.');
+        String kind = dot < 0 ? name : name.substring(dot);
+        for (File root : roots) {
+            File same = new File(root, rest);
+            if (same.isFile()) return same;
+            File[] revisions = new File(root, model).listFiles(File::isDirectory);
+            if (revisions == null || revisions.length == 0) continue;
+            java.util.Arrays.sort(revisions, (x, y) -> Long.compare(y.lastModified(), x.lastModified()));
+            for (File revision : revisions) {
+                File there = new File(revision, name);
+                if (!there.isFile()) {
+                    // (of the same kind, the shortest name, then by name: the model before its
+                    // variants, model.obj before model-vp2s.obj; i0- before i1- - QA, 2026-11-04)
+                    File[] others = revision.listFiles(f -> f.isFile() && f.getName().endsWith(kind));
+                    if (others == null || others.length == 0) continue;
+                    java.util.Arrays.sort(others, (x, y) -> {
+                        int d = x.getName().length() - y.getName().length();
+                        return d != 0 ? d : x.getName().compareTo(y.getName());
+                    });
+                    there = others[0];
+                }
+                if (!packMoved) {
+                    packMoved = true;
+                    System.out.println("[Knox] bar: the furniture pack's files aren't where bar_vp.txt says, " + relative + " -> " + there);
+                }
+                return there;
+            }
+        }
+        return null;
     }
 
     /** The bar's sounds, every frame (KnoxBarSound; stage 6, the author 2026-10-31). */
@@ -159,6 +229,9 @@ public final class KnoxBarLua {
 
         @Override
         public void render() {
+            // (the photo's picture was bound by hand: the game's record of what is bound may be wrong -
+            // the next of its sprites binds its own again; overhaul, 2026-11-04)
+            Texture.lastTextureID = -1;
             if (frame.photoBegin(slot)) {
                 // (a hero's clothes baked now bind back lastID: as for the frame's heroes)
                 photoLastId = TextureFBO.lastID;
@@ -186,6 +259,7 @@ public final class KnoxBarLua {
                 TextureFBO.lastID = photoLastId;
             }
             frame.photoEnd(slot, keep);
+            Texture.lastTextureID = -1;
         }
     }
 
@@ -223,6 +297,7 @@ public final class KnoxBarLua {
     @LuaMethod(name = "knoxBarStart", global = true)
     public static void knoxBarStart() {
         knoxBarStop();
+        findPack();
         frame = new KnoxBarFrame(KnoxBarLua::find);
         frame.quality(high);
         // (the dead out in the storm are the game's own models now: knoxBarDead)
@@ -698,6 +773,7 @@ public final class KnoxBarLua {
     /** The bar's files read in the background, for the next switch to it (the author, 2026-11-02). */
     @LuaMethod(name = "knoxBarPrepare", global = true)
     public static void knoxBarPrepare() {
+        findPack();
         KnoxBarFrame.prepare(KnoxBarLua::find);
     }
 

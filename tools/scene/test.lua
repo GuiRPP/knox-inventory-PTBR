@@ -201,7 +201,7 @@ seconds(1)
 ok("in the look: the menu away", s.uiAway == true and s.uiOff == true)
 local errs0 = #ERRS
 KnoxMenuNewsCards = setmetatable({}, {__index = function() error("boom in the news cards") end})
-seconds(2)
+seconds(0.5)
 ok("failing every frame: the frame told it", #ERRS > errs0, #ERRS)
 ok("failing every frame: the menu back", s.uiAway == false and MainScreen.instance.visible == true, MainScreen.instance.visible)
 tap("KEY_H")
@@ -409,5 +409,216 @@ ok("none of its Java is called", walked == 0, walked)
 ok("the menu is not hidden by it", KnoxMenuScene.uiHidden == false)
 ok("the view stays", s.viewFov == nil)
 
+
+-- the overhaul's stage 2 ----------------------------------------------------------------------------
+-- the camp gone by a swipe: the bar's things keep their light (the tints are all cleared at once)
+local function tintsLost(sc)
+    local n = 0
+    for _, o in ipairs(sc.objects) do
+        if o.tinted and o.world and not o.height and not o.tint and not NEAR[-o.px .. "," .. o.py .. "," .. o.pz] then n = n + 1 end
+    end
+    return n
+end
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+local camp = KnoxMenuScene.instance
+KEYS["KEY_TAB"] = true
+frame(4)
+KEYS["KEY_TAB"] = nil
+for _ = 1, 40 do
+    frame(1)
+    if KnoxMenuScene.instance ~= camp then break end
+end
+s = KnoxMenuScene.instance
+ok("Tab: the bar is up under the swipe", s ~= camp and s.Type == "KnoxMenuBar", s.Type)
+s.revealDone = true     -- (its light spread already: nobody lights them again of himself)
+seconds(3)
+ok("Tab over: the camp gone", camp.retired == true and KnoxMenuScene.swipe == nil)
+ok("Tab over: nothing of the bar left in full light", tintsLost(s) == 0, tintsLost(s))
+
+-- H, then the diary: the new game's screen is seen
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+s = KnoxMenuScene.instance
+tap("KEY_H")
+seconds(1)
+ok("H: the menu away", s.uiOff == true and MainScreen.instance.visible == false)
+s:newGame()
+ok("the diary: a new game's screen open", CALLS.solo >= 1 and MainScreen.instance.soloScreen.visible == true)
+ok("the diary: the menu back with it", KnoxMenuScene.uiHidden == false and s.uiOff == false and MainScreen.instance.visible == true)
+seconds(1)
+ok("the diary: not dimmed", s.menuK == 1, s.menuK)
+
+-- a load that fails: the one asleep back in his rest as it is now
+local function comeBackWith(stir, side, empty)
+    setSaves(THREE)
+    startMenu("bar")
+    seconds(4)
+    local sc = KnoxMenuScene.instance
+    local c = sc.heroAt[1]
+    c.sleepSide, c.sleepEmpty, c.stir = side, empty, stir
+    sc:leave(c)
+    sc:comeBack()
+    return c, sc
+end
+local c = comeBackWith({kind = "swat", at = 0, knocked = true})
+ok("a failed load, swatted: the hand empty", c.anim == "knoxbar_stool_e" and c.sleepEmpty == true, c.anim)
+ok("a failed load, swatted: the stir over", c.stir == nil)
+c = comeBackWith({kind = "swat", at = 0})
+ok("a failed load, about to swat: round the bottle still", c.anim == "knoxbar_stool" and not c.sleepEmpty, c.anim)
+c = comeBackWith({kind = "shift", at = 0})
+ok("a failed load, shifting: on his other side", c.anim == "knoxbar_stool_b" and c.sleepSide == "b", c.anim)
+c = comeBackWith(nil, "b", true)
+ok("a failed load, at rest: as he was", c.anim == "knoxbar_stool_eb", c.anim)
+c = comeBackWith(nil)
+ok("a failed load, untouched: as he was", c.anim == "knoxbar_stool", c.anim)
+
+-- H, Tab, and no scene comes: the menu shown again
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+tap("KEY_H")
+seconds(1)
+ok("H before it: away", MainScreen.instance.visible == false)
+local init0 = knoxMenuInit
+knoxMenuInit = function() return false end
+tap("KEY_TAB")
+seconds(2)
+knoxMenuInit = init0
+ok("no scene came: the menu shown", MainScreen.instance.visible == true, MainScreen.instance.visible)
+ok("no scene came: not hidden any more", KnoxMenuScene.uiHidden == false and KnoxMenuScene.uiHidList == nil)
+ok("no scene came: the swipe over", KnoxMenuScene.swipe == nil and KnoxMenuScene.instance == nil)
+
+-- the bar swiped out takes the narrator's look with it
+s = bar(true)
+tap("KEY_B")
+seconds(1)
+ok("in the look", s.eyes.busy == true)
+n = BITE_STOPS
+tap("KEY_TAB")
+seconds(4)
+ok("Tab, the look not over yet: it stops with the bar", BITE_STOPS > n and BITE == false, BITE_STOPS - n)
+AUTHOR = false
+
+-- a key held through a rebuild is no press
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+KEYS["KEY_H"] = true
+frame(2)
+ok("H held: away", KnoxMenuScene.uiHidden == true)
+KEYS["KEY_H"] = nil
+frame(2)
+tap("KEY_H")
+ok("H again: back", KnoxMenuScene.uiHidden == false)
+KEYS["KEY_H"] = true
+KnoxMenuScene.uiHidden = false
+KnoxMenuScene.create()
+seconds(1)
+ok("H held through a rebuild: nothing", KnoxMenuScene.uiHidden == false)
+KEYS["KEY_H"] = nil
+frame(2)
+tap("KEY_H")
+ok("H let go and pressed: works", KnoxMenuScene.uiHidden == true)
+s = bar(true)
+n = BITE_STARTS
+KEYS["KEY_B"] = true
+KnoxMenuScene.create()
+seconds(4)
+ok("B held through a rebuild: no look", BITE_STARTS == n, BITE_STARTS - n)
+KEYS["KEY_B"] = nil
+frame(2)
+tap("KEY_B")
+ok("B let go and pressed: the look", BITE_STARTS == n + 1, BITE_STARTS - n)
+BITE = false
+AUTHOR = false
+
+-- the bar's frame failing time after time: the camp; failing now and then: the bar stays
+setSaves(THREE)
+startMenu("bar")
+seconds(3)
+s = KnoxMenuScene.instance
+HEROBOOM = true
+frame(10)
+HEROBOOM = false
+seconds(2)
+ok("a few frames fail: the bar stays", KnoxMenuScene.instance == s and not KnoxMenuScene.barFailed)
+KnoxMenuNewsCards = setmetatable({}, {__index = function() error("boom in the news cards") end})
+seconds(3)
+KnoxMenuNewsCards = nil
+seconds(1)
+ok("every frame fails: the camp", KnoxMenuScene.instance.Type == "KnoxMenuScene", KnoxMenuScene.instance.Type)
+ok("every frame fails: flagged", KnoxMenuScene.barFailed == true)
+ok("every frame fails: one scene", scenes() == 1, scenes())
+s = KnoxMenuScene.instance
+KnoxMenuNewsCards = setmetatable({}, {__index = function() error("boom in the news cards") end})
+seconds(3)
+KnoxMenuNewsCards = nil
+seconds(1)
+ok("in the camp: nowhere to go, it stays", KnoxMenuScene.instance == s)
+
+-- the bar's build failing at its very start, the swipe under way: the camp goes on, nothing thrown (QA)
+KnoxMenuScene.barFailed = nil
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+local aim0, thrown = KnoxMenuBar.aimCamera, 0
+KnoxMenuBar.aimCamera = function() error("boom before its objects") end
+KEYS["KEY_TAB"] = true
+for _ = 1, 8 do if not pcall(frame, 1) then thrown = thrown + 1 end end
+KEYS["KEY_TAB"] = nil
+for _ = 1, 200 do if not pcall(frame, 1) then thrown = thrown + 1 end end
+KnoxMenuBar.aimCamera = aim0
+ok("the build failing at its start: nothing thrown", thrown == 0, thrown)
+ok("the build failing at its start: a camp up", KnoxMenuScene.instance and KnoxMenuScene.instance.Type == "KnoxMenuScene", KnoxMenuScene.instance and KnoxMenuScene.instance.Type)
+ok("the build failing at its start: flagged", KnoxMenuScene.barFailed == true)
+ok("the build failing at its start: one scene", scenes() == 1, scenes())
+ok("the build failing at its start: the swipe over", KnoxMenuScene.swipe == nil)
+KnoxMenuScene.barFailed = nil
+
+-- nothing is taken out of a bag in the bar; the camp as it was
+ok("the bar: no keepsakes", KnoxMenuBar.noKeeps == true)
+ok("the camp: keepsakes", KnoxMenuScene.noKeeps == nil)
+
+-- the bar's sounds by the game's sound slider
+setSaves(THREE)
+startMenu("bar")
+seconds(3)
+s = KnoxMenuScene.instance
+local moan0, moanNear = knoxCampMoan, nil
+knoxCampMoan = function(_, near) moanNear = near end
+ok("the slider at its top: as they were", s:sfxK() == 1, s:sfxK())
+SOUND_SLIDER = 5
+ok("the slider half way: half", s:sfxK() == 0.5, s:sfxK())
+s.moanAt = s.clock
+frame(2)
+ok("a moan by the slider", moanNear == 0.5, moanNear)
+SOUND_SLIDER = 0
+ok("the slider down: none", s:sfxK() == 0, s:sfxK())
+SOUND_SLIDER = 10
+knoxCampMoan = moan0
+ok("the camp's: no slider of its own", KnoxMenuScene.sfxK == nil)
+
+-- the narrator's clothes out of the character creation's list of all clothes
+local all = getAllItemsForBodyLocation("base:jacket")
+ok("all clothes: none of the narrator's", #all == 2 and all[1] == "Base.Jacket_Black" and all[2] == "Base.Vest", #all)
+
+-- H with the animations off: at once
+setSaves(THREE)
+startMenu("camp")
+seconds(4)
+s = KnoxMenuScene.instance
+ANIM_ON = false
+KEYS["KEY_H"] = true
+frame(3)
+KEYS["KEY_H"] = nil
+frame(1)
+ok("no animations, H: gone at once", s.menuK == 0 and s.uiOff == true, s.menuK)
+tap("KEY_H")
+frame(2)
+ok("no animations, H again: back at once", s.menuK == 1 and s.uiOff == false, s.menuK)
+ANIM_ON = true
 
 say("scene: " .. pass .. " pass, " .. fail .. " fail")

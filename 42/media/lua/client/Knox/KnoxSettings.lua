@@ -55,7 +55,8 @@ local PAGE_ITEMS = {
              {"cathelp"}, {"cats"}},
     sound = {{"sec", "Sec_sound_ui"}, {"slider", "search.sound"}, {"slider", "ui.sound"},
              {"sec", "Sec_sound_music"}, {"switch", "musicShare"}, {"switch", "musicHear"}, {"slider", "music.others"}},
-    menu = {{"sec", "Sec_menu_news"}, {"switch", "news"}, {"sec", "Camp_Title"}, {"camp"}},
+    menu = {{"sec", "Sec_menu_news"}, {"switch", "news"}, {"sec", "Camp_Title"}, {"camp"},
+            {"sec", "Sec_menu_bar"}, {"switch", "barHigh"}},
 }
 
 local function specOf(list, key)

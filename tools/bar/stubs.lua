@@ -15,6 +15,7 @@ function knoxBarProp(model, x, y, z, rx, ry, rz, sx, sy, sz, r, g, b, moves)
     table.insert(calls.created, {model = model, x = x, y = y, z = z, rx = rx, ry = ry, rz = rz, sx = sx, sy = sy, sz = sz, r = r, g = g, b = b, moves = moves})
 end
 function knoxBarLoad() return barLoads end
+function getCore() return {getOptionSoundVolume = function() return 10 end} end
 function knoxBarFailed() return barFails end
 function knoxBarQuality() end
 function knoxBarBegin() calls.begun = calls.begun + 1 end

@@ -467,6 +467,17 @@ end
 local function inWorld()
     if KnoxCompat and KnoxCompat.windowOpen() then return false end
     if MainScreen and MainScreen.instance and MainScreen.instance:getIsVisible() then return false end
+    -- (the game's own over the world: its map, a right click's menu, a crafting or building window -
+    -- the menu came up over them; QA, 2026-11-04)
+    if ISWorldMap_instance and ISWorldMap_instance:isVisible() then return false end
+    local menu = getPlayerContextMenu and getPlayerContextMenu(0)
+    if menu and menu:isAnyVisible() then return false end
+    local ui = ISEntityUI and ISEntityUI.players and ISEntityUI.players[0]
+    if ui and ui.windows then
+        for _, w in pairs(ui.windows) do
+            if w.instance and w.instance:isVisible() then return false end
+        end
+    end
     return true
 end
 
@@ -595,12 +606,24 @@ local function jobOn(player, item)
     return nil, false
 end
 
+--- The same, anywhere in the queue: rounds carried over from a bag come first, the loading after
+--- them (pressed again meanwhile, it was cleared and begun anew - QA, 2026-11-04).
+local function jobQueuedOn(player, item)
+    local q = queueOf(player)
+    for i = 1, q and #q or 0 do
+        local a = q[i]
+        local field = JOB[a.Type or ""]
+        if field and a[field] == item then return a, JOB_OUT[a.Type] == true end
+    end
+    return nil, false
+end
+
 --- Load a magazine, or the gun that takes rounds itself. (The game's menus' way: as many
 --- rounds as go in brought to the main inventory, then the action.)
 function M.load(item)
     local player = M.player
     if not player or not item then return false end
-    local a, out = jobOn(player, item)
+    local a, out = jobQueuedOn(player, item)
     if a and not out then return true end   -- (already at it)
     local cap, n = item:getMaxAmmo(), item:getCurrentAmmoCount()
     local at = item:getAmmoType()
@@ -629,7 +652,7 @@ end
 function M.unload(item)
     local player = M.player
     if not player or not item then return false end
-    local a, out = jobOn(player, item)
+    local a, out = jobQueuedOn(player, item)
     if a and out then return true end
     local isGun = instanceof(item, "HandWeapon")
     -- (one not known that is empty: unloaded all the same, the game's action finds it so)
@@ -682,6 +705,9 @@ end
 --- The left button: what the chosen row is for.
 function M.lmb()
     if M.state ~= "open" then return end
+    -- (a right click just before, still waiting to be one or two: this click is the last word - its
+    -- loading a moment later cleared the queue of what was asked here; QA, 2026-11-04)
+    M.armed, M.armedItem = nil, nil
     local r, player, gun = M.current(), M.player, M.gun
     if not r then return end
     if r.kind == "bag" then return end
@@ -1124,6 +1150,8 @@ local function stillOpen(player)
     local sc = UIManager.getSpeedControls and UIManager.getSpeedControls()
     if sc and sc:getCurrentGameSpeed() == 0 then return false end
     if not inWorld() then return false end
+    -- (the panel at the crosshair coming up meanwhile doesn't close it: the camera turns with the
+    -- menu open, the author 2026-11-04, and it would close on every shelf looked at)
     return true
 end
 

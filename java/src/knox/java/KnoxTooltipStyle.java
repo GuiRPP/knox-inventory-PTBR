@@ -463,7 +463,9 @@ public class KnoxTooltipStyle {
             tipItem = self;
         }
 
-        @Patch.OnExit
+        // (on a throw too: the game's tooltip failing for one item left it set, and a later
+        // tooltip of something else lost lines that matched its rounds - overhaul, 2026-11-04)
+        @Patch.OnExit(onThrowable = Throwable.class)
         public static void exit() {
             tipItem = null;
         }

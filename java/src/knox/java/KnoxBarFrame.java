@@ -314,6 +314,8 @@ public final class KnoxBarFrame {
     private static final java.util.concurrent.ConcurrentHashMap<String, KnoxBarMesh> MESHES = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.concurrent.ConcurrentHashMap<String, KnoxBarMesh.Picture> READY = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.concurrent.atomic.AtomicBoolean PREPARING = new java.util.concurrent.atomic.AtomicBoolean();
+    // (how many times it was all forgotten: a read ahead still going then stops, and what it read goes too)
+    private static final java.util.concurrent.atomic.AtomicInteger FORGOTTEN = new java.util.concurrent.atomic.AtomicInteger();
     private static final String[] SHADERS = {"room.vert", "room.frag", "glass.frag", "shadow.vert", "shadow.frag", "quad.vert",
         "sky.frag", "ao.frag", "blur.frag", "air.frag", "tone.frag", "motes.vert", "motes.frag",
         "bloom_down.frag", "bloom_up.frag", "final.frag", "walker.frag", "ember.vert", "ember.frag", "bulb.vert", "bulb.frag", 
@@ -341,13 +343,18 @@ public final class KnoxBarFrame {
     /** All the bar's files read ahead, off the main thread; whatever is missing, load() will say. */
     public static void prepare(Source source) {
         if (!PREPARING.compareAndSet(false, true)) return;
+        final int gen = FORGOTTEN.get();
         Thread t = new Thread(() -> {
             try {
-                for (String name : SHADERS) textOf(source, "media/shaders/knoxbar/" + name);
+                for (String name : SHADERS) {
+                    if (FORGOTTEN.get() != gen) return;
+                    textOf(source, "media/shaders/knoxbar/" + name);
+                }
                 textOf(source, "media/knox/bar_poses.txt");
                 for (String list : new String[] {"media/knox/bar_models.txt", "media/knox/bar_vp.txt"}) {
                     Matcher m = MODEL.matcher(textOf(source, list));
                     while (m.find()) {
+                        if (FORGOTTEN.get() != gen) return;
                         String mesh = m.group(2), texture = m.group(3);
                         mesh = mesh.startsWith("media/") ? mesh : "media/models_X/" + mesh + ".x";
                         texture = texture.startsWith("media/") ? texture : "media/textures/" + texture + ".png";
@@ -363,6 +370,9 @@ public final class KnoxBarFrame {
                 System.out.println("[Knox] the bar's files ahead: " + e);
             } finally {
                 PREPARING.set(false);
+                // (the game came in while it read: what it put in after forget() would stay to the game's
+                // end - overhaul, 2026-11-04)
+                if (FORGOTTEN.get() != gen) clearRead();
             }
         }, "Knox bar files");
         t.setDaemon(true);
@@ -372,6 +382,11 @@ public final class KnoxBarFrame {
 
     /** Into the game: what was read ahead off the memory. */
     public static void forget() {
+        FORGOTTEN.incrementAndGet();
+        clearRead();
+    }
+
+    private static void clearRead() {
         for (String key : new ArrayList<>(READY.keySet())) {
             KnoxBarMesh.Picture p = READY.remove(key);
             if (p != null) p.free();
@@ -603,6 +618,7 @@ public final class KnoxBarFrame {
     private final FloatBuffer photoClear = BufferUtils.createFloatBuffer(16);
     private int photoDraw, photoRead;
     private boolean photoScissor, photoSrgb, photoDepthMask, photoOpen;
+    private boolean photoFailed;   // the video card wouldn't make one: no more tries, the sheets keep their drawn ones
 
     // (strips across the photo, as the sheet's own: it bends with it)
     private static final int PHOTO_STRIPS = 6;
@@ -650,7 +666,7 @@ public final class KnoxBarFrame {
 
     /** Render thread: what follows lands in the photo's picture. False: it can't, nothing changed. */
     public boolean photoBegin(int slot) {
-        if (failure != null || released || began || !glReady || photoOpen || slot < 0 || slot >= PHOTOS) return false;
+        if (failure != null || released || began || !glReady || photoOpen || photoFailed || slot < 0 || slot >= PHOTOS) return false;
         try {
             photoDraw = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
             photoRead = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
@@ -661,6 +677,8 @@ public final class KnoxBarFrame {
             glGetBooleanv(GL_COLOR_WRITEMASK, photoMask);
             glGetFloatv(GL_COLOR_CLEAR_VALUE, photoClear);
             if (photoFbo[slot] == 0) {
+                // (the texture bound here is put back: the game's own is bound on this unit - overhaul, 2026-11-04)
+                int was = glGetInteger(GL_TEXTURE_BINDING_2D);
                 photoTex[slot] = glGenTextures();
                 glBindTexture(GL_TEXTURE_2D, photoTex[slot]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, PHOTO_SIZE, PHOTO_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, (java.nio.ByteBuffer) null);
@@ -669,7 +687,7 @@ public final class KnoxBarFrame {
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glGenerateMipmap(GL_TEXTURE_2D);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindTexture(GL_TEXTURE_2D, was);
                 photoDepth[slot] = glGenRenderbuffers();
                 glBindRenderbuffer(GL_RENDERBUFFER, photoDepth[slot]);
                 glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, PHOTO_SIZE, PHOTO_SIZE);
@@ -678,7 +696,14 @@ public final class KnoxBarFrame {
                 glBindFramebuffer(GL_FRAMEBUFFER, photoFbo[slot]);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, photoTex[slot], 0);
                 glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, photoDepth[slot]);
-                check("photo");
+                try {
+                    check("photo");
+                } catch (IllegalStateException e) {
+                    // (not kept half made: the next try drew into it - overhaul, 2026-11-04)
+                    photoFailed = true;
+                    freePhoto(slot);
+                    throw e;
+                }
             }
             glBindFramebuffer(GL_FRAMEBUFFER, photoFbo[slot]);
             glViewport(0, 0, PHOTO_SIZE, PHOTO_SIZE);
@@ -709,9 +734,10 @@ public final class KnoxBarFrame {
             glClearColor(0f, 0f, 0f, 1f);
             glDisable(GL_SCISSOR_TEST);
             glClear(GL_COLOR_BUFFER_BIT);
+            int was = glGetInteger(GL_TEXTURE_BINDING_2D);
             glBindTexture(GL_TEXTURE_2D, photoTex[slot]);
             glGenerateMipmap(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindTexture(GL_TEXTURE_2D, was);
             photoKept[slot] = true;
         }
         photoGiveBack();
@@ -730,7 +756,13 @@ public final class KnoxBarFrame {
 
     /** The photos kept so far, on their sheets. The room's program is in use. */
     private void drawPhotos(Program p) {
-        // (a hair over the sheet: at this distance the depth can't tell them apart otherwise)
+        // (a hair over the sheet: at this distance the depth can't tell them apart otherwise. Given back
+        // as it was: the game never sets it, Viewpoint may - overhaul, 2026-11-04)
+        boolean any = false;
+        for (int i = 0; i < PHOTOS && !any; i++) any = photoKept[i];
+        if (!any) return;
+        boolean offsetWas = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+        float factorWas = glGetFloat(GL_POLYGON_OFFSET_FACTOR), unitsWas = glGetFloat(GL_POLYGON_OFFSET_UNITS);
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-1f, -1f);
         int slot = 0;
@@ -750,19 +782,25 @@ public final class KnoxBarFrame {
             slot++;
         }
         glUniform3f(p.u("uFlutter"), 0f, 0f, 0f);
-        glDisable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(factorWas, unitsWas);
+        set(GL_POLYGON_OFFSET_FILL, offsetWas);
+    }
+
+    private void freePhoto(int i) {
+        if (photoFbo[i] != 0) glDeleteFramebuffers(photoFbo[i]);
+        if (photoDepth[i] != 0) glDeleteRenderbuffers(photoDepth[i]);
+        if (photoTex[i] != 0) glDeleteTextures(photoTex[i]);
+        photoFbo[i] = photoDepth[i] = photoTex[i] = 0;
+        photoKept[i] = false;
     }
 
     private void freePhotos() {
         for (int i = 0; i < PHOTOS; i++) {
-            if (photoFbo[i] != 0) glDeleteFramebuffers(photoFbo[i]);
-            if (photoDepth[i] != 0) glDeleteRenderbuffers(photoDepth[i]);
-            if (photoTex[i] != 0) glDeleteTextures(photoTex[i]);
-            photoFbo[i] = photoDepth[i] = photoTex[i] = 0;
-            photoKept[i] = false;
+            freePhoto(i);
             if (photoQuad[i] != null && photoQuad[i].vao != 0) glDeleteVertexArrays(photoQuad[i].vao);
             photoQuad[i] = null;
         }
+        photoFailed = false;
     }
 
     /** Begun and still open: the heroes the game draws go into target(). */
@@ -2295,7 +2333,9 @@ public final class KnoxBarFrame {
             width = w;
             height = h;
             builtQuality = quality;
-            samples = quality == 1 ? 4 : 1;
+            // (a card may give fewer for a depth picture than for colours: only 1 is promised - overhaul, 2026-11-04)
+            samples = quality == 1 ? Math.max(1, Math.min(4, Math.min(glGetInteger(GL_MAX_COLOR_TEXTURE_SAMPLES),
+                glGetInteger(GL_MAX_DEPTH_TEXTURE_SAMPLES)))) : 1;
             glActiveTexture(GL_TEXTURE0 + 13);
             buildTargetsOn(w, h, quality);
             glBindTexture(GL_TEXTURE_2D, 0);

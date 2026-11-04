@@ -629,6 +629,24 @@ do
     load.ammoCountStart = 2
     check("load: started - empty", near(at(0), 0), at(0))
     check("load: on the magazine only, not its rounds", G.useNow[r1] == nil)
+    do
+        local same = G.useNow
+        G.updateUse(who)
+        check("load: no new table every frame", G.useNow == same)
+        q[1] = nil
+        G.updateUse(who)
+        same = G.useNow
+        G.updateUse(who)
+        local left = 0
+        for _ in pairs(same) do left = left + 1 end
+        check("nothing under way: no new table every frame, empty", G.useNow == same and left == 0, left)
+        q[1] = load
+        G.updateUse(who)
+        q[1] = {action = {}, maxTime = -1, Type = "ISLoadBulletsInMagazine", ammoCount = 6, character = who}
+        G.updateUse(who)
+        check("load: the last one's magazine gone from it", G.useNow[mag] == nil)
+        q[1] = load
+    end
     check("load: on its way to the first round of the 4 carried", near(at(350), 0.95 / 4 * 0.5), at(0))
     check("load: never past the first round before it is in", near(at(5000), 0.95 / 4), at(0))
     mag.o.ammo = 3

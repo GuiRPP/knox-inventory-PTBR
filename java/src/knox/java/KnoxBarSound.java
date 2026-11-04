@@ -37,6 +37,7 @@ final class KnoxBarSound {
     private static final float WORLD_VOL = 0.8f;
     private static long world;
     private static boolean worldTried;
+    private static boolean worldParams;   // the game's parameters set to the bar's: given back in worldOff
     private static long nextCreak, nextCrack;
 
     private static int bangsHeard;
@@ -96,27 +97,28 @@ final class KnoxBarSound {
         KnoxRadioFx.broken = true;
         // (no fire, forest or cricket of the camp in the bar - the author, 2026-11-01)
         for (int i = 0; i < KnoxCamp.CAMP_LOOPS; i++) KnoxCamp.stopLoop(i);
+        float sfx = sfx();
         // (not in the dark of the first seconds, before the wind is up. As hard as it hit: the
         // door's bounces are taps after the slam, QA 2026-10-31)
         if (bang && started >= 1f) {
-            KnoxCamp.play(BANG, 0.06f + 0.4f * frame.doorBangPower(), 0.72f + 0.1f * KnoxCamp.rnd.nextFloat(), false);
+            KnoxCamp.play(BANG, (0.06f + 0.4f * frame.doorBangPower()) * sfx, 0.72f + 0.1f * KnoxCamp.rnd.nextFloat(), false);
         }
 
         long now = System.currentTimeMillis();
         if (pencil && started >= 1f) {
-            KnoxCamp.play(PENCIL, 0.28f, 1f, false);
+            KnoxCamp.play(PENCIL, 0.28f * sfx, 1f, false);
             pencilFloorAt = now + PENCIL_FLOOR_MS - PENCIL_HIT_MS;
         }
         if (pencilFloorAt != 0L && now >= pencilFloorAt) {
             pencilFloorAt = 0L;
-            KnoxCamp.play(PENCIL_FLOOR, 0.28f, 0.97f + 0.06f * KnoxCamp.rnd.nextFloat(), false);
+            KnoxCamp.play(PENCIL_FLOOR, 0.28f * sfx, 0.97f + 0.06f * KnoxCamp.rnd.nextFloat(), false);
         }
         for (int n = 0; n < newPages && started >= 1f; n++) queuePage(now);
         for (int i = 0; i < PAGES_QUEUED; i++) {
             if (pageAt[i] == 0L || now < pageAt[i]) continue;
             pageAt[i] = 0L;
             // (half as loud: they drew the ear too much - the author, 2026-11-02)
-            KnoxCamp.play(PAGE[pageClip[i]], 0.05f + 0.025f * KnoxCamp.rnd.nextFloat(), pagePitch[i], false);
+            KnoxCamp.play(PAGE[pageClip[i]], (0.05f + 0.025f * KnoxCamp.rnd.nextFloat()) * sfx, pagePitch[i], false);
         }
         // (a bag's rustle cut short: KnoxCamp does it under the camp's loops)
         if (!KnoxCamp.CUTS.isEmpty()) KnoxCamp.cuts(now);
@@ -154,7 +156,7 @@ final class KnoxBarSound {
         // (a board somewhere, sooner in a gust; a beam in the frost, seldom)
         if (started >= 1f && now >= nextCreak) {
             if (nextCreak != 0L) {
-                long ch = KnoxCamp.play(CREAK[KnoxCamp.rnd.nextInt(CREAK.length)], 0.45f + 0.35f * KnoxCamp.rnd.nextFloat(),
+                long ch = KnoxCamp.play(CREAK[KnoxCamp.rnd.nextInt(CREAK.length)], (0.45f + 0.35f * KnoxCamp.rnd.nextFloat()) * sfx,
                     0.55f + 0.3f * KnoxCamp.rnd.nextFloat(), false);
                 KnoxCamp.muffle(ch, 0.6f);
             }
@@ -162,7 +164,7 @@ final class KnoxBarSound {
         }
         if (started >= 1f && now >= nextCrack) {
             if (nextCrack != 0L) {
-                long ch = KnoxCamp.play(CRACK, 0.05f + 0.03f * KnoxCamp.rnd.nextFloat(), 0.45f + 0.15f * KnoxCamp.rnd.nextFloat(), false);
+                long ch = KnoxCamp.play(CRACK, (0.05f + 0.03f * KnoxCamp.rnd.nextFloat()) * sfx, 0.45f + 0.15f * KnoxCamp.rnd.nextFloat(), false);
                 KnoxCamp.muffle(ch, 0.35f);
             }
             nextCrack = now + 30000L + KnoxCamp.rnd.nextInt(50000);
@@ -170,7 +172,7 @@ final class KnoxBarSound {
 
         if (gust > 0.45f && now >= nextLatch) {
             if (nextLatch != 0L) {
-                KnoxCamp.play(LATCH, (0.03f + 0.06f * gust) * (0.7f + 0.3f * KnoxCamp.rnd.nextFloat()),
+                KnoxCamp.play(LATCH, (0.03f + 0.06f * gust) * (0.7f + 0.3f * KnoxCamp.rnd.nextFloat()) * sfx,
                     0.85f + 0.2f * KnoxCamp.rnd.nextFloat(), false);
             }
             nextLatch = now + 1500L + KnoxCamp.rnd.nextInt(3500);
@@ -206,6 +208,7 @@ final class KnoxBarSound {
     }
 
     private static void wind(int i, boolean alive, float volume, float pitch, float lowPass) {
+        volume *= sfx();
         // (the loop's fading over the loading screen starts from here)
         KnoxCamp.LOOP_VOL[i] = volume;
         if (!alive) {
@@ -221,6 +224,18 @@ final class KnoxBarSound {
             }
         }
         KnoxCamp.muffle(KnoxCamp.loopCh[i], lowPass);
+    }
+
+    /**
+     * The game's sound slider, 0..1: the bar's and the look's sounds go by it (the author, 2026-11-04; the
+     * camp's stay as they were). At its top, as the author set and heard them.
+     */
+    static float sfx() {
+        try {
+            return Math.max(0, Math.min(10, zombie.core.Core.getInstance().getOptionSoundVolume())) / 10f;
+        } catch (Throwable t) {
+            return 1f;
+        }
     }
 
     /** The sounds are over (KnoxCamp.knoxCampEnd): back from a failed load, a slam meanwhile stays unheard. */
@@ -244,6 +259,7 @@ final class KnoxBarSound {
                 }
                 // (the menu has no listener of its own: the event where the listener is)
                 fmod.javafmod.FMOD_Studio_Listener3D(0, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 1f, 0f);
+                worldParams = true;
                 for (int i = 0; i < WORLD_PARAMS.length; i++) {
                     fmod.javafmod.FMOD_Studio_System_SetParameterByName(WORLD_PARAMS[i], WORLD_VALUES[i], false);
                 }
@@ -254,7 +270,7 @@ final class KnoxBarSound {
                 fmod.javafmod.FMOD_Studio_StartEvent(world);
             }
             fmod.javafmod.FMOD_Studio_System_SetParameterByName("WindIntensity", 0.55f + 0.45f * gust, false);
-            fmod.javafmod.FMOD_Studio_EventInstance_SetVolume(world, WORLD_VOL * started);
+            fmod.javafmod.FMOD_Studio_EventInstance_SetVolume(world, WORLD_VOL * started * sfx());
         } catch (Throwable t) {
             System.out.println("[Knox] bar: the game's winter ambience failed: " + t);
             worldOff();
@@ -264,15 +280,10 @@ final class KnoxBarSound {
     /** The game's winter ambience off (faded by FMOD) and the game's own values of its parameters back. */
     static void worldOff() {
         worldTried = false;
-        if (world == 0L) return;
-        long inst = world;
-        world = 0L;
-        try {
-            fmod.javafmod.FMOD_Studio_EventInstance_Stop(inst, true);
-            fmod.javafmod.FMOD_Studio_ReleaseEventInstance(inst);
-        } catch (Throwable t) {
-            // gone
-        }
+        if (world != 0L) stopWorld();
+        // (given back even with no event made of them: winter stayed set in the game - overhaul, 2026-11-04)
+        if (!worldParams) return;
+        worldParams = false;
         for (String name : WORLD_PARAMS) {
             try {
                 zombie.audio.FMODGlobalParameter p = fmod.fmod.FMODManager.instance.getGlobalParameter(name);
@@ -284,8 +295,21 @@ final class KnoxBarSound {
         }
     }
 
+    private static void stopWorld() {
+        long inst = world;
+        world = 0L;
+        try {
+            // (false: it fades out as its event says, as the game stops its own; true cut it at once -
+            // overhaul, 2026-11-04)
+            fmod.javafmod.FMOD_Studio_EventInstance_Stop(inst, false);
+            fmod.javafmod.FMOD_Studio_ReleaseEventInstance(inst);
+        } catch (Throwable t) {
+            // gone
+        }
+    }
+
     /** One going out pushes the door open. */
     static void doorOpens() {
-        KnoxCamp.play(OPENS, 0.3f, 0.85f, false);
+        KnoxCamp.play(OPENS, 0.3f * sfx(), 0.85f, false);
     }
 }

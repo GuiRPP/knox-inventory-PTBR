@@ -373,6 +373,18 @@ do
     n = 0
     T.frost(plate, -20, 3, 520, 50, true, 1, true)
     check("frost: back after a while, from the start", n < a2, n)
+    -- (an item sliding in, its place changing every frame: it grows on - overhaul, 2026-11-04)
+    local sliding = {drawRect = function() n = n + 1 end}
+    clock = t0 + 5000
+    n = 0
+    T.frost(sliding, -30, 0, 120, 40, true, 1)
+    local first = n
+    for i = 1, 8 do
+        clock = t0 + 5000 + i * 50
+        n = 0
+        T.frost(sliding, -30 + i * 3, 0, 120, 40, true, 1)
+    end
+    check("frost: an item sliding in grows on", n > first, first .. " " .. n)
     -- (a small button)
     for i = 1, 8 do T.frost(ui, 4 + i, 4, 24, 24, true, 0.5) end
     T.barLook(false)

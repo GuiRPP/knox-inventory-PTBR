@@ -37,7 +37,11 @@ function getSpecificPlayer() return nil end
 function getSaveInfo(rel) return SAVEINFO[rel] end
 function getFullSaveDirectoryTable() return SAVES end
 function getTexture(p) return {path = p} end
-function getCore() return {getScreenWidth = function() return 1920 end, getScreenHeight = function() return 1080 end} end
+SOUND_SLIDER = 10
+function getCore() return {getScreenWidth = function() return 1920 end, getScreenHeight = function() return 1080 end,
+    getOptionSoundVolume = function() return SOUND_SLIDER end} end
+-- (the game's own, as it answers: KnoxMenuSceneBar wraps it)
+function getAllItemsForBodyLocation() return {"Base.Jacket_Black", "KnoxBite.JacketRolled", "Base.Vest"} end
 function getSoundManager() return {playUISound = function() end} end
 function instanceof() return false end
 local function vec() return {set = function() end} end

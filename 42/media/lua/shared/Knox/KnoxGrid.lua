@@ -983,8 +983,13 @@ local function useDeltaOf(a)
 end
 KnoxGrid.useDelta = useDeltaOf
 
+-- (this runs every frame with the screen or a panel of rounds open: with no action, or rounds going
+-- in - nearly all of them - no new table: QA, 2026-11-04)
+local useNone = {}
+local useRounds, useRoundsItem = {}, nil
+
 function KnoxGrid.updateUse(player)
-    local map = {}
+    local map = useNone
     local q = queueOf(player)
     local a = q and q[1]
     -- (an animation's action just over: how long such takes, for the next time)
@@ -1002,11 +1007,13 @@ function KnoxGrid.updateUse(player)
         -- shells a shotgun takes, the author 2026-10-31)
         local field = ROUNDS[a.Type or ""]
         if field then
-            local it = a[field]
-            if it and not KnoxGrid.pending[it] then map[it] = d end
-            KnoxGrid.useNow = map
+            if useRoundsItem then useRounds[useRoundsItem] = nil end
+            useRoundsItem = a[field]
+            if useRoundsItem and not KnoxGrid.pending[useRoundsItem] then useRounds[useRoundsItem] = d end
+            KnoxGrid.useNow = useRounds
             return
         end
+        map = {}
         local function take(v)
             if type(v) ~= "userdata" then return end
             if instanceof(v, "InventoryItem") then

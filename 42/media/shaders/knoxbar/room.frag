@@ -76,6 +76,14 @@ float skyVisible(vec3 world, vec3 normal, float cosL)
 	return lit / float(uSoften);
 }
 
+// (normalize of nothing is undefined: NaN on some cards, and the glow spreads one pixel of it over the
+// picture - overhaul, 2026-11-04)
+vec3 unit(vec3 v)
+{
+	float l = length(v);
+	return l > 0.000001 ? v / l : vec3(0.0, 1.0, 0.0);
+}
+
 void main()
 {
 	vec4 tex = texture(uTexture, vUv);
@@ -83,8 +91,8 @@ void main()
 	vec3 albedo = tex.rgb * vTint.rgb;
 
 	vec3 toEye = uEye - vWorld;
-	vec3 view = normalize(toEye);
-	vec3 normal = normalize(vNormal);
+	vec3 view = unit(toEye);
+	vec3 normal = unit(vNormal);
 	if (dot(normal, view) < 0.0) normal = -normal;
 
 	vec3 toSky = -uLightDir;
@@ -106,7 +114,7 @@ void main()
 			if (vTint.a > 0.0)
 			{
 				// (varnish, glass, metal: the only things that shine back at the sky)
-				vec3 h = normalize(toSky + view);
+				vec3 h = unit(toSky + view);
 				float power2 = mix(16.0, 180.0, vTint.a);
 				shine += sun * cosL * vTint.a * pow(max(dot(normal, h), 0.0), power2) * (power2 + 8.0) / 25.0 * 0.04;
 			}
@@ -123,7 +131,7 @@ void main()
 		light += uLampCol[i] * fall * fall * cosLamp;
 		if (i >= uLamps - uLampsShining && vTint.a > 0.0 && cosLamp > 0.0)
 		{
-			vec3 h = normalize(toLamp / max(d, 0.001) + view);
+			vec3 h = unit(toLamp / max(d, 0.001) + view);
 			float power2 = mix(16.0, 180.0, vTint.a);
 			shine += uLampCol[i] * fall * fall * cosLamp * vTint.a * pow(max(dot(normal, h), 0.0), power2) * (power2 + 8.0) / 25.0 * 0.5;
 		}

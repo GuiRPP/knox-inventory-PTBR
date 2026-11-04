@@ -1,6 +1,7 @@
 /* The winter bar's furniture from another mod (the author, 2026-10-31: wanted of every player,
    their files stay theirs and are read where they are installed - PZVoxelStudioViewpoint,
-   Workshop 3810302175; without it the menu stays in the camp). The round tables and the chairs of the mockup of the last ones
+   Workshop 3810302175; without it the menu stays in the camp. Its revisions' folders change with
+   its updates: the paths here are looked for in the model's newest one, KnoxBarLua.packFile). The round tables and the chairs of the mockup of the last ones
    leaving; the table shoved over in the smashed window. */
 
 module KnoxMenuBarVp

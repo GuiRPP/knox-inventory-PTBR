@@ -1212,13 +1212,16 @@ function KnoxGridView:renderGrid()
             self.tileRun = run
         end
         local rows, hov = top * 100000 + bottom, self.hovered or false
+        -- (what fits the thing under the mouse, lit green: those tiles aren't quiet - the list kept them
+        -- unlit till something else changed, then they came at full strength - QA, 2026-11-04)
+        local lit = KnoxLoad and KnoxLoad.shown or false
         if run.ok and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
                 and run.epoch == tilesEpoch and run.sel == KnoxSelect.items and run.toggles == KnoxSelect.toggles
-                and run.fresh == KnoxGridView.fresh then
+                and run.fresh == KnoxGridView.fresh and run.lit == lit then
             mode = run.mode
         else
             run.ok, run.list, run.layout, run.rows, run.hov = true, TL, L, rows, hov
-            run.epoch, run.sel, run.toggles, run.fresh = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh
+            run.epoch, run.sel, run.toggles, run.fresh, run.lit = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh, lit
             run.stamp = run.stamp + 1
             run.nl = 0
             mode = "write"

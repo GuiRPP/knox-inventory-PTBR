@@ -1561,7 +1561,6 @@ B.POINTS = {
     -- the mockup has it, with the author's changes (the author, 2026-10-31)
     {id = "w_bar4_room", menu = true, check = checkBar},
     {id = "w_bar4_counter", menu = true},
-    {id = "w_bar4_dead", menu = true},
     {id = "w_bar4_fire", menu = true},
     {id = "w_bar4_window", menu = true},
     {id = "w_bar4_door", menu = true},
@@ -1577,7 +1576,6 @@ B.POINTS = {
     {id = "w_bar6_look", menu = true},
     {id = "w_bar6_ember", menu = true},
     {id = "w_bar6_leave", menu = true},
-    {id = "w_bar6_door", menu = true},
     {id = "w_bar6_zombies", menu = true},
     {id = "w_bar6_new", menu = true},
     {id = "w_bar6_dark", menu = true},
@@ -1603,7 +1601,6 @@ B.POINTS = {
     {id = "w_bar11_radio", menu = true},
     {id = "w_bar12_ember", menu = true},
     {id = "w_bar12_hand", menu = true},
-    {id = "w_bar12_cans", menu = true},
     {id = "w_bar12_needle", menu = true},
     {id = "w_bar12_hit", menu = true},
     {id = "w_bar2_perf", menu = true},

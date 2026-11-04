@@ -478,6 +478,9 @@ public class KnoxCamp {
 
     static void tick() {
         long now = System.currentTimeMillis();
+        // (a swipe's loops dying out: a hero picked right after Tab, nobody else ticks them now - they
+        // played on through the whole loading - overhaul, 2026-11-04)
+        if (!CUTS.isEmpty()) cuts(now);
         if (endAt != 0L) {
             float f = ease((now - endAt) / (double) END_FADE_MS);
             for (int i = 0; i < loopCh.length; i++) {

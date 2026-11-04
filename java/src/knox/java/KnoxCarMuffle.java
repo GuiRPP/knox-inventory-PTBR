@@ -10,8 +10,9 @@ import fmod.javafmodJNI;
  *   - the body: almost no highs through steel and glass - a steep low-pass,
  *     darker the farther off one stands (`set(ch, k)`, k 0 by the car .. 1 far);
  *   - the cabin's boom: the bass and the low middle carry, a bump at ~120 Hz and
- *     a smaller one at ~250 Hz; no rumble under 45 Hz;
- *   - the panels: a very short, quiet echo - a box ringing a little.
+ *     a smaller one at ~250 Hz; no rumble under 45 Hz.
+ * (No echo: the sound the author approved had none - the check for one never passed, "echo false"
+ * in every log; once the radio's checks were fixed it would have come on. Left as heard, 2026-11-04.)
  * No hiss and no air: the radio's chain (and its noise) is off the track meanwhile.
  * Two of them: MAIN for the player's track, PARKED for the one left playing in
  * another car (KnoxMusic's parked track - the author, 2026-10-21: both cars play);
@@ -24,9 +25,8 @@ public class KnoxCarMuffle {
     // or the windows: the author, 2026-10-21 - the music sounds otherwise then)
     static final float CUT_NEAR = 950f, CUT_FAR = 380f;
     static final float OPEN_CUT_NEAR = 5200f, OPEN_CUT_FAR = 1600f;
-    // the cabin's boom (shut .. open): an open car booms less, rings less
+    // the cabin's boom (shut .. open): an open car booms less
     static final float BOOM = 6f, BOOM_OPEN = 1.5f, LOWMID = 2.5f, LOWMID_OPEN = 0.5f;
-    static final float ECHO_WET = -16f, ECHO_WET_OPEN = -26f;
 
     static final KnoxCarMuffle MAIN = new KnoxCarMuffle("KnoxCarMuffle", true);
     static final KnoxCarMuffle PARKED = new KnoxCarMuffle("KnoxCarMuffleParked", false);
@@ -39,7 +39,7 @@ public class KnoxCarMuffle {
     final String name;
     final boolean ownsRadio;   // the player's track: the radio's chain comes off it first
     boolean tried;
-    long eq, echo, group;
+    long eq, group;
     long attachedTo;
     float darkNow = -1f, openNow = -1f;
 
@@ -65,7 +65,6 @@ public class KnoxCarMuffle {
             tried = true;
             try {
                 eq = KnoxRadioFx.find(KnoxRadioFx.GUESS_EQ, KnoxRadioFx::isEq);
-                echo = KnoxRadioFx.find(KnoxRadioFx.GUESS_ECHO, KnoxRadioFx::isEcho);
                 if (eq != 0L) {
                     n(eq, 0, F_LOWPASS_24); f(eq, 1, CUT_NEAR); f(eq, 2, 0.707f);
                     n(eq, 4, F_PEAKING); f(eq, 5, 120f); f(eq, 6, 0.9f); f(eq, 7, 6f);
@@ -73,21 +72,14 @@ public class KnoxCarMuffle {
                     n(eq, 12, F_HIGHPASS_12); f(eq, 13, 45f); f(eq, 14, 0.707f);
                     n(eq, 16, F_OFF);
                 }
-                if (echo != 0L) {
-                    f(echo, 0, 7f); f(echo, 1, 12f); f(echo, 2, 0f); f(echo, 3, -16f);
-                }
                 if (eq != 0L) {
                     group = fmod.javafmod.FMOD_System_CreateChannelGroup(name);
-                    if (group != 0L) {
-                        for (long d : new long[] {eq, echo}) {
-                            if (d != 0L) javafmodJNI.FMOD_ChannelGroup_AddDSP(group, 0, d);
-                        }
-                    }
+                    if (group != 0L) javafmodJNI.FMOD_ChannelGroup_AddDSP(group, 0, eq);
                 }
-                System.out.println("[Knox] car muffle " + name + ": eq " + (eq != 0L) + ", echo " + (echo != 0L) + ", group " + (group != 0L));
+                System.out.println("[Knox] car muffle " + name + ": eq " + (eq != 0L) + ", group " + (group != 0L));
             } catch (Throwable t) {
                 System.out.println("[Knox] car muffle " + name + ": no effects (" + t + ")");
-                eq = echo = group = 0L;
+                eq = group = 0L;
             }
         }
         return group != 0L;
@@ -120,7 +112,6 @@ public class KnoxCarMuffle {
             f(eq, 1, cut);
             f(eq, 7, BOOM + (BOOM_OPEN - BOOM) * o);
             f(eq, 11, LOWMID + (LOWMID_OPEN - LOWMID) * o);
-            if (echo != 0L) f(echo, 3, ECHO_WET + (ECHO_WET_OPEN - ECHO_WET) * o);
         } catch (Throwable t) {
             // left as it was
         }

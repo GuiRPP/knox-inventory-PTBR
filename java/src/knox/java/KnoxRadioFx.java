@@ -21,8 +21,11 @@ import fmod.javafmodJNI;
  * under it all is KnoxRadioStatic (Lua).
  *
  * The game's FMOD bridge creates an effect by its type number, and those
- * numbers moved between FMOD versions: each effect is told apart by how its
- * parameters take values (counts and ranges), not trusted by number.
+ * numbers moved between FMOD versions: each effect is told apart by what
+ * parameters it has, not trusted by number. (By their count and kind only: FMOD
+ * clips a value out of range and says nothing, so the checks that expected an
+ * error for one never passed - only the EQ was ever on. Asked of the game's FMOD
+ * 2.03.09 itself, outside the game; the author, 2026-11-04: fix it, the sound changes.)
  */
 public class KnoxRadioFx {
 
@@ -30,6 +33,7 @@ public class KnoxRadioFx {
     static final int GUESS_EQ = 32, GUESS_DIST = 9, GUESS_ECHO = 6, GUESS_REVERB = 17;
     // FMOD_DSP_MULTIBAND_EQ_FILTER_TYPE
     static final int F_OFF = 0, F_LOWPASS_24 = 2, F_HIGHPASS_24 = 5, F_PEAKING = 9;
+    static final int NO_SUCH = 31;   // FMOD_ERR_INVALID_PARAM: no parameter of that number
 
     static boolean tried;
     static long eq, dist, echo, reverb;
@@ -57,16 +61,19 @@ public class KnoxRadioFx {
             && f(d, 1, 1000f) == 0 && f(d, 19, 0f) == 0;
     }
 
+    // one number and no more (a fader has a second, of another kind: it answers otherwise)
     static boolean isDist(long d) {
-        return f(d, 0, 0.5f) == 0 && f(d, 0, -20f) != 0 && f(d, 0, 5000f) != 0 && f(d, 1, 0f) != 0;
+        return f(d, 0, 0.5f) == 0 && f(d, 1, 0f) == NO_SUCH && n(d, 1, 0) == NO_SUCH;
     }
 
+    // four numbers
     static boolean isEcho(long d) {
-        return f(d, 0, 50f) == 0 && f(d, 1, 20f) == 0 && f(d, 2, 0f) == 0 && f(d, 3, -10f) == 0 && f(d, 0, 5f) != 0;
+        return f(d, 0, 50f) == 0 && f(d, 1, 20f) == 0 && f(d, 2, 0f) == 0 && f(d, 3, -10f) == 0 && f(d, 4, 0f) != 0;
     }
 
+    // thirteen numbers
     static boolean isReverb(long d) {
-        return f(d, 0, 1500f) == 0 && f(d, 11, -20f) == 0 && f(d, 12, 0f) == 0 && f(d, 0, 50f) != 0 && f(d, 13, 0f) != 0;
+        return f(d, 0, 1500f) == 0 && f(d, 11, -20f) == 0 && f(d, 12, 0f) == 0 && f(d, 13, 0f) != 0;
     }
 
     static long create(int type) {
@@ -117,7 +124,7 @@ public class KnoxRadioFx {
             echo = find(GUESS_ECHO, KnoxRadioFx::isEcho);
             reverb = find(GUESS_REVERB, KnoxRadioFx::isReverb);
             campTone();
-            tunedBroken = false;
+            tuned = TONE_CAMP;
             System.out.println("[Knox] radio sound: eq " + (eq != 0L) + ", distortion " + (dist != 0L)
                 + ", echo " + (echo != 0L) + ", reverb " + (reverb != 0L));
         } catch (Throwable t) {
@@ -149,18 +156,42 @@ public class KnoxRadioFx {
         }
     }
 
-    // Which radio the chain is tuned for: the fire's or the bar's (KnoxBarRadio; the author,
-    // 2026-11-01: each its own sound). Tab goes between them with the music playing.
-    static boolean tunedBroken;
+    /**
+     * The radio in a car, as it has always sounded there: the speaker's band alone. The breakup,
+     * the box and the reverb by the fire came on for the fire and the bar (the author's answer,
+     * 2026-11-04), and were never asked of the car. (-80 dB: FMOD's "none" for both.)
+     */
+    static void carTone() {
+        campTone();
+        if (dist != 0L) f(dist, 0, 0f);
+        if (echo != 0L) f(echo, 3, -80f);
+        if (reverb != 0L) f(reverb, 11, -80f);
+    }
+
+    // Which radio the chain is tuned for: the fire's, the bar's (KnoxBarRadio; the author,
+    // 2026-11-01: each its own sound) or a car's. Tab goes between them with the music playing.
+    static final int TONE_CAMP = 0, TONE_BAR = 1, TONE_CAR = 2;
+    static int tuned = TONE_CAMP;
+
+    // (in the world: a track still fading on the loading screen keeps the fire's sound to its end)
+    static boolean inWorld() {
+        try {
+            zombie.gameStates.GameStateMachine states = zombie.GameWindow.states;
+            return states != null && states.current instanceof zombie.gameStates.IngameState;
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
 
     static void tune(long ch) {
-        if (tunedBroken == broken) return;
-        tunedBroken = broken;
-        if (broken) {
+        int want = broken ? TONE_BAR : inWorld() ? TONE_CAR : TONE_CAMP;
+        if (tuned == want) return;
+        tuned = want;
+        if (want == TONE_BAR) {
             KnoxBarRadio.tone(eq, dist, echo, reverb);
             KnoxBarRadio.begin(System.currentTimeMillis());
         } else {
-            campTone();
+            if (want == TONE_CAR) carTone(); else campTone();
             KnoxBarRadio.hush();
             KnoxBarRadio.pitch(ch, 1f);
         }
@@ -328,8 +359,13 @@ public class KnoxRadioFx {
     static final float BUTTON_VOL = 0.45f;
     static final int[] lastTake = {-1, -1, -1, -1};
 
+    // (the bar's sounds by the game's sound slider; the fire's as they were - the author, 2026-11-04)
+    static float slider() {
+        return broken ? KnoxBarSound.sfx() : 1f;
+    }
+
     static void button() {
-        KnoxCamp.play(pick(BUTTON, 3), BUTTON_VOL, 0.95f + rnd.nextFloat() * 0.1f, false);
+        KnoxCamp.play(pick(BUTTON, 3), BUTTON_VOL * slider(), 0.95f + rnd.nextFloat() * 0.1f, false);
     }
 
     static String[] takes(String name, int n) {
@@ -354,6 +390,7 @@ public class KnoxRadioFx {
     /** The same at a pitch; its channel, 0 for none. */
     static long throughSpeaker(String file, float volume, float pitch) {
         if (!ready() || !makeGroup()) return 0L;
+        tune(attachedTo);   // (with no track playing nothing else has: the switch's tail in a car - QA, 2026-11-04)
         try {
             long sound = fmod.fmod.FMODManager.instance.loadSound(file);
             if (sound == 0L) return 0L;
@@ -371,8 +408,8 @@ public class KnoxRadioFx {
     }
 
     static void switched(boolean nowOn, float musicVolume) {
-        KnoxCamp.play(pick(SWITCH, 0), SWITCH_VOL, 0.97f + rnd.nextFloat() * 0.06f, false);
-        float v = Math.max(0.15f, musicVolume) * TAIL_VOL;
+        KnoxCamp.play(pick(SWITCH, 0), SWITCH_VOL * slider(), 0.97f + rnd.nextFloat() * 0.06f, false);
+        float v = Math.max(0.15f, musicVolume) * TAIL_VOL * slider();
         if (nowOn) {
             throughSpeaker(pick(TUNE_IN, 1), v);
             // the music out of the air: a dropout begun at its deepest

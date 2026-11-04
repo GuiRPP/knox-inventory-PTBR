@@ -205,8 +205,11 @@ local function bagSound(bag, open)
     local script = back and getScriptManager():getItem(back.type)
     local name = script and script:getOpenSound() or ""
     if name ~= "" and isCloth(name) and knoxCampSoundCut then
-        -- open: the first rustle, cut short; close: the whole of it, the bag set down
-        if knoxCampSoundCut("", open and 0.35 or 0.3, open and 450 or 0) then return end
+        -- open: the first rustle, cut short; close: the whole of it, the bag set down (in the bar by the
+        -- game's sound slider: KnoxMenuSceneBar)
+        local sc = KnoxMenuScene and KnoxMenuScene.instance
+        local k = sc and sc.sfxK and sc:sfxK() or 1
+        if knoxCampSoundCut("", (open and 0.35 or 0.3) * k, open and 450 or 0) then return end
     end
     getSoundManager():playUISound(open and "KnoxBagOpen" or "KnoxBagClose")
 end
@@ -214,6 +217,14 @@ B.sound = bagSound   -- (a keepsake put back into a bag: KnoxMenuScene)
 
 KnoxBagCard = ISPanel:derive("KnoxBagCard")
 local BC = KnoxBagCard
+
+--- Can a thing be taken out of the bag here, to be put down in the scene? Only in the camp: the bar has
+--- no keepsakes (the author, 2026-11-04 - there it had no hint, the camp's ground and bounds, and the
+--- thing turned up in the camp).
+local function keepsHere()
+    local sc = KnoxMenuScene and KnoxMenuScene.instance
+    return KnoxMenuKeep ~= nil and not (sc and sc.noKeeps)
+end
 
 function BC:new()
     local o = ISPanel:new(0, 0, 10, 10)
@@ -442,6 +453,7 @@ function BC:drawSection(b, a, mx, my)
     local hovered = nil
     local f, fh = T.fontTile, T.fontTileH
     local held = KnoxMenuKeep and KnoxMenuKeep.drag
+    local keeps = keepsHere()
     for _, it in ipairs(s.items) do
         local w2, h2 = it.w, it.h
         if it.r == 1 then w2, h2 = it.h, it.w end
@@ -456,9 +468,10 @@ function BC:drawSection(b, a, mx, my)
         local pw, ph = w2 * cs - 1, h2 * cs - 1
         local over = not held and mx >= tx and mx < tx + pw and my >= ty2 and my < ty2 + ph
         if over then hovered = it end
-        -- can it be put down in the camp (a model of it on the ground)? If not, dimmed
+        -- can it be put down in the camp (a model of it on the ground)? If not, dimmed (in the bar
+        -- nothing is taken out: none)
         if it.model == nil then it.model = (KnoxMenuKeep and KnoxMenuKeep.modelOf(it.type)) or false end
-        local ia = it.model and a or a * 0.45
+        local ia = (it.model or not keeps) and a or a * 0.45
         local taken = held and held.tile == it
         local ta = taken and a * 0.4 or a
         -- lifted under the mouse as in the inventory (KnoxGridView.liftPx): a
@@ -547,7 +560,7 @@ function BC:render()
     local it = self.hovered
     if not it or self.k < 0.5 then return end
     local s = it.name .. (it.n > 1 and ("  x" .. it.n) or "")
-    if KnoxMenuKeep then
+    if keepsHere() then
         local hint = not it.model and "IGUI_Knox_Keep_NoModel"
             or (KnoxMenuKeep.full() and "IGUI_Knox_Keep_Full" or "IGUI_Knox_Keep_Drag")
         s = s .. "  " .. string.char(183) .. "  " .. getText(hint)
@@ -572,7 +585,7 @@ function BC:onMouseDown(x, y)
     -- (going dark to the other scene, the author's bar, 2026-10-31: it would land there)
     if KnoxMenuScene and KnoxMenuScene.instance and KnoxMenuScene.instance.switchK then return true end
     local it = self.hovered
-    if it and it.model and it.rect and KnoxMenuKeep and KnoxMenuKeep.beginDrag(it, self.hero, self.save) then
+    if it and it.model and it.rect and keepsHere() and KnoxMenuKeep.beginDrag(it, self.hero, self.save) then
         -- held where it was taken, as in the inventory (KnoxDrag: grab point)
         local d = KnoxMenuKeep.drag
         local r = it.rect

@@ -51,13 +51,16 @@ end
 -- pressed over a thing with a panel - its panel; pressed again - the tooltip back.
 L.panelFor = nil   -- the thing the key asked the panel for
 local keyWas, keyMs, keyHit = false, -1, false
+local KEY_GAP_MS = 250   -- not asked this long: the mouse has only just come onto a thing
 --- Was the key pressed down just now? (the same answer to every caller in a frame)
 function L.keyHit()
     local now = getTimestampMs()
     if now ~= keyMs then
-        keyMs = now
         local down = L.held()
-        keyHit = down and not keyWas
+        -- (a key already held as the mouse comes onto the thing is no press over it: Shift+click
+        -- along a row, a run past the hotbar - QA, 2026-11-04; the author 2026-10-30: "pressed over it")
+        keyHit = down and not keyWas and now - keyMs < KEY_GAP_MS
+        keyMs = now
         keyWas = down
     end
     return keyHit
@@ -245,7 +248,20 @@ local function rebuild(now)
             end
         end
     end
-    L.lit = n > 0 and lit or EMPTY
+    -- (the same ones as before: the same table - a calm grid keeps its ready list while it stays,
+    -- KnoxGridView renderGrid)
+    local old, same = L.lit, n > 0
+    if same then
+        local m = 0
+        for x in pairs(old) do
+            if not lit[x] then same = false break end
+            m = m + 1
+        end
+        local k = 0
+        for _ in pairs(lit) do k = k + 1 end
+        same = same and m == k
+    end
+    if not same then L.lit = n > 0 and lit or EMPTY end
     if pt then Pf.part("load: lit", pt, n) end
 end
 
@@ -290,7 +306,8 @@ function L.sync()
     track(now)
     local on = L.lit ~= EMPTY and not L.picking
     if on then L.shown = L.lit end
-    local step = math.max(0, math.min(100, now - fadeMs)) / FADE_MS
+    -- (the animations off: at once - overhaul, 2026-11-04)
+    local step = T.animOn() and math.max(0, math.min(100, now - fadeMs)) / FADE_MS or 1
     fadeMs = now
     if on then
         L.litA = math.min(1, L.litA + step)
@@ -506,6 +523,12 @@ local function isFree(player)
     return not (player:isAiming() or player:isRunning() or player:isSprinting())
 end
 
+--- Where it goes back to, and off it goes (both inside the one guard: a homes' look failing
+--- stopped the whole tick - QA, 2026-11-04).
+local function sendBack(player, mag, from, layouts)
+    return sendHome(player, mag, homesFor(player, from), layouts)
+end
+
 local function lookBack()
     local now = getTimestampMs()
     if now < nextLook then return end
@@ -526,7 +549,7 @@ local function lookBack()
             if free then
                 layouts = layouts or {}
                 w.tries = w.tries + 1
-                local ok, sent = pcall(sendHome, player, mag, homesFor(player, w.from), layouts)
+                local ok, sent = pcall(sendBack, player, mag, w.from, layouts)
                 if not ok then print("[Knox] a magazine back: " .. tostring(sent)) end
                 if not ok or not sent or w.tries >= TRIES then waiting[mag] = nil end
             end
@@ -803,8 +826,10 @@ end
 function L.tipQuiet(item, has)
     -- (the key pressed over another thing that never got its panel: forgotten)
     if L.panelFor and L.panelFor ~= item and not openOn(L.panelFor) then L.panelFor = nil end
+    -- (asked over any thing: the key's state followed while the mouse goes from one to the next)
+    local hit = L.keyHit()
     if not has then return false end
-    if L.keyHit() then
+    if hit then
         if L.panelFor == item or openOn(item) then
             L.panelFor = nil
             if openOn(item) then KnoxSlotPicker.dismiss() end

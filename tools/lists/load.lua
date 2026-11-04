@@ -78,8 +78,13 @@ check("not another magazine", not L.isLit(full))
 local was = L.lit
 frame(mag)
 check("not looked for again every frame", L.lit == was)
+local looks, allViews = 0, KnoxActions.allViews
+KnoxActions.allViews = function(...) looks = looks + 1 return allViews(...) end
 frame(mag, 600)
-check("looked for again after a while", L.lit ~= was and L.isLit(loose[1]))
+KnoxActions.allViews = allViews
+check("looked for again after a while", looks > 0 and L.isLit(loose[1]), looks)
+-- (the same ones found: the same table, a calm grid keeps its ready list - QA, 2026-11-04)
+check("the same ones: the same table", L.lit == was)
 frame(nil, 100)
 check("the mouse off it: still lit for a moment", L.isLit(loose[1]))
 frame(nil, 200)
@@ -325,6 +330,23 @@ clock = clock + 16
 L.tipQuiet(newItem("Base.Bullets9mm"), false)
 check("pressed, then gone on to another thing: forgotten", L.panelFor == nil)
 HELD = false
+P.close()
+-- the key already held as the mouse comes onto the thing: no press over it (Shift+click along a row,
+-- a run past the hotbar - QA, 2026-11-04)
+local m5 = newItem("Base.9mmClip", INV)
+HELD = true
+clock = clock + 2000
+check("held as the mouse came onto it: the tooltip", L.tipQuiet(m5, true) == false)
+clock = clock + 16
+check("held on: still the tooltip", L.tipQuiet(m5, true) == false)
+HELD = false
+clock = clock + 16
+L.tipQuiet(m5, true)
+HELD = true
+clock = clock + 16
+check("let go and pressed over it: the panel's", L.tipQuiet(m5, true) == true)
+HELD = false
+L.panelFor = nil
 P.close()
 
 -- as the game goes in a frame: the tile asks for its panel, then its tooltip sees

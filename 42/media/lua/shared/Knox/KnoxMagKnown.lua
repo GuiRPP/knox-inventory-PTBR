@@ -72,6 +72,17 @@ if not K.hooked then
         if mag and mag:getCurrentAmmoCount() == 0 then K.mark(mag, self.character) end
         return r
     end
+    -- (in a game with others start() is the client's: the flag set there is the client's alone,
+    -- and an empty one was found out again after a reload. The server starts it too, and it sends
+    -- the flag round - QA, 2026-11-04)
+    local serverStart = ISUnloadBulletsFromMagazine.serverStart
+    if serverStart then
+        function ISUnloadBulletsFromMagazine:serverStart()
+            local mag = self.magazine
+            if mag and mag:getCurrentAmmoCount() == 0 then K.mark(mag, self.character) end
+            return serverStart(self)
+        end
+    end
 end
 
 return KnoxMagKnown

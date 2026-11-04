@@ -116,10 +116,14 @@ public class KnoxBite {
     private static final float N_LOWER = 5.55f, N_GRAB = 6.0f, N_DOWN = 6.45f, N_DONE = 7.7f;
     private static final float SETTLE = 1.35f;   // s after letting go, the arms back in the clip's own
     private static final float GIVE_UP = 4f;     // s more, whatever the springs say
+    private static final float READ_WAIT = 2f;   // s for the hook to read his clip, or there is no look
 
     private static volatile boolean busy;
     private static boolean bitten, started;
+    private static boolean hurried;              // cut short before it got going: done once it does
+    private static boolean unseen;               // cut short before the sight of it: no shiver after
     private static float t, tWas, restPitch;
+    private static float waited;                 // s it has waited for the hook (READ_WAIT)
     private static float wL, wR;                 // the arms' weights over the clip's own, 0..1
     private static boolean rightOn;              // the right hand at the sleeve
     private static float[] wristGoal = RAISE;    // where the left wrist goes now
@@ -257,9 +261,12 @@ public class KnoxBite {
         bitten = bite;
         busy = true;
         started = false;
+        hurried = false;
+        unseen = false;
         read = false;
         aimed = false;
         t = tWas = 0f;
+        waited = 0f;
         rollGoal = 0f;
         wL = wR = 0f;
         rightOn = false;
@@ -289,8 +296,16 @@ public class KnoxBite {
      */
     @LuaMethod(name = "knoxBiteHurry", global = true)
     public static void knoxBiteHurry() {
-        if (!busy || !started) return;
+        if (!busy) return;
+        // (a click in its first frame or two, before the hook read his clip: kept for when it starts,
+        // not lost and the whole look sat through - overhaul, 2026-11-04)
+        if (!started) {
+            hurried = true;
+            return;
+        }
         float to;
+        // (the bite not seen yet: he didn't see it, he doesn't shiver - the author, 2026-11-04)
+        if (t < T_SEE) unseen = true;
         if (t < T_LET) to = bitten ? B_DONE : N_DONE;
         else to = bitten ? B_LOWER : N_LOWER;
         if (t < to) t = tWas = to;
@@ -314,7 +329,13 @@ public class KnoxBite {
         if (!busy) return 0;
         restPitch = (float) Math.toRadians(restDeg);
         float d = (float) Math.max(0, Math.min(0.1, dt));
-        if (!read) return 0;   // (the hook hasn't read his clip yet: it starts from there)
+        if (!read) {
+            // (the hook hasn't read his clip yet: it starts from there. Never read - the model not drawn,
+            // the hook off - it was never over, the view held and the menu away for good: overhaul, 2026-11-04)
+            waited += d;
+            if (waited > READ_WAIT) busy = false;
+            return 0;
+        }
         if (!started) {
             started = true;
             System.arraycopy(animWristL, 0, wrist, 0, 3);
@@ -325,6 +346,10 @@ public class KnoxBite {
             poleR[3] = poleR[4] = poleR[5] = 0f;
             gripS[0] = 0.03f;
             gripS[1] = 0f;
+            if (hurried) {
+                hurried = false;
+                knoxBiteHurry();
+            }
         }
         t += d;
         timeline(d);
@@ -468,7 +493,7 @@ public class KnoxBite {
         else if (t >= end) wR = Math.max(0f, wR - dt / 0.35f);
 
         // the shiver after the sight of it, fading slowly
-        fear = b && t >= T_SEE ? Math.min(1f, (t - T_SEE) / 0.25f) * (1f - 0.6f * smooth(B_DONE, B_DONE + 2f, t)) : 0f;
+        fear = b && !unseen && t >= T_SEE ? Math.min(1f, (t - T_SEE) / 0.25f) * (1f - 0.6f * smooth(B_DONE, B_DONE + 2f, t)) : 0f;
 
         // the hand never still: breath and a drift of a few millimetres, the shiver on top
         float n = 0.0035f + 0.002f * fear;
@@ -501,16 +526,17 @@ public class KnoxBite {
 
     /** The sleeve's rustle at each pull, his breath at the sight of it. */
     private static void sounds(boolean b) {
-        if (passed(T_RIGHT + 0.4f)) KnoxCamp.knoxCampSoundCut("", 0.12, 350);
-        if (passed(T_TUG + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.2, 520);
-        if (passed(T_TUG2 + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.2, 520);
+        float k = KnoxBarSound.sfx();
+        if (passed(T_RIGHT + 0.4f)) KnoxCamp.knoxCampSoundCut("", 0.12 * k, 350);
+        if (passed(T_TUG + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.2 * k, 520);
+        if (passed(T_TUG2 + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.2 * k, 520);
         if (b) {
-            if (passed(T_SEE + 0.05f)) KnoxCamp.knoxCampSoundCut(PANIC, 0.3, 4500);
-            if (passed(B_YANK)) KnoxCamp.knoxCampSoundCut("", 0.3, 450);
-            if (passed(B_YANK2)) KnoxCamp.knoxCampSoundCut("", 0.18, 350);
+            if (passed(T_SEE + 0.05f)) KnoxCamp.knoxCampSoundCut(PANIC, 0.3 * k, 4500);
+            if (passed(B_YANK)) KnoxCamp.knoxCampSoundCut("", 0.3 * k, 450);
+            if (passed(B_YANK2)) KnoxCamp.knoxCampSoundCut("", 0.18 * k, 350);
         } else {
-            if (passed(T_SEE + 0.15f)) KnoxCamp.knoxCampSoundCut(RELIEF, 0.26, 1400);
-            if (passed(N_DOWN + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.13, 900);
+            if (passed(T_SEE + 0.15f)) KnoxCamp.knoxCampSoundCut(RELIEF, 0.26 * k, 1400);
+            if (passed(N_DOWN + 0.05f)) KnoxCamp.knoxCampSoundCut("", 0.13 * k, 900);
         }
     }
 

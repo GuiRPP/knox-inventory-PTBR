@@ -97,6 +97,12 @@ check("and round", M.sel == 1, M.sel)
 frames(1)
 check("the width stays", M.W == wasW)
 
+-- the panel at the crosshair coming up under it: it stays (the camera turns with it open, the author 2026-11-04)
+KnoxCrosshair = {visible = true}
+frames(2)
+check("the crosshair panel coming up: the menu stays", M.state == "open", M.state)
+KnoxCrosshair = nil
+
 -- the mouse: left
 M.sel = 2
 M.lmb()
@@ -578,6 +584,14 @@ for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
 check("R: not known and full, load: one round tried", M.load(plainMag) == true and queued("ISLoadBulletsInMagazine").b == 1 and not K.is(plainMag))
 for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
 check("R: known and full, load: nothing", M.load(knownFull) == false and #QUEUE == 0)
+-- (pressed again while the rounds are still coming over from a bag: the loading behind them stands - QA, 2026-11-04)
+for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
+local half = mag(5, true)
+QUEUE[1] = {Type = "ISInventoryTransferAction"}
+QUEUE[2] = {Type = "ISLoadBulletsInMagazine", magazine = half}
+check("R: loading behind a transfer, pressed again: left as it is", M.load(half) == true and #QUEUE == 2 and QUEUE[1].Type == "ISInventoryTransferAction")
+for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
+INV:remove(half)
 local blank = mag(0)
 check("R: not known and empty, unload: the game's action finds it so", M.unload(blank) == true and queued("ISUnloadBulletsFromMagazine") ~= nil and not K.is(blank))
 for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
