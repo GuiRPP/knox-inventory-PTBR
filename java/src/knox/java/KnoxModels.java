@@ -120,6 +120,7 @@ public class KnoxModels {
     /** Version of the Java part, for the Lua side to check it is loaded. */
     @LuaMethod(name = "knoxJavaVersion", global = true)
     public static String knoxJavaVersion() {
-        return "144";   // 144: the bar's frame no longer prints its build times (the author's decision before a release, 2026-11-04)
+        return "145";   // 145: a new jar hash on purpose. Update 13's signed jar was force-denied by ZombieBuddy; whoever had "Save decisions to disk" on keeps a stored denial of that hash, silently, with no row in its window (linlin, 2026-11-05)
+                        // 144: the bar's frame no longer prints its build times (the author's decision before a release, 2026-11-04)
     }
 }
