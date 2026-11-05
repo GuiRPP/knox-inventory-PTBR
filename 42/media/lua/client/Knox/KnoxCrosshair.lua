@@ -115,7 +115,13 @@ local keysMs = -1e9
 local function keyName(id, fallback)
     local k = KnoxControls and KnoxControls.vpKeys and KnoxControls.vpKeys() or (Viewpoint and Viewpoint.Keys)
     if not k or not k.get or not k.display then return fallback end
-    local ok, s = pcall(function() return k.display(k.get(id)) end)
+    -- (the value first: a key Viewpoint could not give comes back as nothing at all, and
+    -- display() with no argument is an error of its own - players' reports, 2026-11-05)
+    local ok, s = pcall(function()
+        local v = k.get(id)
+        if v == nil or v == "" then return nil end
+        return k.display(v)
+    end)
     if not ok or type(s) ~= "string" or s == "" or s == "NONE" then return fallback end
     -- (the game's names are in capitals: "TAB" as "Tab", as the mockup has it)
     if #s > 1 and string.find(s, "^%u+$") then s = string.sub(s, 1, 1) .. string.lower(string.sub(s, 2)) end
@@ -127,7 +133,11 @@ local function keys(now)
     KEYS.take = keyName("keys.lootTake", "F")
     KEYS.all = keyName("keys.lootTakeAll", "R")
     KEYS.open = keyName("keys.lootWindow", "Tab")
-    KEYS.place = keyName("keys.lootPlace", "G")
+    -- (only a Viewpoint that has it, 0.1.7: asked of 0.1.6, its Java throws, and the game logs
+    -- that past any pcall - an error every second for the players, 2026-11-05)
+    if knoxVpPanelPlaceKey and knoxVpPanelPlaceKey() == true then
+        KEYS.place = keyName("keys.lootPlace", "G")
+    end
 end
 
 local function ease(k)

@@ -1,0 +1,7 @@
+[h1]Knox Inventory 1.0 BETA - update 14: Hotfix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Fixed "Invalid signature" in ZombieBuddy's window, which kept the mod from being enabled: the signature from update 13 is removed. If you already allowed KnoxInventoryJava.jar, you will not be asked again.
+[*]Fixed the endless errors from KnoxCrosshair.lua ("expected 1 argument, got 0") with the public version of Viewpoint.
+[/list]

@@ -721,6 +721,34 @@ run("the foot in two lines", function()
     VP.placeKey, VP.actions = false, {}
 end)
 
+-- Viewpoint 0.1.6 has no place key: asking it throws in its Java, and the game logs that past
+-- any pcall, so it is never asked; a key that comes back as nothing is not shown (2026-11-05)
+run("keys: a Viewpoint without the place key", function()
+    local asked, shown = {}, 0
+    Viewpoint = {Keys = {
+        get = function(id)
+            asked[id] = (asked[id] or 0) + 1
+            if id == "keys.lootTake" then return "F" end
+            -- (nothing at all, as the game gives after a Java exception)
+        end,
+        display = function(...)
+            shown = shown + 1
+            if select("#", ...) == 0 or select(1, ...) == nil then error("display with no key") end
+            return "F"
+        end,
+    }}
+    VP.placeKey = false
+    frames(3, 1100)
+    check("0.1.6: the place key not asked", asked["keys.lootPlace"] == nil, asked["keys.lootPlace"])
+    check("0.1.6: the others are", (asked["keys.lootTake"] or 0) >= 1)
+    check("nothing back: no display", shown == (asked["keys.lootTake"] or 0), shown)
+    VP.placeKey = true
+    frames(2, 1100)
+    check("0.1.7: the place key asked", (asked["keys.lootPlace"] or 0) >= 1)
+    VP.placeKey = false
+    Viewpoint = nil
+end)
+
 run("all along: no clip left on", function()
     check("left", STENCIL.left == 0, STENCIL.left)
     check("bad", STENCIL.bad == 0, STENCIL.bad)
