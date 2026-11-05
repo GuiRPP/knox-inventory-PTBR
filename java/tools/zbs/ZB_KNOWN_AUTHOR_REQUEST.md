@@ -6,7 +6,7 @@
 ключ берётся из профиля, а профиль не загрузился, подписанный мод блокируется.
 
 ## Ключ
-- Закрытый: `C:\Users\pielo\Zomboid\tools\keys\knox_zbs.key.pending`. Никуда не выкладывать и не загружать.
+- Закрытый: `C:\Users\pielo\Zomboid\tools\keys\knox_zbs.key` (включён 05.11.2026), копия `F:\Knox_keys\knox_zbs.key`. Никуда не выкладывать и не загружать.
 - Открытый: `JavaModZBS:8b10f205cfc8b6bc6d55f44410fde965696d43ad7a0de33e6e976ae3e7c83745`
 
 ## Просьба отправлена (22.10.2026)

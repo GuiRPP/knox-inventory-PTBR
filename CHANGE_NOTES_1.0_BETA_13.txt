@@ -1,0 +1,6 @@
+[h1]Knox Inventory 1.0 BETA - update 13: A signed Java part[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[b]The Java part is new again: when ZombieBuddy asks about KnoxInventoryJava.jar, click "Allow".[/b]
+
+KnoxInventoryJava.jar is now signed: ZombieBuddy can check that it comes from the author of Knox and has not been changed. Nothing else changes in the mod.
