@@ -16,7 +16,7 @@
 #   grid filling up; see DrawGridAt)
 #   -Winter: the preview of the winter update (the author, 2026-11-04): the ice skin
 #   (KnoxTheme T.SKINS "ice") in place of the sand, no tags over the panel - a plate
-#   "WINTER IS COMING - UPDATE SOON" in their place, a light sweeping over it once a loop
+#   "WINTER IS COMING - UPDATE AVAILABLE" in their place (UPDATE SOON till update 11 came out, 2026-11-05), a light sweeping over it once a loop
 param([switch]$Overlay, [int]$Fps = 8, [double]$Length = 3.5, [switch]$Winter)
 
 . (Join-Path $PSScriptRoot "news_ui.ps1")
@@ -244,7 +244,7 @@ TxtMid $g $cp "title" $bp $(if ($Winter) { Mix $K.accent $K.ink 0.62 } else { He
 
 # the winter plate where the tags were: ice with ink, Knox's 2 px frame a darker ice;
 # a light sweeps over it in the loop's first frames (as make_preview_beta.ps1's plate)
-$wName = "WINTER IS COMING"; $wSoon = "UPDATE SOON"; $wDot = [string][char]0x00B7
+$wName = "WINTER IS COMING"; $wSoon = "UPDATE AVAILABLE"; $wDot = [string][char]0x00B7
 $wPx = 40; $wGap = 24
 function DrawWinterAt($g, $f) {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias

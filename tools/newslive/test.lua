@@ -303,5 +303,35 @@ run("an error is a line, and the block goes away", function()
     check("it doesn't come back", W.live == false)
 end)
 
+-- a long bag name in a scrolled column (the players' "black bars", 2026-11-05)
+run("a sliding name's clip goes with the scroll, no hole left", function()
+    local T = KnoxTheme
+    local calls = {}
+    local ui = {}
+    function ui:getXScroll() return 0 end
+    function ui:getYScroll() return -120 end
+    function ui:setStencilRect(x, y, w, h) table.insert(calls, {"set", x, y, w, h}) end
+    function ui:clearStencilRect() table.insert(calls, {"clear"}) end
+    function ui:repaintStencilRect(x, y, w, h) table.insert(calls, {"back", x, y, w, h}) end
+    local textWas, measureWas = T.text, T.measure
+    local at
+    T.text = function(_, _, x, y) at = {x, y} end
+    T.measure = function() return 500 end
+    T.marquee(ui, {}, "a long name", 10, 200, 100, T.color.text, T.fontCaps, 1, {0, 0, 300, 400})
+    check("the clip on the name: 200 down, 120 scrolled", calls[1][1] == "set" and calls[1][3] == 200 - 2 - 120, calls[1][3])
+    check("the text in the content, where it stands", at[2] == 200, at[2])
+    check("taken off", calls[2][1] == "clear")
+    check("its box painted back", calls[3] and calls[3][1] == "back" and calls[3][3] == 78, calls[3] and calls[3][3])
+    -- scrolled off the top: cut to the column
+    calls = {}
+    T.marquee(ui, {}, "a long name", 10, 120, 100, T.color.text, T.fontCaps, 1, {0, 0, 300, 400})
+    check("cut to the column", calls[3] and calls[3][3] == 0 and calls[3][5] < T.fontH(T.fontCaps) + 4, calls[3] and calls[3][5])
+    -- gone from it: nothing to paint
+    calls = {}
+    T.marquee(ui, {}, "a long name", 10, 50, 100, T.color.text, T.fontCaps, 1, {0, 0, 300, 400})
+    check("out of it: no paint", calls[3] == nil)
+    T.text, T.measure = textWas, measureWas
+end)
+
 check("no stencil left on", STENCILS == 0, STENCILS)
 print("DONE pass=" .. pass .. " fail=" .. fail)

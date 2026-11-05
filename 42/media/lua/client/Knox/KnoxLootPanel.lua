@@ -771,6 +771,9 @@ function KnoxLootPanel:prerender()
     local total = #self.containers * (m.rowH + m.gap) - m.gap
     self.listScroll = math.max(0, math.min(self.listScroll or 0, total - listH))
     self:setStencilRect(0, 0, m.listW, listH)
+    local listBox = self.listBox or {0, 0, 0, 0}
+    self.listBox = listBox
+    listBox[3], listBox[4] = m.listW, listH
     self.rowRects = {}
     local y = -self.listScroll
     local lists = rowLists[self.playerNum]
@@ -926,7 +929,7 @@ function KnoxLootPanel:prerender()
                 nst = {}
                 self.nameSt[c.container] = nst
             end
-            T.marquee(self, nst, c.name, nameX, ty, nameW, nameC, T.fontText)
+            T.marquee(self, nst, c.name, nameX, ty, nameW, nameC, T.fontText, 1, listBox)
             -- a plate with the number in the heavier caps font: sand with black
             -- when looked into, plain grey when not yet; centred by its pixels
             T.rect(self, boxX, ty - 2, boxW, boxH, base, pa)

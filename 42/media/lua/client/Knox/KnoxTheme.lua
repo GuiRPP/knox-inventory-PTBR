@@ -1709,9 +1709,12 @@ end
 --- One line of text in w px from x: a longer one is not cut but slides, smoothly,
 --- to show its end, waits, and slides back (the radio card's way, KnoxMenuMusic;
 --- the author, 2026-10-18: no "..." on long names). `st`: a table kept with the
---- line - when its text changes the slide starts over.
+--- line - when its text changes the slide starts over. `outer` ({x, y, w, h} on the
+--- element, not scrolled): a clip the line is drawn inside - its box is painted back
+--- to that clip's level, or it stays a hole in it (the game's clips nest, see
+--- KnoxCrosshair's pushClip).
 local MARQUEE_HOLD, MARQUEE_SPEED = 1300, 45   -- ms at each end, px a second
-function T.marquee(ui, st, s, x, y, w, c, font, a)
+function T.marquee(ui, st, s, x, y, w, c, font, a, outer)
     a = a or 1
     local over = T.measure(font, s) - w
     if over <= 0 then
@@ -1729,9 +1732,18 @@ function T.marquee(ui, st, s, x, y, w, c, font, a)
     elseif t < 2 * MARQUEE_HOLD + move then p = 1
     else p = 1 - (t - 2 * MARQUEE_HOLD - move) / move end
     p = (1 - math.cos(math.pi * p)) / 2               -- (eased at both ends)
-    ui:setStencilRect(x, y - 2, w, T.fontH(font) + 4)
+    -- (a clip is on the element, not in its scrolled content: left where the line stood
+    -- unscrolled, it cut the name away and the box stayed a black hole over the grid -
+    -- the players' "black bars", SullenestGrunt's screenshots, 2026-11-05)
+    local bx, by, bh = x + ui:getXScroll(), y - 2 + ui:getYScroll(), T.fontH(font) + 4
+    ui:setStencilRect(bx, by, w, bh)
     T.text(ui, s, x - math.floor(over * p + 0.5), y, c, font, a)
     ui:clearStencilRect()
+    if outer then
+        local x2, y2 = math.min(bx + w, outer[1] + outer[3]), math.min(by + bh, outer[2] + outer[4])
+        bx, by = math.max(bx, outer[1]), math.max(by, outer[2])
+        if x2 > bx and y2 > by then ui:repaintStencilRect(bx, by, x2 - bx, y2 - by) end
+    end
 end
 
 -- How far food is frozen or cooked, shown on its tile and on its tooltip's
