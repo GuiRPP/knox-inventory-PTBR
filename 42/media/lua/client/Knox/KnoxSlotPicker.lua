@@ -394,7 +394,6 @@ function P:prerender()
             if it == hovered then self:drawRect(x, y, cs, cs, 0.08, 1, 1, 1) end
             local side = math.floor(cs * 0.8)
             T.itemIcon(self, it, x + math.floor((cs - side) / 2), y + math.floor((cs - side) / 2), side, ta)
-            if it:isBroken() then T.brokenMark(self, x, y, cs, cs, ta) end
             if g and #g > 1 then
                 -- how many of it
                 T.outlinedRight(self, tostring(#g), x + cs - 4, y + cs - T.fontTileH - 3, T.color.bright, T.fontTile, ta)
@@ -807,6 +806,7 @@ function P:onMouseWheel(del) return true end
 -- frame, 2026-10-20)
 Events.OnPreUIDraw.Add(function()
     if KnoxScreen and KnoxScreen.instance then return end
+    if KnoxNewsLive and KnoxNewsLive.live then return end   -- (the live grid of a news post keeps them itself)
     -- (a magazine's or gun's panel from the hotbar: its bar of rounds going in follows the action -
     -- the screen, which keeps it, is shut; it stood still - QA, 2026-11-04)
     local open = P.instance

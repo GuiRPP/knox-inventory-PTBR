@@ -43,6 +43,9 @@
 # --- Reports the tools write
 /tools/**/report.txt
 
+# --- The media library: hard links to the files above, rebuilt by tools/make_media.ps1
+/MEDIA/
+
 # --- System
 Thumbs.db
 desktop.ini

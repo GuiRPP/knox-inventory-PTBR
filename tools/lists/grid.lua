@@ -279,4 +279,24 @@ do
     check("bag: played again", frame(bag) == 0 and J.played == 2)
 end
 
+-- magazines with Shift (the author, 2026-11-05)
+do
+    local marked = {}
+    KnoxMagKnown = {is = function(m) return marked[m] == true end, mark = function(m) marked[m] = true end}
+    local function mag(n, cap)
+        return {getCurrentAmmoCount = function() return n end, getMaxAmmo = function() return cap end}
+    end
+    local m1, m2 = mag(7, 15), mag(15, 15)
+    local e = {items = {m1, m2}, draw = {mag = true}}
+    KnoxGridView.checkMags(e)
+    check("Shift: all of the tile checked", marked[m1] and marked[m2])
+    check("Shift: its look read anew", e.draw == nil)
+    e.draw = {mag = true}
+    KnoxGridView.checkMags(e)
+    check("Shift again: nothing to read anew", e.draw ~= nil)
+    check("one magazine: rounds / room", KnoxGridView.magRounds({items = {m1}}) == "7/15", KnoxGridView.magRounds({items = {m1}}))
+    check("a stack: all of them", KnoxGridView.magRounds(e) == "22/30", KnoxGridView.magRounds(e))
+    KnoxMagKnown = nil
+end
+
 print("grid: " .. pass .. " pass, " .. fail .. " fail")

@@ -2180,8 +2180,6 @@ function M:swipeOver()
             end
             Events.OnPreUIDraw.Add(again)
         end
-        print("[Knox] menu switch: Tab to the first move " .. ((sw.movedAt or getTimestampMs()) - sw.askedAt) .. " ms, the whole "
-            .. (getTimestampMs() - sw.askedAt) .. " ms")
     end
 end
 
@@ -2196,8 +2194,8 @@ function M:updateSwitch(dt)
         if not sw or knoxMenuSwipeFailed() or not T.animOn() then
             self:swipeOver()
         elseif self.frames >= SWIPE_FROM and (sw.t > 0 or self.clock >= SWIPE_WAIT or self:heroesPosed()) then
-            if not sw.movedAt then
-                sw.movedAt = getTimestampMs()
+            if not sw.moved then
+                sw.moved = true
                 knoxCampSwipe(sw.dir)
             end
             sw.t = sw.t + math.min(dt, 1 / 30)
@@ -2242,7 +2240,7 @@ function M:updateSwitch(dt)
     if not pcall(KnoxMenuPlace.toggle) then return end
     if T.animOn() and knoxMenuSwipeTake and not knoxMenuSwipeFailed() then
         local ok, to = pcall(KnoxMenuPlace.current)
-        KnoxMenuScene.swipe = {dir = (ok and to == "bar") and -1 or 1, t = 0, askedAt = getTimestampMs()}
+        KnoxMenuScene.swipe = {dir = (ok and to == "bar") and -1 or 1, t = 0}
         self.switchK = 1
     else
         self.switchK = 0

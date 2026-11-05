@@ -601,10 +601,15 @@ public class KnoxMusic {
             // (no fade here: the track plays on over "Click to start" and fades
             // after the click, in the game - begun at the world's load it was
             // nearly gone by the click: the author, 2026-10-16)
-            if (fadeFrom != 0L) fadeStep();
-            else apply();
+            if (fadeFrom != 0L) {
+                fadeStep();
+            } else {
+                KnoxRadioFx.loading = true;
+                apply();
+                KnoxRadioFx.loading = false;
+            }
         } catch (Throwable t) {
-            // the music goes on as it is; the game stops it
+            KnoxRadioFx.loading = false;   // the music goes on as it is; the game stops it
         }
     }
 

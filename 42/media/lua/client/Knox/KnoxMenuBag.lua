@@ -100,6 +100,8 @@ function B.capture(player)
                     meter, kind = sum / math.max(1, #e.items), "u"
                 elseif from == "f" then
                     meter, kind = T.itemLevel(it, "f"), "f"
+                elseif from == "m" then
+                    meter, kind = T.itemLevel(it, "m"), "m"
                 end
                 local kg = 0
                 for _, x in ipairs(e.items) do kg = kg + KnoxGrid.weightOf(x) end
@@ -482,7 +484,7 @@ function BC:drawSection(b, a, mx, my)
             ty2 = ty2 - lp
         end
         -- (its state: the colour's height, as in the inventory - condition_v3, the author, 2026-10-31)
-        local level = it.broken and 0 or (it.cond >= 0 and it.cond) or (it.meter >= 0 and it.meter) or nil
+        local level = it.broken and 0 or (it.kind == "m" and it.meter) or (it.cond >= 0 and it.cond) or (it.meter >= 0 and it.meter) or nil
         T.tileFill(self, tx, ty2, pw, ph, level, T.category[it.cat] or T.category.misc, ta)
         if over then self:drawRect(tx, ty2, pw, ph, 0.06 * a, 1, 1, 1) end
         if taken then
@@ -496,10 +498,13 @@ function BC:drawSection(b, a, mx, my)
         local tex = iconOf(it.tex)
         if tex then
             local side = math.floor(math.min(pw, ph) * 0.85)
-            local dim = it.broken and 0.2 or 1
+            local dim = 1
+            if it.broken then
+                local grey = T.greyIcon(tex)
+                tex, dim = grey or tex, grey and T.BROKEN_GREY or 0.6
+            end
             self:drawTextureScaledAspect(tex, tx + math.floor((pw - side) / 2), ty2 + math.floor((ph - side) / 2), side, side, ia, dim, dim, dim)
         end
-        if it.broken then T.brokenMark(self, tx, ty2, pw, ph, ta) end
         if it.n > 1 then
             T.outlinedRight(self, tostring(it.n), tx + pw - 4, ty2 + ph - fh - 3, T.color.bright, f, ta)
         end

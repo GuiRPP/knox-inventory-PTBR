@@ -176,6 +176,35 @@ function D.mergeTarget(view)
     return nil
 end
 
+-- Dropping rounds onto a magazine's tile loads it (the author, 2026-11-05): the game's action,
+-- as the Shift panel does it. One known to be full takes nothing; one not checked always
+-- looks as if it would, so the drop tells no more than trying does.
+
+--- The magazine in this tile that would take these rounds, nil if none.
+local function magFor(t, key)
+    local K = KnoxMagKnown
+    for _, m in ipairs(t.items) do
+        if (K and K.hide and not K.is(m)) or m:getCurrentAmmoCount() < m:getMaxAmmo() then
+            local at = m:getAmmoType()
+            if at and at:getItemKey() == key then return m end
+        end
+    end
+    return nil
+end
+
+--- The magazines' tile under the cursor that the dragged rounds would go in, and the magazine.
+function D.magTarget(view)
+    local e = D.entity
+    if not e or #D.extras > 0 or not view:isMouseOver() then return nil end
+    local t = view:entityUnderMouse()
+    if not t or t.item == e.item then return nil end
+    local item = t.item
+    if instanceof(item, "HandWeapon") or item:getMaxAmmo() <= 0 then return nil end
+    local m = magFor(t, e.item:getFullType())
+    if m then return t, m end
+    return nil
+end
+
 -- Dropping onto a bag's tile puts the item into that bag (first free place
 -- of its grid), without opening it.
 
@@ -459,6 +488,19 @@ end
 --- Put the dragged tile(s) at x,y of the target view's container.
 function D.drop(view, x, y, player)
     local e = D.entity
+    local magTile, mag = D.magTarget(view)
+    if magTile then
+        local far = outOfReach(player, e, mag:getContainer())
+        local items = e.items
+        D.cancel()
+        if far then
+            D.explain(player, "IGUI_Knox_TooFar")
+            return false
+        end
+        KnoxLoad.loadMagazine(player, mag, {items = items})
+        view:markDirty()
+        return true
+    end
     local bag = D.bagUnderMouse(view)
     if bag then
         local ok = dropIntoBag(bag, player, D.sourceInfo(), D.extras)

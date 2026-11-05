@@ -346,8 +346,37 @@ end
 -- so the grid is also rebuilt every so often.
 local REBUILD_MS = 250
 
+--- Shift held with the mouse on a tile of magazines (the author, 2026-11-05): they are
+--- checked from now on, the stripes give way to their level at once.
+function KnoxGridView.checkMags(e)
+    local K = KnoxMagKnown
+    if not K then return end
+    local any = false
+    for _, it in ipairs(e.items) do
+        if not K.is(it) then
+            K.mark(it)
+            any = true
+        end
+    end
+    if any then e.draw = nil end
+end
+
+--- Rounds in a tile's magazines and what they can hold, for the mouse with Shift.
+function KnoxGridView.magRounds(e)
+    local n, cap = 0, 0
+    for _, it in ipairs(e.items) do
+        n = n + it:getCurrentAmmoCount()
+        cap = cap + it:getMaxAmmo()
+    end
+    return string.format("%d/%d", n, cap)
+end
+
 function KnoxGridView:prerender()
     local now = getTimestampMs()
+    local over = self.hovered
+    if over and over.draw and over.draw.mag and isShiftKeyDown() and not KnoxDrag.isActive() then
+        KnoxGridView.checkMags(over)
+    end
     self.prerenderMs = now   -- (the grid is up and built: its bag's meter counts by it, KnoxInventoryPanel)
     -- the middle button has no event of its own: its press is looked for
     local mmb = isMouseButtonDown(2)
@@ -573,10 +602,20 @@ function KnoxGridView:tileInfo(e)
     -- how high its colour is filled (T.tileFill, condition_v3, the author, 2026-10-31):
     -- a stack of batteries, tape...: what is left in all of them together
     local kind = T.levelKind(item)
+    d.mag = kind == "m"
     if kind == "u" and not d.broken then
         local sum = 0
         for _, it in ipairs(e.items) do sum = sum + it:getCurrentUsesFloat() end
         d.level = sum / math.max(1, #e.items)
+    elseif kind == "m" and #e.items > 1 then
+        -- a stack of magazines: what is left in all of them, stripes if any is not checked
+        local sum = 0
+        for _, it in ipairs(e.items) do
+            local l = T.magLevel(it)
+            if l == T.LEVEL_UNKNOWN then sum = nil break end
+            sum = sum + l
+        end
+        d.level = sum and sum / #e.items or T.LEVEL_UNKNOWN
     else
         d.level = T.itemLevel(item, kind)
     end
@@ -731,9 +770,9 @@ function KnoxGridView:isQuiet(e)
     if KnoxGrid.useOf(e.items) then return false end
     -- (a favorite's star, the heat tint and a frozen tile's blue frame are drawn
     -- here, not by the Java part: the frame showed only under the mouse - 2026-10-18)
-    -- (a broken thing's dimmed icon and cross too, 2026-10-31: few, and not worth the Java part's time)
+    -- (a broken thing's grey icon and a magazine's stripes too: few, and not worth the Java part's time)
     local d = self:tileInfo(e)
-    if d.fav or d.heat or d.frozen or d.broken then return false end
+    if d.fav or d.heat or d.frozen or d.broken or d.level == T.LEVEL_UNKNOWN then return false end
     return true
 end
 
@@ -851,9 +890,11 @@ function KnoxGridView:drawTile(e, alpha)
         end
     end
 
-    if d.broken then T.brokenMark(self, x + jx, y + jy, pw, ph, alpha) end
     -- a stack's count as outlined text in the corner, like Tarkov
-    if #e.items > 1 then
+    if hovered and d.mag and isShiftKeyDown() then
+        -- (magazines with Shift: rounds in them / what they can hold - the author, 2026-11-05)
+        T.outlinedRight(self, KnoxGridView.magRounds(e), x + pw - 4, y + ph - fh - 3, T.color.bright, f, alpha)
+    elseif #e.items > 1 then
         -- (in sand: not all alike - the mouse on it shows them one by one)
         T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3, d.mixed and T.color.accent or T.color.bright, f, alpha)
     end
@@ -1339,9 +1380,16 @@ function KnoxGridView:renderGrid()
         local x, y = self:dropCell()
         local w, h = KnoxDrag.dims()
         local merge = KnoxDrag.mergeTarget(self)
-        local bag = not merge and KnoxDrag.bagUnderMouse(self)
+        local magTile, mag
+        if not merge then magTile, mag = KnoxDrag.magTarget(self) end
+        local bag = not merge and not magTile and KnoxDrag.bagUnderMouse(self)
         local ok, why
-        if merge then
+        if magTile then
+            -- rounds onto a magazine: it lights up, they will go in
+            x, y = magTile.x, magTile.y
+            w, h = KnoxGrid.dims(magTile, magTile.r)
+            ok, why = true, nil
+        elseif merge then
             x, y = merge.x, merge.y
             w, h = KnoxGrid.dims(merge, merge.r)
             ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
@@ -1375,7 +1423,7 @@ function KnoxGridView:renderGrid()
             end
         end
         -- (walked away with it in hand: red, the drop is refused - KnoxDrag.tooFarFor)
-        if ok and KnoxDrag.tooFarFor(self:player(), bag and bag.item:getInventory() or L.container) then
+        if ok and KnoxDrag.tooFarFor(self:player(), mag and mag:getContainer() or bag and bag.item:getInventory() or L.container) then
             ok, why = false, "IGUI_Knox_TooFar"
         end
         local c = ok and T.color.ok or T.color.bad
@@ -1439,7 +1487,8 @@ function KnoxDragLayer:prerender()
     end
     self.rmbWas, self.mmbWas = rmb, mmb
     self:bringToTop()
-    KnoxTooltip.apply()
+    -- (the live grid of a news post applies it itself, before the UI is drawn: KnoxNewsLive)
+    if not self.noTooltip then KnoxTooltip.apply() end
 end
 
 -- Inertia: the held tile follows the cursor as a weight on a spring - a

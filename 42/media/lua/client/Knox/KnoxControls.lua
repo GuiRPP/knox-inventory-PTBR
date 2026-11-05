@@ -232,10 +232,17 @@ C.VP_ACTIONS = {
 local vpById = {}
 for _, a in ipairs(C.VP_ACTIONS) do vpById[a.id] = a end
 
+local javaKeys = nil
+
 --- Viewpoint's keys (nil: no Viewpoint, or one without them).
 function C.vpKeys()
     local k = Viewpoint and Viewpoint.Keys
     if k and k.get and k.set and k.display and k.fallback then return k end
+    -- (Viewpoint 0.1.7 has none in its Lua: the same through the Java part - 2026-11-04)
+    if knoxVpKeysHere and knoxVpKeysHere() then
+        javaKeys = javaKeys or {get = knoxVpKeyGet, set = knoxVpKeySet, display = knoxVpKeyDisplay, fallback = knoxVpKeyFallback}
+        return javaKeys
+    end
     return nil
 end
 

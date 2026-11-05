@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 130
+T.JAVA_NEEDED = 139
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -424,15 +424,15 @@ function T.applySkin()
 end
 
 T.category = {
-    wpn  = hex("#2a2f22"),
-    med  = hex("#3b2427"),
-    food = hex("#24331f"),
-    ammo = hex("#3a321c"),
-    tool = hex("#1f2d38"),
-    clo  = hex("#2b2a33"),
-    info = hex("#302640"),
-    mat  = hex("#2f2a24"),
-    misc = hex("#262929"),
+    wpn  = hex("#322e23"),
+    med  = hex("#422725"),
+    food = hex("#263722"),
+    ammo = hex("#463a22"),
+    tool = hex("#1b343d"),
+    clo  = hex("#242a32"),
+    info = hex("#382732"),
+    mat  = hex("#443123"),
+    misc = hex("#232726"),
 }
 
 local CATEGORY_BY_DISPLAY = {
@@ -1430,8 +1430,10 @@ end
 
 -- A thing's state is its category's colour itself (condition_v3, the author, 2026-10-31):
 -- filled from the bottom as high as its condition, or as what is left in it; above
--- that the empty cell's dark. No state: as full. Broken: nothing, the icon
--- dimmed x0.2, a red cross. In place of the old thin meters (good/warn/bad and "0%").
+-- that the empty cell's dark. No state: as full. Broken: nothing, the icon in grey
+-- (the author, 2026-11-05). In place of the old thin meters (good/warn/bad and "0%").
+-- A magazine: as high as the parts of the menu on R; one not checked: stripes, not a
+-- height (the author, 2026-11-05: "?" and a dark icon were too weak).
 
 local function fluidOf(item)
     local fluid = item:getFluidContainer()
@@ -1441,11 +1443,35 @@ local function fluidOf(item)
     return instanceof(wi, "IsoWorldInventoryObject") and wi:getFluidContainer() or nil
 end
 
---- What a thing's level is read from: "c" condition, "u" uses, "f" liquid, false none.
+--- A magazine's parts lit of 5 for n rounds of cap (for 15: 15 - 5, 10-14 - 4, 6-9 - 3, 4-5 - 2,
+--- 1-3 - 1, 0 - 0): the tile can't tell more than the menu on R.
+function T.magParts(n, cap)
+    if cap <= 0 or n <= 0 then return 0 end
+    if n >= cap then return 5 end
+    local f = n / cap
+    if f >= 2 / 3 then return 4 end
+    if f >= 0.4 then return 3 end
+    if f >= 0.25 then return 2 end
+    return 1
+end
+
+--- The level of a magazine whose rounds the character doesn't know.
+T.LEVEL_UNKNOWN = -1
+
+--- A magazine's level, T.LEVEL_UNKNOWN if not checked (with the menu on R off nothing is
+--- hidden, as in the game).
+function T.magLevel(mag)
+    local K = KnoxMagKnown
+    if K and K.hide and not K.is(mag) then return T.LEVEL_UNKNOWN end
+    return T.magParts(mag:getCurrentAmmoCount(), mag:getMaxAmmo()) / 5
+end
+
+--- What a thing's level is read from: "c" condition, "u" uses, "f" liquid, "m" rounds, false none.
 --- (Worth keeping per item: the answer doesn't change, the level does.)
 function T.levelKind(item)
     if (instanceof(item, "HandWeapon") or instanceof(item, "Clothing")) and item:getConditionMax() > 0 then return "c" end
     if item:IsDrainable() then return "u" end
+    if not instanceof(item, "HandWeapon") and item:getMaxAmmo() > 0 then return "m" end
     local fluid = fluidOf(item)
     if fluid and fluid:getCapacity() > 0 then return "f" end
     return false
@@ -1458,6 +1484,7 @@ function T.itemLevel(item, kind)
     if kind == nil then kind = T.levelKind(item) end
     if kind == "c" then return item:getCondition() / math.max(1, item:getConditionMax()) end
     if kind == "u" then return item:getCurrentUsesFloat() end
+    if kind == "m" then return T.magLevel(item) end
     if kind == "f" then
         local fluid = fluidOf(item)
         if fluid and fluid:getCapacity() > 0 then return fluid:getAmount() / fluid:getCapacity() end
@@ -1481,8 +1508,20 @@ end
 --- merely empty.
 function T.levelKey(item, h, level)
     if not level then return -1 end
+    if level == T.LEVEL_UNKNOWN then return -3 end
     if level <= 0 then return item:isBroken() and -2 or 0 end
     return fillH(h, level)
+end
+
+--- A magazine not checked: stripes in its colour inside the frame, 1:1. (No stripes to be
+--- had: an even half of the colour.)
+function T.tileHatch(ui, x, y, w, h, color, a)
+    local hatch = knoxHatch and knoxHatch(w - 4, h - 5)
+    if hatch then
+        ui:drawTextureScaled(hatch, x + 2, y + 2, w - 4, h - 5, a, color.r, color.g, color.b)
+    else
+        T.rect(ui, x + 2, y + 2, w - 4, h - 5, color, 0.5 * a)
+    end
 end
 
 --- A tile's background: `color` filled up to `level` inside its 2 px frame, nil as full
@@ -1492,45 +1531,53 @@ function T.tileFill(ui, x, y, w, h, level, color, a)
     a = a or 1
     T.rect(ui, x, y, w, h, T.color.cell, a)
     level = level or 1
+    if level == T.LEVEL_UNKNOWN then
+        T.tileHatch(ui, x, y, w, h, color, a)
+        return
+    end
     if level <= 0 then return end
     local fh = fillH(h, level)
     T.rect(ui, x + 2, y + h - 3 - fh, w - 4, fh + 1, color, a)
 end
 
---- A broken thing's icon: its picture dimmed x0.2 (as ISInventoryItem.renderItemIcon
---- draws a thing, without its liquid).
+--- A broken thing's picture in grey (the author, 2026-11-05: the cross and the x0.2 were
+--- "very aggressive, you can't tell which thing is broken"), nil while there is none.
+--- (The Java part makes it once, it is kept here so that a frame asks it nothing.)
+local greyOf = {}
+function T.greyIcon(tex)
+    local grey = greyOf[tex]
+    if grey then return grey end
+    grey = knoxGreyIcon and knoxGreyIcon(tex) or nil
+    if grey then greyOf[tex] = grey end
+    return grey
+end
+
+--- How bright a broken thing's grey picture is drawn.
+T.BROKEN_GREY = 0.72
+
+--- A broken thing's icon: its picture in grey (without its liquid). No grey to be had:
+--- dimmed in its own colour.
 function T.brokenIcon(ui, item, x, y, side, a)
     local tex = item:getTex()
     if not tex then return end
-    local r, g, b = 0.2, 0.2, 0.2
-    if not item:getTextureColorMask() then r, g, b = item:getR() * 0.2, item:getG() * 0.2, item:getB() * 0.2 end
+    local grey = T.greyIcon(tex)
+    if grey then
+        local k = T.BROKEN_GREY
+        ui:drawTextureScaledAspect(grey, x, y, side, side, a or 1, k, k, k)
+        return
+    end
+    local r, g, b = 0.6, 0.6, 0.6
+    if not item:getTextureColorMask() then r, g, b = item:getR() * 0.6, item:getG() * 0.6, item:getB() * 0.6 end
     ui:drawTextureScaledAspect(tex, x, y, side, side, a or 1, r, g, b)
 end
 
---- A thing's icon: as ever, or dimmed when broken (then true: its cross is due).
+--- A thing's icon: as ever, or in grey when broken.
 function T.itemIcon(ui, item, x, y, side, a)
     if item:isBroken() then
         T.brokenIcon(ui, item, x, y, side, a)
-        return true
+        return
     end
     ISInventoryItem.renderItemIcon(ui, item, x, y, a, side, side)
-    return false
-end
-
---- The red cross over a broken thing, 2 px at any size: a ready picture for each
---- size (tools\make_cross.ps1) drawn 1:1 - scaled, its lines would go soft.
-local crossTex = {}
-function T.brokenMark(ui, x, y, w, h, a)
-    local k = math.floor(math.min(w, h) * 0.22 + 0.5)
-    k = math.max(8, math.min(44, k - k % 2))
-    local tex = crossTex[k]
-    if tex == nil then
-        tex = getTexture("media/ui/knox_cross_" .. k .. ".png") or false
-        crossTex[k] = tex
-    end
-    if not tex then return end
-    local c, s = T.color.bad, k * 2 + 4
-    ui:drawTexture(tex, x + math.floor((w - s) / 2), y + math.floor((h - s) / 2), a or 1, c.r, c.g, c.b)
 end
 
 --- A worn item that the move being considered would take off: red tint and

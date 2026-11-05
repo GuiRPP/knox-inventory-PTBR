@@ -175,9 +175,7 @@ function KnoxQuickSlot:render()
         if item then
             T.tileFill(self, 0, 0, w, h, level, cat, alpha)
             local side = math.floor(math.min(w, h) * 0.66)
-            if T.itemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, side, alpha * da) then
-                T.brokenMark(self, 0, dy, w, h, alpha * da)
-            end
+            T.itemIcon(self, item, math.floor((w - side) / 2), math.floor((h - side) / 2) + dy, side, alpha * da)
         end
         if self.label then
             T.text(self, T.fit(T.upper(self.label), T.fontTile, w - 8), 5, 2, T.color.dim, T.fontTile, item and 1 or 0.8)

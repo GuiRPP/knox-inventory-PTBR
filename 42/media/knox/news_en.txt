@@ -17,17 +17,73 @@
 ;   @back power                         - a drawn backdrop of the post: a grid and a bulb that light up when a generator of the post runs
 ;   @vp / @vp fridge                    - Viewpoint's crosshair panel, live, in the post's text (a cupboard / a fridge with a freezer)
 ;   @art vp                             - the crosshair panel itself on the right instead of a picture (live)
+;   @art thanks                         - Knox's coin and "thank you" from the pinned post on the right instead of a picture (with @back blizzard - in the Ice colours)
 ;   @back aim                           - a drawn backdrop of the post: a grid and a crosshair that brighten while a panel of the post is busy
 ;   @open settings                      - an "Open Knox's settings" button in the post's text
 ;   # | date | pinned | title           - the pinned post (the roadmap and Boosty): always the first card. "New" on it only when an @road line is added.
 ;   @lead text                           - the card's second line (when it is not the first paragraph)
 ;   @boosty                              - the support block with the Boosty button
+;   @pinstyle                            - the pinned post's head and Boosty (from 05.11 every post); @boosty right under the head
+;   @back blizzard                       - a drawn backdrop: the blizzard (update 11)
+;   @inv                                 - the live inventory grid on real things (main menu only, KnoxNewsLive)
+;   @rmenu                               - a key plate: holding it opens the real menu on R (main menu only)
+;   @menu text                           - a paragraph for the main menu only (about the live blocks); not in the in-game list
+;   ~~~~~~~~ or ~~~~~~~~~~~~~            - a place scribbled out by pen in a list item (58 or 96 px, no words under it)
 ;   @road date | version | title | text | preview | post
 ;                                        - a roadmap line: preview - road_<name>_en.png of media/knox/news/road, post - the title of a post of this file
 ;                                          that a click on its card opens. Date "-" - a stage to come. The last line with a date is "Now".
 ;   plain text                          - a paragraph; an empty line starts a new one
 ;   ; ...                               - a comment, not shown in game
 ; A post counts as read by its version, date and title: change them and it shows as new again.
+
+# | 05.11.2026 | update | Winter Is Coming
+@frame #8ec5e0
+@back blizzard
+@pinstyle
+@banner u11_bar_banner.png
+@art thanks
+@lead Nine days now, the long road north.
+@boosty
+
+"Nine days now, the long road had been taking us north. Then a sudden blizzard changed our route for us, and we had to take cover in the nearest bar. We knocked the door out, hinges and all, and only once we got our breath back did we see there was nothing left to shut it with. We meant to sit out one night, but we have been stuck in this hole far too long. The first of us found comfort at the bottom of a bottle. The second smokes at a table and cuts notches into the wall - by now he has fewer cigarettes than notches. The third stands at the broken door every morning, looks out through the snow, and can't bring himself to go."
+
+As for the fourth, search all you like, you won't find them in this room. They don't smoke, don't sleep, and don't speak to anyone.
+
+## Important
+! The Java part of the mod has been updated. When ZombieBuddy asks about KnoxInventoryJava.jar, answer "Allow", or the new things won't work.
+! The bar needs the mod "6282 3D models for Viewpoint" [sour_kisel] from the Workshop: the tables and chairs come from it. Without it the menu stays at the campfire, and everything else works as usual.
+
+## The bar in the blizzard
++ Knox now has two main menus: the campfire and the bar in the blizzard. Press Tab to switch between them.
++ Four survivors have taken cover in the bar: three are your characters from your last three saves, and the fourth is ~~~~~~~~.
++ To start a new game, click the diary on the bar counter.
++ Look around and you'll find a board with photos of the missing people of your group: the characters you failed to save end up on it.
++ The radio on the counter is the menu's player. Its speaker is torn and the signal is lousy. In these conditions, there's no complaining about the sound.
++ A draft walks through the bar: it sways the string of lights, leafs through the diary, stirs the newspapers and other trash. The lights can be turned on with the switch on their wire.
++ Don't disturb the one asleep at the counter: they may swat at you and knock over their bottle.
++ Stay in the menu long enough, and you can ~~~~~~~~~~~~~.
+* Press H to hide the interface and be alone with the scene.
+* If the bar runs slowly, turn off "Winter bar: high quality" in Knox's settings, on the "Menu" page.
+
+## Magazines
+@inv
+@menu Try it right here: this is the real inventory grid. Put the mouse on a magazine and hold Shift, then drag rounds onto it.
+
++ A magazine no longer tells you at once how many rounds it holds: now you have to find out, and until then it's hatched. To check a magazine in the inventory, put the mouse on it and press Shift.
++ To load a magazine, now just drag rounds onto it.
++ The tile's fill shows about how many rounds the magazine has left.
++ Hold the reload key, and instead of the usual radial menu Knox's menu opens, with all the magazines you have and about how many rounds are in them. The wheel chooses, the left button does it, the right button loads the chosen magazine, a double right click unloads it.
+@rmenu
+
+## Inventory
+* The grid's category colours have changed a little.
+* A broken thing loses its category colour and turns grey.
+
+## Viewpoint's context panel
+* Knox now works with Viewpoint 0.1.7.
+
+## Fixed
+- The quick slots panel puts less load on the game while the inventory is closed.
 
 # | 30.10.2026 | tech | Faster and sharper
 A technical update of the beta: fixes from your Steam reports, an open inventory that is much easier on your computer, and a clearer, safer Viewpoint crosshair panel.

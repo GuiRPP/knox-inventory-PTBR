@@ -127,6 +127,7 @@ function A.allViews()
     local out = A.playerViews()
     for _, v in ipairs(A.lootViews()) do table.insert(out, v) end
     for _, v in ipairs(A.windowViews()) do table.insert(out, v) end
+    if A.newsView then table.insert(out, A.newsView) end   -- (the live grid of a news post: KnoxNewsLive)
     return out
 end
 

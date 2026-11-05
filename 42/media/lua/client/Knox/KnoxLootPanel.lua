@@ -1032,7 +1032,6 @@ function KnoxLootPanel:prerender()
                     local ix, iy = tx + math.floor((pw - side) / 2), ty + math.floor((ph - side) / 2)
                     if o.broken then
                         T.brokenIcon(self, o.item, ix, iy, side, a)
-                        T.brokenMark(self, tx, ty, pw, ph, a)
                     else
                         ISInventoryItem.renderItemIcon(self, o.item, ix, iy, a, side, side)
                     end

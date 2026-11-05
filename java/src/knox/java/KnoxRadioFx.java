@@ -43,6 +43,10 @@ public class KnoxRadioFx {
     static long dropAt, dropLen, nextDrop;
     // the winter bar's radio is smashed (KnoxBarSound, 2026-10-31): it cuts out for a moment or longer
     static boolean broken;
+    // The loading screen: its frames come far apart, and the bar's cuts, knocks and moving EQ, made
+    // for a menu's frames, jump from one to the next - the music crackled (the author, 2026-11-05).
+    // They rest while a game loads; the bar's own sound in the menu is as it was.
+    static boolean loading;
 
     static int f(long d, int i, float v) {
         return javafmodJNI.FMOD_DSP_SetParameterFloat(d, i, v);
@@ -275,7 +279,7 @@ public class KnoxRadioFx {
         // (the bar's: more air under it all, and its own faults and cuts)
         float base = broken ? AIR_BASE * AIR_BROKEN : AIR_BASE;
         airVolume(volume * (float) (base * (0.6 + 0.8 * sway) + AIR_DROP * dip));
-        if (broken) k *= KnoxBarRadio.tick(ch, now, volume);
+        if (broken && !loading) k *= KnoxBarRadio.tick(ch, now, volume);
         return k;
     }
 

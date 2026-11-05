@@ -357,10 +357,7 @@ function B:build()
             p.rx or 0, p.yaw or 0, p.rz or 0, (p.sx or 1) * s, (p.sy or 1) * s, (p.sz or 1) * s,
             tint and tint[1] or 1, tint and tint[2] or 1, tint and tint[3] or 1, p.moves or 0)
     end
-    local readFrom = getTimestampMs()
     self.frameLoaded = knoxBarLoad()
-    -- (what a switch to the bar waits for: the author, 2026-11-02)
-    print("[Knox] menu scene (bar): the room's files read in " .. (getTimestampMs() - readFrom) .. " ms")
     -- (just back from the game: told here, or a later Tab would have the camp's
     -- hero walk in as if back this moment; a bar that failed leaves it to the camp)
     if knoxMenuReturned and self:builtOk() then knoxMenuReturned() end
@@ -415,7 +412,6 @@ function B:updatePhotos()
         self:removeChild(camera)
         p.camera = camera
         p.since = now
-        self.photoMs = getTimestampMs()
     end
     local j = p.camera.javaObject
     local last = p.readyAt and now - p.readyAt >= PHOTO_FOR
@@ -424,7 +420,6 @@ function B:updatePhotos()
     end
     if last or now - p.since > PHOTO_GIVE_UP then
         table.remove(q, 1)
-        self.photoTakenMs = getTimestampMs()
     end
 end
 
@@ -502,7 +497,6 @@ function B:updateDead()
             if knoxBarClothesLoaded() or t > DEAD_GIVE_UP then
                 c.clad = true
                 knoxBarDead(j, c.id)
-                self.dressMs, self.dressId = getTimestampMs(), c.id
                 c.holdUntil = t + 0.8   -- (built anew in the frames to come)
                 c.cladAt = t
             end
@@ -510,7 +504,6 @@ function B:updateDead()
             self:watchPose(c, t)
             if c.posedAt or t - c.cladAt > DEAD_GIVE_UP then
                 c.shownAt = t
-                self.shownMs = getTimestampMs()
                 c.s = 1
                 self:place(c)
             end
@@ -1264,25 +1257,6 @@ function B:drawPointed(el)
     end
 end
 
--- The bar stalls now and then for a second (the author, 2026-11-02): no Lua and no UI in those
--- frames (knox_perf.txt), so something the game loads. A frame longer than STALL_MS says in
--- console.txt what the bar did before it, to find which of its doings it is.
-local STALL_MS = 250
-
-local function ago(now, at)
-    return at and string.format("%.1f s ago", (now - at) / 1000) or "not yet"
-end
-
-function B:watchStall()
-    local now = getTimestampMs()
-    local last = self.stallLast
-    self.stallLast = now
-    if not last or now - last <= STALL_MS then return end
-    print(string.format("[Knox] menu scene (bar): a frame of %d ms at %.0f s; before it: one of the dead dressed %s (%s), shown %s; a photo begun %s, taken %s",
-        now - last, self.clock or 0, ago(now, self.dressMs), tostring(self.dressId), ago(now, self.shownMs),
-        ago(now, self.photoMs), ago(now, self.photoTakenMs)))
-end
-
 --- The bar can't be: back to the camp, Tab with nothing to switch to till the menu's Lua is
 --- loaded anew (a game's start and the way back from it try again), built anew outside of drawing.
 function B:backToCamp(why)
@@ -1309,7 +1283,6 @@ function B:drawBackdrop()
     -- is clamped. The heroes go with them, or they'd stand on black.
     if not knoxMenuInMenu() then
         local now = getTimestampMs()
-        self.stallLast = nil
         self.outSince = self.outSince or now
         if now - self.outSince > 220 then
             self:restWhileLoading()
@@ -1333,7 +1306,6 @@ function B:drawBackdrop()
     end
     self.resting = false
     self.frameOpen = true
-    self:watchStall()
     self:updateHeroes()
     self:updatePhotos()
     knoxBarQuality(T.switch("barHigh"))

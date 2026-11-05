@@ -627,7 +627,111 @@ local function sight(ui, x, y, w, h, c, lit, am, ya, yb)
     ui:drawRect(cx - d / 2, cy - d / 2, d, d, (0.1 + 0.6 * lit) * am, T.color.accent.r, T.color.accent.g, T.color.accent.b)
 end
 
+-- "@back blizzard": the snow of update 11 "Winter is coming" (the author chose it from the
+-- mockup .claude/mockups/news_bar, 2026-11-05): 300 streaks in a gusting wind, thinner down the
+-- column of text, a cold light from the lower left, snow drifting up in the lower corners. Its
+-- numbers are the mockup's at 1080p; `s` scales them. Stepped once a frame, sorted into rows of
+-- SNOW_ROW px: where a scrolled post fades, the panel is painted back strip by strip, and each
+-- strip draws only the flakes that reach it.
+local SNOW, SNOW_ROW = 300, 16
+local SNOW_C = {r = 226 / 255, g = 238 / 255, b = 245 / 255}
+local DRIFT_C = {r = 170 / 255, g = 195 / 255, b = 210 / 255}
+local snow = {w = 0, h = 0, ms = 0, t = 0, g = 0.5, s = 1, x = {}, y = {}, z = {}, p = {}, rows = {}, n = {}, nRows = 0}
+
+local function snowR(a, b) return a + (b - a) * ZombRandFloat(0, 1) end
+
+local function stepSnow(w, h, s)
+    local S = snow
+    if S.w ~= w or S.h ~= h or S.s ~= s then
+        S.w, S.h, S.s = w, h, s
+        for i = 1, SNOW do
+            S.x[i], S.y[i], S.z[i], S.p[i] = snowR(0, w), snowR(0, h), snowR(0.25, 1), snowR(0, 6.28)
+        end
+        S.nRows = math.floor((h + 128 * s) / SNOW_ROW) + 2
+        for r = 1, S.nRows do S.rows[r] = S.rows[r] or {} end
+    end
+    local now = getTimestampMs()
+    if S.ms == now then return end
+    local dt = T.animOn() and math.max(0, math.min(100, now - S.ms)) / 1000 or 0
+    S.ms = now
+    local t = now / 1000
+    local g = 0.55 + 0.3 * math.sin(t * 0.37) + 0.15 * math.sin(t * 1.13 + 1)
+    S.t, S.g = t, g
+    local n, rows = S.n, S.rows
+    for r = 1, S.nRows do n[r] = 0 end
+    local vx, vy = (70 + 760 * g) * s * dt, (40 + 170 * g) * s * dt
+    local xs, ys, zs, ps = S.x, S.y, S.z, S.p
+    for i = 1, SNOW do
+        local z = zs[i]
+        local fx, fy = xs[i] - vx * z, ys[i] + vy * z
+        if dt > 0 then fy = fy + math.sin(t * 2 + ps[i]) * 0.25 end
+        if fx < -40 * s then fx, fy = w + snowR(0, 60 * s), snowR(-60 * s, h) end
+        if fy > h + 10 * s then fx, fy = snowR(0, w + 60 * s), -10 * s end
+        xs[i], ys[i] = fx, fy
+        local r = math.max(1, math.min(S.nRows, math.floor((fy + 64 * s) / SNOW_ROW) + 1))
+        local cnt = n[r] + 1
+        n[r] = cnt
+        rows[r][cnt] = i
+    end
+end
+
+local function flake(ui, i, x, y, am)
+    local S = snow
+    local z, fx = S.z[i], S.x[i]
+    local l = (2 + 24 * S.g) * z * S.s
+    -- (calmer down the middle, where the text is)
+    local half = S.w / 2
+    local d = math.abs(fx - half) / half
+    local calm = d < 0.62 and 0.32 or math.min(1, 0.32 + (d - 0.62) / 0.38 * 0.68)
+    local a = (0.12 + 0.5 * z) * calm * am
+    local px, py = x + fx, y + S.y[i]
+    bar(ui, px, py, px + l, py - l * 0.22, (z > 0.7 and 1.6 or 1) * S.s, SNOW_C, a)
+end
+
+--- The snow drifting up: one lower corner, a soft edge over thin columns. (`ya`: a strip's top:
+--- only the columns that reach it.)
+local function drift(ui, x0, x1, top, y, s, am, ya)
+    if ya and ya < y - top - 6 * s then return end
+    local f = T.readyTex("media/ui/knoxmenu/pinned/fade.png")
+    if not f then return end
+    local cw = 8 * s
+    local t = snow.t
+    local cx = x0
+    while cx < x1 do
+        local k = (cx - x0) / (x1 - x0)
+        local px = cx / s
+        local ch = top * math.sin(k * math.pi) ^ 1.2 + (math.sin(px * 0.05 + t * 0.2) * 2 + math.sin(px * 0.13) * 2) * s
+        if ch > 0 and not (ya and ya + 3 < y - ch) then T.quad(ui, f, cx, y - ch, cx, y, cx + cw, y, cx + cw, y - ch, DRIFT_C, 0.13 * am) end
+        cx = cx + cw
+    end
+end
+
+--- All but the flakes: the grid, the cold light, the drifts. (`ya`, `yh`: a strip of it only.)
+local function snowGround(ui, x, y, w, h, c, am, ya, yh)
+    local S = snow
+    local s, g = S.s, S.g
+    local step = math.max(12, math.floor(40 * s))
+    local ly, lh = ya or y, yh or h
+    for gx = x + step, x + w - 1, step do ui:drawRect(gx, ly, 1, lh, 0.035 * am, c.r, c.g, c.b) end
+    for gy = y + step, y + h - 1, step do
+        if not ya or (gy >= ya and gy < ya + yh) then ui:drawRect(x, gy, w, 1, 0.035 * am, c.r, c.g, c.b) end
+    end
+    local soft = tex("soft")
+    if soft then
+        local r = 720 * s
+        ui:drawTextureScaled(soft, x - r, y + h - r, r * 2, r * 2, (0.05 + 0.09 * g) * am, c.r, c.g, c.b)
+    end
+    drift(ui, x - 60 * s, x + 190 * s, (26 + g * 14) * s, y + h, s, am, ya)
+    drift(ui, x + w - 247 * s, x + w + 3 * s, (34 + g * 16) * s, y + h, s, am, ya)
+end
+
 function B.draw(ui, kind, x, y, w, h, c, lit)
+    if kind == "blizzard" then
+        stepSnow(w, h, T.cell / 48)
+        snowGround(ui, x, y, w, h, c, 1)
+        for i = 1, SNOW do flake(ui, i, x, y, 1) end
+        return
+    end
     if kind == "road" then
         local s = T.cell / 48
         stepRoad(w, h, s)
@@ -669,6 +773,19 @@ function B.drawStrip(ui, kind, x, y0, w, h0, c, lit, y, h, am)
         if am > 0.003 and road.t then drawRoad(ui, x + 2, y0 + 2, w - 4, h0 - 4, T.cell / 48, y, y + h, am) end
         return
     end
+    if kind == "blizzard" then
+        if am <= 0.003 or snow.w == 0 then return end
+        local S = snow
+        snowGround(ui, x, y0, w, h0, c, am, y, h)
+        local base = 64 * S.s - y0
+        local r0 = math.max(1, math.floor((y - 2 + base) / SNOW_ROW) + 1)
+        local r1 = math.min(S.nRows, math.floor((y + h + 7 * S.s + base) / SNOW_ROW) + 1)
+        for r = r0, r1 do
+            local row = S.rows[r]
+            for j = 1, S.n[r] or 0 do flake(ui, row[j], x, y0, am) end
+        end
+        return
+    end
     if (kind ~= "power" and kind ~= "aim") or am <= 0.003 then return end
     local step = math.max(12, math.floor(T.cell / 2))
     local minor, major = (0.04 + 0.035 * lit) * am, (0.08 + 0.07 * lit) * am
@@ -708,5 +825,7 @@ function B.drawStrip(ui, kind, x, y0, w, h0, c, lit, y, h, am)
         lines(ui, FILAMENT, cx, cy, k, th, lit > 0.01 and warm or c, (0.08 + 0.7 * lit) * am)
     end
 end
+
+B.bar = bar   -- (the scribbled-out words of a post: KnoxNews.drawMarked)
 
 return KnoxNewsBack

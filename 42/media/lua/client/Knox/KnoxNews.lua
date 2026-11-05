@@ -222,6 +222,73 @@ function N.colorOf(p)
     return p.frameColor or T.color.accent
 end
 
+-- Scribbled-out words in a post (the author, 2026-11-05: "as if something had been written there,
+-- but it must not be seen"): ~~~~~~~~ (8) or ~~~~~~~~~~~~~ (13) in the text, no words under them.
+-- The pen's strokes are the approved mockup's, 58 and 96 px wide at 1080p and 15 high: its
+-- zigzag, then the two lines across.
+local PENS = {
+    [58] = {{
+        1.0, 2.1, 4.0, 13.8, 6.8, 2.3, 9.9, 12.0, 12.8, 2.6, 16.1, 11.7, 18.7, 1.2, 22.0, 13.2,
+        24.3, 3.5, 27.9, 13.1, 30.9, 1.4, 33.1, 12.8, 35.4, 1.5, 38.0, 11.6, 40.8, 2.1, 44.2, 12.8,
+        47.3, 2.2, 50.4, 12.6, 53.0, 3.5, 56.6, 13.6, 57.0, 5.1, 53.2, 3.6, 48.6, 6.6, 44.2, 6.5,
+        39.5, 10.6, 39.0, 4.9, 31.0, 7.2, 26.3, 6.6, 27.7, 8.7, 19.0, 5.4, 20.3, 6.0, 8.9, 9.8,
+        12.7, 5.2, 9.1, 3.5},
+        {0.0, 5.5, 9.7, 5.8, 19.3, 5.9, 29.0, 5.8, 38.7, 5.6, 48.3, 5.1, 58.0, 4.5},
+        {0.0, 9.5, 9.7, 9.6, 19.3, 9.6, 29.0, 9.6, 38.7, 9.5, 48.3, 9.4, 58.0, 9.3},
+    },
+    [96] = {{
+        1.0, 3.3, 4.5, 13.7, 6.8, 2.5, 9.6, 12.8, 12.0, 1.5, 14.8, 12.1, 17.7, 1.1, 20.0, 13.3,
+        22.8, 2.3, 26.0, 12.4, 28.3, 3.0, 31.3, 13.1, 34.4, 3.4, 37.1, 13.4, 39.8, 2.4, 42.9, 12.3,
+        45.3, 2.2, 48.5, 13.0, 51.3, 2.6, 53.7, 11.9, 56.4, 3.0, 58.9, 11.8, 61.2, 1.1, 63.8, 12.9,
+        67.1, 1.8, 69.9, 12.2, 72.5, 2.9, 75.5, 12.1, 77.8, 3.0, 81.0, 13.6, 83.5, 2.4, 87.0, 13.0,
+        90.5, 1.4, 94.1, 11.6, 95.0, 10.3, 90.9, 11.8, 86.5, 11.5, 82.9, 11.9, 78.2, 6.1, 73.1,
+        6.4, 72.5, 3.7, 67.2, 4.8, 60.2, 11.6, 61.0, 3.9, 54.8, 4.5, 50.6, 10.3, 49.4, 6.8, 38.8,
+        7.0, 40.8, 11.0, 31.2, 11.1, 28.6, 6.7, 24.4, 10.5, 21.0, 5.1, 22.1, 6.7, 10.7, 8.0, 10.2,
+        10.4, 13.9, 8.7, 6.1, 8.0},
+        {0.0, 5.5, 16.0, 5.8, 32.0, 6.0, 48.0, 6.0, 64.0, 5.7, 80.0, 5.3, 96.0, 4.7},
+        {0.0, 9.5, 16.0, 10.0, 32.0, 10.2, 48.0, 10.1, 64.0, 9.7, 80.0, 9.1, 96.0, 8.2},
+    },
+}
+local PEN_C = {r = 0xd9 / 255, g = 0xd6 / 255, b = 0xc8 / 255}
+local marked = {}   -- a line with a scribble: {pre, post, n, w of `pre`}, by the line and its font
+
+local function drawPen(ui, n, x, y, s)
+    local bar = KnoxNewsBack and KnoxNewsBack.bar
+    if not bar then return end
+    local pen = n >= 13 and PENS[96] or PENS[58]
+    local th = 1.5 * s
+    for j = 1, #pen do
+        local p = pen[j]
+        for i = 3, #p, 2 do
+            bar(ui, x + p[i - 2] * s, y + p[i - 1] * s, x + p[i] * s, y + p[i + 1] * s, th, PEN_C, 1)
+        end
+    end
+end
+
+--- A line of a list, its scribble drawn (a line without one: as T.text).
+function N.drawMarked(ui, line, x, y, color, font)
+    if not string.find(line, "~", 1, true) then
+        T.text(ui, line, x, y, color, font)
+        return
+    end
+    local m = marked[line]
+    if not m or m.font ~= font then
+        local a, b = string.find(line, "~+")
+        m = {pre = string.sub(line, 1, a - 1), post = string.sub(line, b + 1), n = b - a + 1, font = font}
+        m.w = T.measure(font, m.pre)
+        marked[line] = m
+    end
+    if m.pre ~= "" then T.text(ui, m.pre, x, y, color, font) end
+    local s = T.cell / 48
+    local w = (m.n >= 13 and 96 or 58) * s
+    drawPen(ui, m.n, x + m.w, y + math.floor((T.fontH(font) - 15 * s) / 2), s)
+    if m.post ~= "" then T.text(ui, m.post, x + m.w + w, y, color, font) end
+end
+
+-- (what only the main menu's reader has: its head, Boosty, the live inventory and menu on R
+-- need the whole screen and no world - the list in the game goes without them)
+local MENU_ONLY = {pinstyle = true, boosty = true, inv = true, rmenu = true, menu = true, back = true, lead = true}
+
 --- A post's body as blocks for one text width: paragraphs, headings, list
 --- items (marker color), pictures.
 local function layoutBody(post, width)
@@ -266,7 +333,8 @@ local function layoutBody(post, width)
             elseif string.match(s, "^@open%s+settings") then
                 -- (a button that opens Knox's settings window itself)
                 table.insert(blocks, {kind = "open", what = "settings", text = getText("IGUI_Knox_NewsOpenSettings"), rect = {0, 0, 0, 0}})
-            elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
+            elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame")
+                    and not MENU_ONLY[string.match(s, "^@(%a+)") or ""] then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then table.insert(blocks, {kind = "image", tex = tex}) end
             end
@@ -437,7 +505,7 @@ function KnoxNews:prerender()
             local d = math.max(6, math.floor(T.fontH(T.fontText) / 3))
             T.rect(self, rx + 2, y + math.floor((T.fontH(T.fontText) - d) / 2) + 1, d, d, b.color)
             for _, l in ipairs(b.lines) do
-                T.text(self, l, rx + b.indent, y, T.color.text, T.fontText)
+                N.drawMarked(self, l, rx + b.indent, y, T.color.text, T.fontText)
                 y = y + lh
             end
             y = y + 2

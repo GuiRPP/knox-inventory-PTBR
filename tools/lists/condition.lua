@@ -1,6 +1,6 @@
 -- A thing's state as its category's colour (condition_v3, the author, 2026-10-31) on the
 -- game's Lua with tools/settings/stubs.lua and the real KnoxTheme: what a level is
--- read from, how high the colour goes, the broken thing's icon and cross.
+-- read from, how high the colour goes, the broken thing's icon, a magazine's rounds.
 local T = KnoxTheme
 T.refresh()
 local pass, fail = 0, 0
@@ -36,6 +36,8 @@ function Item:IsDrainable() return self.uses ~= nil end
 function Item:getCurrentUsesFloat() return self.uses end
 function Item:getFluidContainer() return self.fluid end
 function Item:getWorldItem() return self.world end
+function Item:getMaxAmmo() return self.maxAmmo or 0 end
+function Item:getCurrentAmmoCount() return self.rounds or 0 end
 function Item:getTex() return "tex" end
 function Item:getTextureColorMask() return self.mask end
 function Item:getR() return 1 end
@@ -120,47 +122,62 @@ check("2160p's tile: as high", r[2].y == Y + 112 - 3 - 53 and r[2].h == 54, r[2]
 r = fillAt(0.5, nil, 0.4)
 check("faded with the tile", r[1].a == 0.4 and r[2].a == 0.4)
 
--- the broken thing -----------------------------------------------------------------
+-- the broken thing (the author, 2026-11-05: grey, no fill, no cross) ------------------
 clear()
 T.brokenIcon(ui, wreck, 1, 2, 30, 0.5)
-check("its picture x0.2, in its tint", #tex == 1 and tex[1].r == 0.2 and tex[1].g == 0.1 and tex[1].b == 0.05 and tex[1].a == 0.5)
+check("no grey to be had: dimmed in its own tint", #tex == 1 and tex[1].t == "tex" and tex[1].r == 0.6 and tex[1].g == 0.3 and tex[1].b == 0.15 and tex[1].a == 0.5)
 clear()
 T.brokenIcon(ui, item({mask = "m"}), 1, 2, 30, 1)
-check("with a colour mask: just dark", tex[1].r == 0.2 and tex[1].g == 0.2 and tex[1].b == 0.2)
+check("with a colour mask: just dimmer", tex[1].r == 0.6 and tex[1].g == 0.6 and tex[1].b == 0.6)
+local greyAsked = 0
+knoxGreyIcon = function(t) greyAsked = greyAsked + 1 return t == "tex" and "grey" or nil end
+clear()
+T.brokenIcon(ui, wreck, 1, 2, 30, 0.5)
+check("grey: its own picture, one brightness", #tex == 1 and tex[1].t == "grey" and tex[1].r == T.BROKEN_GREY and tex[1].b == T.BROKEN_GREY and tex[1].a == 0.5)
+clear()
+T.brokenIcon(ui, wreck, 1, 2, 30, 0.5)
+check("grey: asked of Java once", greyAsked == 1, greyAsked)
+knoxGreyIcon = nil
 clear()
 rendered = 0
-local due = T.itemIcon(ui, wreck, 1, 2, 30, 1)
-check("T.itemIcon: broken dimmed, its cross due", #tex == 1 and rendered == 0 and due == true)
+T.itemIcon(ui, wreck, 1, 2, 30, 1)
+check("T.itemIcon: broken", #tex == 1 and rendered == 0)
 clear()
-due = T.itemIcon(ui, gun, 1, 2, 30, 1)
-check("T.itemIcon: else as ever", #tex == 0 and rendered == 1 and due == false)
+T.itemIcon(ui, gun, 1, 2, 30, 1)
+check("T.itemIcon: else as ever", #tex == 0 and rendered == 1)
+clear()
+T.tileFill(ui, 0, 0, 48, 48, T.itemLevel(wreck), CAT)
+check("a broken thing has no fill", #rects == 1 and isCell(rects[1]))
 
-local asked = {}
-local real = getTexture
-getTexture = function(name)
-    asked[name] = (asked[name] or 0) + 1
-    return name
-end
-local function crossAt(w, h)
-    clear()
-    T.brokenMark(ui, 100, 200, w, h, 0.7)
-    return tex[1]
-end
-local c = crossAt(56, 56)
-check("a hotbar's tile: its size, red, faded", c.t == "media/ui/knox_cross_12.png" and c.r == T.color.bad.r and c.a == 0.7, c.t)
-check("centred, 1:1", c.x == 100 + (56 - 28) / 2 and c.y == 200 + (56 - 28) / 2, c.x)
-check("a grid's tile", crossAt(47, 47).t == "media/ui/knox_cross_10.png")
-check("2160p's", crossAt(95, 95).t == "media/ui/knox_cross_20.png")
-check("wide: by the short side", crossAt(95, 47).t == "media/ui/knox_cross_10.png")
-check("tiny: the smallest there is", crossAt(10, 10).t == "media/ui/knox_cross_8.png")
-check("huge: the largest", crossAt(1000, 1000).t == "media/ui/knox_cross_44.png")
-check("read once", asked["media/ui/knox_cross_10.png"] == 1, asked["media/ui/knox_cross_10.png"])
-getTexture = function() return nil end
--- (no picture: nothing, no error - a size not asked for yet)
+-- a magazine (the author, 2026-11-05) -----------------------------------------------
+local function mag(n, cap, known) return item({cls = "InventoryItem", maxAmmo = cap, rounds = n, known = known}) end
+KnoxMagKnown = {hide = true, is = function(m) return m.known == true end}
+check("a magazine's level is read from its rounds", T.levelKind(mag(5, 15, true)) == "m")
+check("a gun stays by its condition", T.levelKind(item({cls = "HandWeapon", cmax = 10, c = 7, maxAmmo = 15})) == "c")
+check("the steps of the menu on R", T.magParts(15, 15) == 5 and T.magParts(14, 15) == 4 and T.magParts(10, 15) == 4
+    and T.magParts(9, 15) == 3 and T.magParts(6, 15) == 3 and T.magParts(5, 15) == 2 and T.magParts(4, 15) == 2
+    and T.magParts(3, 15) == 1 and T.magParts(1, 15) == 1 and T.magParts(0, 15) == 0)
+check("known: full", T.itemLevel(mag(15, 15, true)) == 1)
+check("known: 3 of 5", T.itemLevel(mag(7, 15, true)) == 0.6)
+check("known: empty", T.itemLevel(mag(0, 15, true)) == 0)
+check("not checked: told nothing", T.itemLevel(mag(0, 15)) == T.LEVEL_UNKNOWN and T.itemLevel(mag(15, 15)) == T.LEVEL_UNKNOWN)
+check("not checked: a ready list's key of its own", T.levelKey(mag(0, 15), 48, T.LEVEL_UNKNOWN) == -3)
+KnoxMagKnown.hide = false
+check("the menu on R off: nothing hidden", T.itemLevel(mag(0, 15)) == 0)
+KnoxMagKnown.hide = true
+local hatched = {}
+function UI:drawTextureScaled(t, x, y, w, h, a, r, g, b) table.insert(hatched, {t = t, x = x, y = y, w = w, h = h, a = a, r = r, g = g, b = b}) end
+knoxHatch = function(w, h) return "hatch" .. w .. "x" .. h end
 clear()
-T.brokenMark(ui, 0, 0, 200, 140, 1)
-check("no picture: nothing drawn", #tex == 0)
-getTexture = real
+T.tileFill(ui, 10, 20, 48, 96, T.LEVEL_UNKNOWN, CAT, 0.5)
+check("stripes 1:1 inside the frame, in its colour", #hatched == 1 and hatched[1].t == "hatch44x91" and hatched[1].x == 12 and hatched[1].y == 22
+    and hatched[1].w == 44 and hatched[1].h == 91 and hatched[1].r == CAT.r and hatched[1].a == 0.5)
+check("under them only the cell", #rects == 1 and isCell(rects[1]))
+knoxHatch = nil
+clear()
+T.tileFill(ui, 10, 20, 48, 48, T.LEVEL_UNKNOWN, CAT)
+check("no stripes to be had: half the colour", #rects == 2 and isCat(rects[2]) and rects[2].a == 0.5)
+KnoxMagKnown = nil
 
 -- a key number readable over the colour
 local texts = {}

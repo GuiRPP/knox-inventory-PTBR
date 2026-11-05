@@ -291,9 +291,7 @@ function ISHotbar:render()
             local side = math.floor(size * 0.66)
             local dy, da = T.settleIn(memo, self.attachedItems[i])
             if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
-            if T.itemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, side, da) then
-                T.brokenMark(self, x, y + dy, size, size, da)
-            end
+            T.itemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, side, da)
         elseif slot.texture then
             -- an empty slot: the game's faint picture of what goes there
             local side = math.floor(size * 0.5)
@@ -427,9 +425,7 @@ function ISHotbar:drawHands()
             local side = math.floor(h * 0.66)
             local dy, da = T.settleIn(memo, item)
             if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
-            if T.itemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, side, da) then
-                T.brokenMark(self, x, y + dy, w, h, da)
-            end
+            T.itemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, side, da)
             -- a gun's rounds: loaded / magazine
             if not (KnoxMagKnown and KnoxMagKnown.hide) and instanceof(item, "HandWeapon") and item:isRanged() then
                 local text = tostring(item:getCurrentAmmoCount()) .. "/" .. tostring(item:getMaxAmmo())

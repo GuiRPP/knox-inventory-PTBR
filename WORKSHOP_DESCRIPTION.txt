@@ -18,6 +18,7 @@ The beta is for trying the new features and reporting bugs, [b]not for a full pl
 Not finished yet: the dashboard, some item sizes, bag balance, menu tooltips. No Health tab in 1.0 (it comes in 2.0). Report bugs in the [b]1.0 BETA[/b] discussion with your console.txt and mod list. Full change list: the in-game news and Change Notes.
 [h1]Compatibility[/h1]
 [b]Viewpoint[/b], [b]OldPoint[/b] and [b]Project Viewpoint QOL[/b] are supported: Knox windows give you the cursor, Viewpoint's loot key opens Knox on what you look at (pick the fridge or freezer with the wheel), its Grab goes through Knox's grids.
+The winter bar menu needs "6282 3D models for Viewpoint" (3810302175); else the campfire menu.
 Not compatible: Grid Inventory, Inventory Tetris (they replace the same windows).
 
 [h1]Stage 1: Inventory[/h1]
@@ -98,7 +99,6 @@ Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, 
 [*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers, in testing - tell us how it goes.
 [*][b]A windowed inventory?[/b] Not planned - the opacity sliders in Settings > Look let you see the world through it.
 [*][b]An item's size or sound?[/b] Set your own in Zomboid/Lua/knox_overrides.txt.
-[*][b]With Grid Inventory / Inventory Tetris?[/b] No: both replace the same windows.
 [*][b]Controller?[/b] Controller and split-screen keep the game's inventory.
 [*][b]Found a bug?[/b] Post in Discussions with what you did and your [i]Zomboid\console.txt[/i].
 [/list]

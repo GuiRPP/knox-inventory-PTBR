@@ -52,6 +52,9 @@ VP = {owned = false, shown = false, kind = 3, locked = false, loot = true, conta
       actions = {}, wheel = 0, pressed = 0, held = false, left = false, obj = nil, sq = nil}
 function knoxVpPanelOwn(on) VP.owned = on return on end
 function knoxVpPanelWants(on) VP.wants = on end
+function knoxVpPanelPlaces(on) VP.places = on end
+function knoxVpPanelPlaceKey() return VP.placeKey == true end
+function knoxVpPanelPlaceable(it) return it.noPlace ~= true end
 function knoxVpPanelShown() return VP.shown end
 function knoxVpPanelKind() return VP.kind end
 function knoxVpPanelLocked() return VP.locked end

@@ -229,6 +229,9 @@ local function prepare(post)
         local leadLine = string.match(s, "^@lead%s+(.+)$")
         if leadLine then
             post.leadLine = trim(leadLine)
+        elseif string.match(s, "^@pinstyle") then
+            -- every post from now on (the author, 2026-11-05): the head of the pinned one, Boosty under it
+            post.pinstyle = true
         elseif frame then
             post.frameColor = {r = tonumber(frame:sub(1, 2), 16) / 255, g = tonumber(frame:sub(3, 4), 16) / 255,
                                b = tonumber(frame:sub(5, 6), 16) / 255}
@@ -244,6 +247,9 @@ local function prepare(post)
         elseif art and trim(art) == "vp" then
             -- "@art vp": the crosshair panel itself in the frame, live (KnoxCrosshairDemo, 2026-10-25)
             post.artVp = true
+        elseif art and trim(art) == "thanks" then
+            -- "@art thanks": the pinned post's coin and "thank you" in the frame (the author, 2026-11-05)
+            post.artThanks = true
         elseif art then
             post.artFile = trim(art)
         elseif not post.lead and s ~= "" and not MARK[string.sub(s, 1, 1)] and string.sub(s, 1, 1) ~= "#"
@@ -326,7 +332,22 @@ local function layout(post, width)
             elseif string.match(s, "^@open%s+settings") then
                 -- a button that opens Knox's settings window itself, over the post (2026-10-25)
                 table.insert(blocks, {kind = "open", what = "settings", text = getText("IGUI_Knox_NewsOpenSettings"), rect = {0, 0, 0, 0}})
-            elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame") then
+            elseif string.match(s, "^@boosty") then
+                -- the support plate in the post's colour (KnoxPinned.drawSupport)
+                table.insert(blocks, {kind = "boosty"})
+            elseif string.match(s, "^@inv") then
+                -- Knox's inventory itself, live (KnoxNewsLive); a section opened by it, as by a picture
+                local last = blocks[#blocks]
+                if last and last.kind == "heading" then last.framed = true end
+                table.insert(blocks, {kind = "inv"})
+            elseif string.match(s, "^@rmenu") then
+                -- the menu on R itself: held, it comes up here (KnoxNewsLive)
+                table.insert(blocks, {kind = "rmenu"})
+            elseif string.match(s, "^@menu%s") then
+                -- a line that speaks of what only this reader has: the list in the game has no live blocks
+                table.insert(para, trim(string.sub(s, 6)))
+            elseif not string.match(s, "^@banner") and not string.match(s, "^@art") and not string.match(s, "^@frame")
+                    and not string.match(s, "^@pinstyle") and not string.match(s, "^@back") and not string.match(s, "^@lead") then
                 local tex = getTexture("media/knox/news/" .. trim(string.sub(s, 2)))
                 if tex then
                     -- a section opened by a picture: its heading gets a frame
@@ -516,7 +537,7 @@ function R:prerender()
 
     -- Esc closes (the key is watched here: the menu under this takes no part)
     local esc = isKeyDown(Keyboard.KEY_ESCAPE) == true
-    if esc and not self.escDown then
+    if esc and not self.escDown and not (KnoxNewsLive and KnoxNewsLive.onEsc()) then
         R.leave()
         -- (closed: nothing more to draw; on its way back to the roadmap: drawn on)
         if R.instance ~= self then return end
@@ -565,10 +586,13 @@ function R:prerender()
     local ax, ay = side + textPanelW + gap, top
     T.rect(self, ax, ay, artW, panelH, T.color.cell)
     if post.back and KnoxNewsBack then KnoxNewsBack.grid(self, ax, ay, artW, panelH, backC, backLit, 1) end
-    local art = not self.pin and not post.artGen and not post.artVp and newsTexture(post.artFile, "news_art.png") or nil
+    local art = not self.pin and not post.artGen and not post.artVp and not post.artThanks and newsTexture(post.artFile, "news_art.png") or nil
     if self.pin then
         -- the pinned post: Knox's coin turning in the light, "thank you" under it
         KnoxPinned.drawRight(self, ax, ay, artW, panelH)
+    elseif post.artThanks then
+        -- the same in the winter post's Ice (its own colours whatever skin the menu wears)
+        KnoxPinned.drawRight(self, ax, ay, artW, panelH, post.back == "blizzard" and KnoxPinned.ICE or nil)
     elseif post.artGen and KnoxGeneratorWindow and KnoxGeneratorWindow.newsDemo then
         -- the generator itself in the middle of the frame, standing (live: started, it
         -- lights the post's backdrop up - the author, 2026-10-22)
@@ -631,27 +655,41 @@ function R:prerender()
         -- post's colour under it: a thin grey line alone did not part it from the post (the
         -- author, 2026-10-22)
         pc = post.frameColor or T.color.accent
-        local headH = pad * 2 + #self.titleLines * T.fontH(titleFont) + math.floor(pad / 2) + T.fontH(T.fontTab) + pad + math.floor(pad / 2)
-        T.rect(self, px + 2, top + 2, pw - 4, headH - 2, T.color.header)
-        T.rect(self, px + 2, top + headH, pw - 4, 4, pc)   -- (2 px read thin: the author, 2026-10-22)
-        local y = top + pad * 2
-        for _, l in ipairs(self.titleLines) do
-            T.textCentre(self, l, centre, y, T.color.bright, titleFont)
-            y = y + T.fontH(titleFont)
+        local meta = self.metaLine
+        if not meta then
+            meta = tagText(post.tag)
+            if post.version ~= "" then meta = meta .. " " .. post.version end
+            if post.date ~= "" then meta = meta .. "  " .. DOT .. "  " .. post.date end
+            self.metaLine = meta
         end
-        local meta = tagText(post.tag)
-        if post.version ~= "" then meta = meta .. " " .. post.version end
-        if post.date ~= "" then meta = meta .. "  " .. DOT .. "  " .. post.date end
-        y = y + math.floor(pad / 2)
-        -- (a post with a colour of its own - @frame - has it here too: the line under the
-        -- head, its headings, its pictures' frames, the scroll bar)
-        T.textCentre(self, meta, centre, y, pc, T.fontTab)
-        y = top + headH + 4 + pad
+        local y
+        if post.pinstyle then
+            -- the pinned post's head in this post's colour (KnoxPinned.drawHead)
+            self.headTitle = self.headTitle or T.upper(post.title)
+            self.headMeta = self.headMeta or T.upper(meta)
+            KnoxPinned.drawHead(self, self.headTitle, self.headMeta, pc, px + 2, top + 2, pw - 4, getTimestampMs() / 1000)
+            y = top + 2 + math.floor(144 * cell / 48)
+        else
+            local headH = pad * 2 + #self.titleLines * T.fontH(titleFont) + math.floor(pad / 2) + T.fontH(T.fontTab) + pad + math.floor(pad / 2)
+            T.rect(self, px + 2, top + 2, pw - 4, headH - 2, T.color.header)
+            T.rect(self, px + 2, top + headH, pw - 4, 4, pc)   -- (2 px read thin: the author, 2026-10-22)
+            y = top + pad * 2
+            for _, l in ipairs(self.titleLines) do
+                T.textCentre(self, l, centre, y, T.color.bright, titleFont)
+                y = y + T.fontH(titleFont)
+            end
+            y = y + math.floor(pad / 2)
+            -- (a post with a colour of its own - @frame - has it here too: the line under the
+            -- head, its headings, its pictures' frames, the scroll bar)
+            T.textCentre(self, meta, centre, y, pc, T.fontTab)
+            y = top + headH + 4 + pad
+        end
 
         -- the body scrolls under the title
         viewTop, viewH = y, top + panelH - pad - y
         self.view = {px, viewTop, pw, viewH}
-        self:setStencilRect(px, viewTop, pw, viewH)
+        -- (T.clip: the support plate's button clips itself and comes back to this one)
+        T.clip(self, px, viewTop, pw, viewH)
         local lh = T.fontH(T.fontText) + 5
         local colX = centre - math.floor(textW / 2)
         y = viewTop - self.scroll + pad
@@ -665,7 +703,8 @@ function R:prerender()
                     y = y + lh
                 end
                 y = y + math.floor(lh * 0.8)
-                first = false
+                -- (in the pinned style the whole intro before the first heading is bright)
+                if not post.pinstyle then first = false end
             elseif b.kind == "heading" then
                 y = y + math.floor(lh * 0.8)
                 if b.framed then y = y + math.floor(pad / 2) end
@@ -687,7 +726,7 @@ function R:prerender()
                 end
                 for _, l in ipairs(b.lines) do
                     if y > viewTop - lh and y < viewTop + viewH then
-                        T.text(self, l, colX + b.indent, y, T.color.text, T.fontText)
+                        KnoxNews.drawMarked(self, l, colX + b.indent, y, T.color.text, T.fontText)
                     end
                     y = y + lh
                 end
@@ -728,6 +767,30 @@ function R:prerender()
                     T.button(self, r, b.text, openOpts)
                 end
                 y = r[2] + bh + pad + math.floor(lh * 0.4)
+            elseif b.kind == "boosty" then
+                -- Boosty right under the head, as on the pinned post, in this post's colours
+                local s = cell / 48
+                local st = self.support
+                if not st then
+                    st = {color = pc, hotColor = T.mix(pc, T.color.bright, 0.35), shine = T.mix(pc, T.color.bright, 0.7),
+                          logo = post.back == "blizzard" and "logo_clean_128_winter" or nil}
+                    self.support = st
+                end
+                st.clip = self.view
+                st.inView = self:isMouseOver() and T.inRect(mx, my, self.view)
+                local colW = math.min(720 * s, pw - 4 - 40 * s)
+                y = y + 6 * s
+                y = y + KnoxPinned.drawSupport(self, st, math.floor(px + (pw - colW) / 2), y, colW, s, mx, my, getTimestampMs()) + 20 * s
+            elseif b.kind == "inv" and KnoxNewsLive and not KnoxNewsLive.broken then
+                -- the live inventory: the real grid on real things, in the view only
+                local w, h = KnoxNewsLive.gridSize()
+                y = y + math.floor(lh * 0.4)
+                KnoxNewsLive.hostGrid(self, centre - math.floor(w / 2), y, self.view)
+                y = y + h + pad + math.floor(lh * 0.4)
+            elseif b.kind == "rmenu" and KnoxNewsLive and not KnoxNewsLive.broken then
+                -- where the menu on R comes up while its key is held
+                y = y + math.floor(lh * 0.4)
+                y = y + KnoxNewsLive.drawRBlock(self, centre, y, self.view, pc) + pad + math.floor(lh * 0.4)
             elseif b.kind == "vp" and KnoxCrosshair and KnoxCrosshair.newsDemo then
                 -- the live crosshair panel: the panel itself on a pretend cupboard, in the view only
                 local d = KnoxCrosshair.newsDemo(self, b.key, b.place)
@@ -738,7 +801,7 @@ function R:prerender()
                 y = y + h + pad + math.floor(lh * 0.4)
             end
         end
-        self:clearStencilRect()
+        T.unclip(self)
         contentH = y + self.scroll - viewTop + pad
     end
     self.scrollMax = math.max(0, contentH - viewH)
@@ -851,6 +914,14 @@ end
 
 function R:onMouseDown(x, y)
     if self.switchTo then return true end
+    -- (past the live post's context menu: it closes - the click isn't one on the post)
+    if KnoxNewsLive and KnoxNewsLive.menuUp then return true end
+    -- the support plate's button in a post of the pinned style
+    local sup = self.support
+    if sup and sup.btn and sup.inView and T.inRect(x, y, sup.btn) then
+        KnoxPinned.openBoosty()
+        return true
+    end
     local pin = self.pin
     if pin then
         -- the support block's button: Boosty in the browser
@@ -888,6 +959,8 @@ function R:onRightMouseDown(x, y) return true end
 
 function R:onRightMouseUp(x, y)
     if self.switchTo then return true end
+    -- (the live post's context menu up: it closes, the post stays)
+    if KnoxNewsLive and KnoxNewsLive.onEsc() then return true end
     R.leave()
     return true
 end

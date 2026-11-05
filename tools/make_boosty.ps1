@@ -6,11 +6,23 @@
 #   text - KNOX INVENTORY, under it a line of what the page is, between sand lines
 # Writes tools\art\boosty_cover.png (and _view: how it reads on a 1280 px page).
 #
-# Usage: powershell -ExecutionPolicy Bypass -File tools\make_boosty.ps1
+# Usage: powershell -ExecutionPolicy Bypass -File tools\make_boosty.ps1 [-Ice]
 # (saved with a UTF-8 BOM: the Russian lines)
+#   -Ice: the winter set (the author, 2026-11-04: "the same for Boosty in the Ice style") - the ice
+#   skin's colours, the winter logo, the winter bar of the new main menu behind (tools\art\screen_bar_menu.png,
+#   a frame of the author's video) in place of the camp; boosty_cover_ice.png, boosty_tier_<n>_ice.png.
+#   The levels' rarity colours stay. The avatar: tools\art\knox_logo_avatar_winter.png (made already).
+param([switch]$Ice)
 
 . (Join-Path $PSScriptRoot "news_ui.ps1")
 $art = Join-Path $PSScriptRoot "art"
+$sfx = ""
+if ($Ice) {
+    $sfx = "_ice"
+    foreach ($kv in @{ accent = "#8ec5e0"; window = "#101317"; header = "#171c21"; border = "#262e36"; cell = "#0b0f12"
+                       text = "#d0d8de"; bright = "#e6edf2"; dim = "#87929b"; screen = "#090c0f"; ink = "#0c151b" }.GetEnumerator()) { $K[$kv.Key] = Hex $kv.Value }
+}
+$backFile = $(if ($Ice) { "screen_bar_menu.png" } else { "screen_camp_three.png" })
 
 $W = 2560; $H = 320
 $bmp, $g = Canvas $W $H $K.screen
@@ -18,9 +30,10 @@ $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
 # --- the camp: the author's screenshot (2026-10-25) - three heroes round the fire ---
 # 1500 px wide in the middle (the heroes away from the edges of a 1280 page), faces just above the name, the flames under it
-$shot = [System.Drawing.Image]::FromFile((Join-Path $art "screen_camp_three.png"))
+$shot = [System.Drawing.Image]::FromFile((Join-Path $art $backFile))
 $sw = 1500; $sk = $sw / $shot.Width; $sx = ($W - $sw) / 2
-$g.DrawImage($shot, [float]$sx, [float](-140 * $sk), [float]$sw, [float]($shot.Height * $sk))
+# (the bar: the windows and the snow round the name, the tables under it)
+$g.DrawImage($shot, [float]$sx, [float]$(if ($Ice) { -230 * $sk } else { -140 * $sk }), [float]$sw, [float]($shot.Height * $sk))
 $shot.Dispose()
 Fill $g $K.screen 0 0 $W $H 0.05
 # the middle a little darker under the logo, the fire still glows through
@@ -28,7 +41,7 @@ Fill $g $K.screen 0 0 $W $H 0.05
 $path = New-Object System.Drawing.Drawing2D.GraphicsPath
 $path.AddEllipse(($W / 2 - 600), -60, 1200, ($H + 120))
 $pg = New-Object System.Drawing.Drawing2D.PathGradientBrush $path
-$pg.CenterColor = A $K.screen 0.4
+$pg.CenterColor = A $K.screen $(if ($Ice) { 0.6 } else { 0.4 })   # (the snow in the windows is brighter than the fire)
 $pg.SurroundColors = [System.Drawing.Color[]]@((A $K.screen 0))
 $pg.FocusScales = New-Object System.Drawing.PointF 0.4, 0.2
 $g.FillPath($pg, $path)
@@ -45,7 +58,7 @@ $g.FillRectangle($lgR, ($sx + $sw - $fe), 0, $fe, $H)
 # --- the logo (2026-10-25: the search-mark logo the author chose, tools\art\knox_logo_clear.png,
 # exported from .claude\mockups\logo.html; its ink is at 574,119 - 1714,618), and the logo with
 # the line under it in the middle of the height (the author: the name sat too high) ---
-$logo = [System.Drawing.Image]::FromFile((Join-Path $art "knox_logo_clear.png"))
+$logo = [System.Drawing.Image]::FromFile((Join-Path $art $(if ($Ice) { "knox_logo_clear_winter.png" } else { "knox_logo_clear.png" })))
 $lsrc = New-Object System.Drawing.Rectangle 574, 119, 1140, 499
 $lh = 178; $lw = $lh * $lsrc.Width / $lsrc.Height
 $sub = "ДНЕВНИКИ РАЗРАБОТКИ"; $subPx = 30
@@ -63,7 +76,7 @@ Fill $g $K.accent (($W + $subW) / 2 + 24) ($ly + $capH * $subPx / 2 - 1) 48 3
 Txt $g $sub "head" $subPx $K.text (($W - $subW) / 2) $ly
 
 $g.Dispose()
-$file = Join-Path $art "boosty_cover.png"
+$file = Join-Path $art "boosty_cover$sfx.png"
 $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
 # how it reads on a 1280 px page: 240 px high, the middle 1280 px
 $view = New-Object System.Drawing.Bitmap 1280, 240
@@ -71,7 +84,7 @@ $g2 = [System.Drawing.Graphics]::FromImage($view)
 $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
 $g2.DrawImage($bmp, (New-Object System.Drawing.Rectangle 0, 0, 1280, 240), [int](($W - 1280 * 4 / 3) / 2), 0, [int](1280 * 4 / 3), $H, [System.Drawing.GraphicsUnit]::Pixel)
 $g2.Dispose()
-$view.Save((Join-Path $art "boosty_cover_view.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+$view.Save((Join-Path $art "boosty_cover_view$sfx.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $view.Dispose(); $bmp.Dispose()
 Write-Host "  $file"
 
@@ -87,12 +100,14 @@ $TIERS = @(
     @{ n = 6; name = "ЛЕГЕНДА НОКСА"; price = "20 000 ₽"; icon = "c_campfire"; cat = "mat"; rare = "#ff8a1e"; tint = $true }
 )
 $TW = 480; $TH = 300
-$camp = [System.Drawing.Image]::FromFile((Join-Path $art "screen_camp_three.png"))
+$camp = [System.Drawing.Image]::FromFile((Join-Path $art $backFile))
 foreach ($t in $TIERS) {
     $bmp, $g = Canvas $TW $TH $K.screen
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     # the fire in the middle of the screenshot, dark
-    $g.DrawImage($camp, (New-Object System.Drawing.Rectangle 0, 0, $TW, $TH), 420, 200, 640, 400, [System.Drawing.GraphicsUnit]::Pixel)
+    # (the bar: the open window with the blizzard and the man at the door)
+    if ($Ice) { $g.DrawImage($camp, (New-Object System.Drawing.Rectangle 0, 0, $TW, $TH), 960, 240, 640, 400, [System.Drawing.GraphicsUnit]::Pixel) }
+    else { $g.DrawImage($camp, (New-Object System.Drawing.Rectangle 0, 0, $TW, $TH), 420, 200, 640, 400, [System.Drawing.GraphicsUnit]::Pixel) }
     Fill $g $K.screen 0 0 $TW $TH 0.72
     $rare = Hex $t.rare
     Frame $g $rare 0 0 $TW $TH 4
@@ -118,11 +133,12 @@ foreach ($t in $TIERS) {
     Fill $g $K.accent $rx $y $pw $plH
     TxtCentre $g $t.price "head" 26 $K.ink $rx $y $pw $plH
     $g.Dispose()
-    $f = Join-Path $art "boosty_tier_$($t.n).png"
+    $f = Join-Path $art "boosty_tier_$($t.n)$sfx.png"
     $bmp.Save($f, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
     Write-Host "  $f"
 }
 $camp.Dispose()
+if ($Ice) { return }   # (the winter avatar is knox_logo_avatar_winter.png)
 
 # --- the avatar (2026-10-25): Boosty cuts it to a circle and shows it about 160 px.
 # a - the hero behind the fire (the author's screenshot), b - the same in a sand ring,

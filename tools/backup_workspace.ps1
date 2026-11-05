@@ -20,7 +20,7 @@ $git = "C:\Program Files\Git\cmd\git.exe"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $remote = "https://github.com/SVNTHETIK/knox-workspace.git"
 
-$skip = @('^\.claude/steam_login\.txt$', '\.jar$', '^java/build/', '/report\.txt$', '/__pycache__/')
+$skip = @('^\.claude/steam_login\.txt$', '\.jar$', '^java/build/', '/report\.txt$', '/__pycache__/', '^MEDIA/')   # (MEDIA: hard links to files backed up already - tools\make_media.ps1)
 $files = & $git -C $root -c core.quotepath=off ls-files --others --ignored --exclude-standard |
     Where-Object { $p = $_; -not ($skip | Where-Object { $p -match $_ }) }
 if (-not $files) { throw "git listed no ignored files - wrong folder?" }

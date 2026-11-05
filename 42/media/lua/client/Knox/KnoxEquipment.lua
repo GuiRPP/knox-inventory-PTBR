@@ -539,9 +539,7 @@ local function drawSlotBody(self, w, h, items, idx, item, alpha, cat, hl, over, 
     if item then
         local areaH = h - fh
         local side = math.floor(math.min(w, areaH) * 0.8)
-        if T.itemIcon(self, item, math.floor((w - side) / 2), fh + math.floor((areaH - side) / 2) + dy, side, alpha * da) then
-            T.brokenMark(self, 0, fh + dy, w, areaH, alpha * da)
-        end
+        T.itemIcon(self, item, math.floor((w - side) / 2), fh + math.floor((areaH - side) / 2) + dy, side, alpha * da)
     end
     if self.label then
         -- the name leaves room for the layer counter ("1/2") in the corner

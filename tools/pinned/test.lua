@@ -263,6 +263,42 @@ run("pictures not read yet: none drawn (no red-white squares)", function()
     READY = true
 end)
 
+-- the coin and "thank you" of a winter post (the author, 2026-11-05: in the Ice style); the pinned
+-- post's stay gold
+run("the right panel's look", function()
+    local function drawn(look)
+        local seen = {caps = {}, tex = {}, colors = {}, cell = nil}
+        local sp, q, r = T.spaced, T.quad, T.rect
+        T.spaced = function(ui, s, rr, c, o) table.insert(seen.caps, {s, c}) return sp(ui, s, rr, c, o) end
+        T.quad = function(ui, tx, x1, y1, x2, y2, x3, y3, x4, y4, c, a)
+            seen.tex[tx.path] = true
+            seen.colors[c] = true
+            return q(ui, tx, x1, y1, x2, y2, x3, y3, x4, y4, c, a)
+        end
+        T.rect = function(ui, x, y, w, h, c) seen.cell = seen.cell or c return r(ui, x, y, w, h, c) end
+        P.drawRight(UI, 620, 60, 700, 860, look)
+        T.spaced, T.quad, T.rect = sp, q, r
+        return seen
+    end
+    local base = "media/ui/knoxmenu/pinned/"
+    local gold, ice = drawn(nil), drawn(P.ICE)
+    check("gold: its own face", gold.tex[base .. "logo.png"] and not gold.tex[base .. "logo_winter.png"])
+    check("gold: the skin's caption, then gold", gold.caps[1][2] == T.color.bright and gold.caps[2][2] == N.PINNED_COLOR)
+    check("gold: the skin's ground", gold.cell == T.color.cell)
+    check("ice: its own face", ice.tex[base .. "logo_winter.png"] and not ice.tex[base .. "logo.png"])
+    check("ice: both captions, the same words", #ice.caps == 2 and ice.caps[1][1] == gold.caps[1][1] and ice.caps[2][1] == gold.caps[2][1])
+    check("ice: its caption's colours", ice.caps[1][2] == P.ICE.bright and ice.caps[2][2] == P.ICE.color)
+    check("ice: its ground", ice.cell == P.ICE.cell)
+    check("ice: its edge, both tones", ice.colors[P.ICE.edgeLight] and ice.colors[P.ICE.edgeDark])
+    local warm = 0
+    for c in pairs(ice.colors) do
+        if c.r > c.b and c ~= P.ICE.color then warm = warm + 1 end
+    end
+    check("ice: nothing warm", warm == 0, warm)
+    for _ = 1, 40 do clock = clock + 250 P.drawRight(UI, 620, 60, 700, 860, P.ICE) end
+    check("no clip left", STENCIL.level == 0, STENCIL.level)
+end)
+
 run("at the start every picture asked for", function()
     local asked = {}
     local orig = getTexture
@@ -270,6 +306,7 @@ run("at the start every picture asked for", function()
     P.preload()
     getTexture = orig
     check("banner", asked["media/ui/knoxmenu/pinned/banner.png"])
+    check("the ice coin's face", asked["media/ui/knoxmenu/pinned/logo_winter.png"])
     check("glints", asked["media/ui/knoxmenu/pinned/glint_00.png"] and asked["media/ui/knoxmenu/pinned/glint_31.png"])
     check("stage digits", asked["media/ui/knoxmenu/pinned/stage_9.png"])
     check("disc", asked["media/ui/knoxdash/disc.png"])
@@ -316,6 +353,125 @@ run("a fade strip: its rows of the road's pictures", function()
         check("parts inside strip " .. sy, inside)
     end
     UI.drawTextureScaled, UI.javaObject.DrawSubTextureRGBA = oS, oP
+end)
+
+-- every post from now on (the author, 2026-11-05): the pinned post's head and Boosty, a backdrop
+-- of its own, the live inventory and menu on R, the scribbled-out words
+run("a post in the pinned style, whole", function()
+    local R = KnoxMenuNewsReader
+    local winter
+    for _, p in ipairs(N.posts or N.load()) do
+        if string.find(table.concat(p.body, "|"), "@pinstyle", 1, true) then winter = p break end
+    end
+    check("there is one", winter ~= nil)
+    if not winter then return end
+    -- what the reader draws with, here
+    for k, v in pairs(UI) do if type(v) == "function" and not ISPanel[k] then ISPanel[k] = v end end
+    ISPanel.javaObject = UI.javaObject
+    function ISPanel:getWidth() return self.width end
+    function ISPanel:getHeight() return self.height end
+    T.pad = 8
+    local texts = {}
+    local function say(ui, s) table.insert(texts, s) DRAWN.label = DRAWN.label + 1 end
+    function T.text(ui, s) say(ui, s) end
+    function T.textCentre(ui, s) say(ui, s) end
+    function T.marquee() end
+    function T.keyHint(ui, x, y, key, label) say(ui, key) say(ui, label) return x end
+    function T.mix(a, b, k) return {r = a.r + (b.r - a.r) * k, g = a.g + (b.g - a.g) * k, b = a.b + (b.b - a.b) * k} end
+    function T.anim(k) return k end
+    function isKeyDown() return false end
+    Keyboard = {KEY_ESCAPE = 1}
+    local live = {hosted = 0, rblock = 0}
+    KnoxNewsLive = live
+    function live.gridSize() return 389, 101 end
+    function live.hostGrid(host, x, y, view) live.hosted = live.hosted + 1 live.at = {x, y} live.view = view end
+    function live.drawRBlock(host, centre, y, view, c) live.rblock = live.rblock + 1 live.color = c return 30 end
+    function live.onEsc() return live.took == true end
+
+    R.open(winter)
+    local o = R.instance
+    MOUSE.x, MOUSE.y = -1, -1
+    clock = clock + 16
+    o:prerender()
+    clock = clock + 16
+    o:prerender()
+    o:render()
+    check("its style is read", winter.pinstyle == true and winter.back == "blizzard" and winter.frameColor ~= nil)
+    check("the coin on the right, no picture, its banner named", winter.artThanks == true and winter.artFile == nil and winter.bannerFile == "u11_bar_banner.png", winter.artFile)
+    local kinds = {}
+    for _, b in ipairs(o.blocks) do kinds[b.kind] = (kinds[b.kind] or 0) + 1 end
+    check("Boosty, the grid and the menu on R, once each", kinds.boosty == 1 and kinds.inv == 1 and kinds.rmenu == 1)
+    check("Boosty comes first", o.blocks[1].kind == "boosty", o.blocks[1].kind)
+    check("the live blocks asked for", live.hosted >= 2 and live.rblock >= 2, live.hosted)
+    check("in the post's colour", live.color == winter.frameColor)
+    check("the plate in the post's colour, its own logo", o.support.color == winter.frameColor and o.support.logo == "logo_clean_128_winter")
+    local tags = 0
+    for _, s in ipairs(texts) do if string.sub(s, 1, 1) == "@" then tags = tags + 1 end end
+    check("no tag shows as text", tags == 0, tags)
+    local tilde = 0
+    for _, s in ipairs(texts) do if string.find(s, "~", 1, true) then tilde = tilde + 1 end end
+    check("no ~ shows as text", tilde == 0, tilde)
+    check("it scrolls", o.scrollMax > 0, o.scrollMax)
+
+    -- scrolled: the fades paint the snow back
+    o.scroll = 300
+    for _ = 1, 40 do
+        clock = clock + 16
+        o:prerender()
+        o:render()
+    end
+    check("all drawn with no clip left", STENCIL.level == 0, STENCIL.level)
+    STENCIL.level = 0
+
+    -- the plate's button
+    o.scroll = 0
+    MOUSE.x, MOUSE.y = 10, 10
+    clock = clock + 16
+    o:prerender()
+    local btn = o.support.btn
+    check("its button placed", btn ~= nil and btn[3] > 0)
+    local before = #OPENED
+    MOUSE.x, MOUSE.y = btn[1] + 3, btn[2] + 3
+    clock = clock + 16
+    o:prerender()
+    o:onMouseDown(MOUSE.x, MOUSE.y)
+    check("a click: Boosty, and the post stays", #OPENED == before + 1 and R.instance == o)
+    MOUSE.x, MOUSE.y = -1, -1
+
+    -- the live post's context menu has the clicks
+    live.menuUp = true
+    o:onMouseDown(1, 1)
+    check("past the menu: the post stays", R.instance == o and o.switchTo == nil)
+    live.menuUp, live.took = false, true
+    o:onRightMouseUp(1, 1)
+    check("the right button with the menu up: the post stays", R.instance == o)
+    live.took = false
+    o:onRightMouseUp(1, 1)
+    check("with no menu it leaves, as always", R.instance == nil)
+    KnoxNewsLive = nil
+    STENCIL.level, UI.knoxClip = 0, nil
+    if o.knoxClip then o.knoxClip = nil end
+end)
+
+run("the scribble: no words, the pen's strokes", function()
+    local quads = 0
+    local t0 = UI.javaObject.DrawTexture
+    UI.javaObject.DrawTexture = function(self, tex, ...) quads = quads + 1 return t0(self, tex, ...) end
+    local out = {}
+    local tw = T.text
+    T.text = function(ui, s, x) table.insert(out, {s, x}) end
+    N.drawMarked(UI, "a line", 10, 0, T.color.text, T.fontText)
+    check("no scribble: as it is", #out == 1 and out[1][1] == "a line" and quads == 0)
+    out = {}
+    N.drawMarked(UI, "fourth - ~~~~~~~~.", 10, 0, T.color.text, T.fontText)
+    check("the words before and after", #out == 2 and out[1][1] == "fourth - " and out[2][1] == ".")
+    check("after the pen's 58 px", out[2][2] == 10 + T.measure(T.fontText, "fourth - ") + 58, out[2][2])
+    check("the pen drew", quads > 30, quads)
+    out = {}
+    N.drawMarked(UI, "you can ~~~~~~~~~~~~~.", 10, 0, T.color.text, T.fontText)
+    check("thirteen: the long one", out[2][2] == 10 + T.measure(T.fontText, "you can ") + 96, out[2][2])
+    T.text = tw
+    UI.javaObject.DrawTexture = t0
 end)
 
 run("all along: clips", function()

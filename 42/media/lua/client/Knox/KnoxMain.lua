@@ -427,20 +427,15 @@ local function hookViewpoint()
     ViewpointLoot.knoxHooked = true
     -- (each pair only when Viewpoint still has both: a version without them keeps
     -- its own, and the log says which - KnoxCompat.report)
-    if KnoxCompat.luaHas("ViewpointLoot", ViewpointLoot, {"openWindow", "closeWindow"}) then
+    -- (from Viewpoint 0.1.7 its key opens a screen of its own: KnoxCompat.routeViewpointScreen;
+    -- these two are for the versions before it)
+    if not KnoxCompat.routeViewpointScreen()
+        and KnoxCompat.luaHas("ViewpointLoot", ViewpointLoot, {"openWindow", "closeWindow"}) then
         local open, close = ViewpointLoot.openWindow, ViewpointLoot.closeWindow
         ViewpointLoot.openWindow = function(player, container, ...)
             local n = player and player:getPlayerNum() or 0
             if not Knox.forPlayer(n) then return open(player, container, ...) end
-            -- Viewpoint gives the first container of what is looked at (a fridge, never
-            -- its freezer; a car's first part within reach): the one whose row is chosen
-            -- in its panel (the wheel) is opened instead
-            -- (Knox's crosshair panel shown: the row chosen in it - 2026-10-25)
-            local chosen = KnoxCrosshair and KnoxCrosshair.owned and KnoxCrosshair.chosen() or nil
-            if not chosen then
-                chosen = KnoxCompat.vpHas("menu") and knoxViewpointChosen and knoxViewpointChosen() or nil
-            end
-            if chosen and container and chosen ~= container then container = chosen end
+            container = KnoxCompat.vpChosen(container)
             if not KnoxScreen.instance then Knox.viewpointLookAfter = true end
             ViewpointLoot.knoxOpened = KnoxScreen.instance == nil
             if not Knox.open(n, container or ISInventoryPage.GetFloorContainer(n)) then

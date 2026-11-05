@@ -95,15 +95,7 @@ end
 -- The scales ------------------------------------------------------------------------------
 
 --- Parts lit of 5 for n rounds of cap (for 15: 15 - 5, 10-14 - 4, 6-9 - 3, 4-5 - 2, 1-3 - 1, 0 - 0).
-function M.levelOf(n, cap)
-    if cap <= 0 or n <= 0 then return 0 end
-    if n >= cap then return 5 end
-    local f = n / cap
-    if f >= 2 / 3 then return 4 end
-    if f >= 0.4 then return 3 end
-    if f >= 0.25 then return 2 end
-    return 1
-end
+M.levelOf = T.magParts   -- (the tiles of the inventory show the same)
 
 --- Parts lit of the rounds carried: one for a magazine's worth, 5 at most.
 function M.reserveLit(n, cap)
@@ -566,6 +558,7 @@ function M.open(player, key)
     local rowsH = math.min(#M.rows, MAX_ROWS) * Z.ROW + Z.GROW_H + (#M.rows > MAX_ROWS and 2 * Z.STRIP or 0)
     local H = Z.GAP + Z.PH + Z.GAP + rowsH + Z.GAP + 1 + Z.GAP + Z.ROUNDS + Z.GAP + 1 + Z.GAP + Z.KH + Z.GAP
     M.ox, M.oy = Z.LEFT, math.floor((getCore():getScreenHeight() - H) / 2)
+    M.openH = H
     if not M.catch then
         M.catch = KnoxRMenuCatch:new()
         M.catch:initialise()
@@ -1151,6 +1144,8 @@ local function readJob(player)
 end
 
 local function stillOpen(player)
+    -- (in a news post, on a pretend character: as long as the key is held - KnoxNewsLive)
+    if M.inNews then return not M.key or isKeyDown(M.key) end
     if not player or player:isDead() or not M.on() then return false end
     if M.key and not isKeyDown(M.key) then return false end
     local sc = UIManager.getSpeedControls and UIManager.getSpeedControls()

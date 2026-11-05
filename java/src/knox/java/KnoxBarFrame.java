@@ -562,18 +562,13 @@ public final class KnoxBarFrame {
         int w = savedViewport[2], h = savedViewport[3];
         if (w <= 0 || h <= 0) return;   // (the window minimised: nothing to draw into, nothing wrong)
         try {
-            // (what a switch to the bar waits for, measured in the console: the author, 2026-11-02)
-            long startedAt = System.nanoTime();
             boolean gl = !glReady;
             int quality = high ? 1 : 0;
             boolean targets = w != width || h != height || quality != builtQuality;
             if (gl || targets) forgetCardErrors();
             if (gl) buildGL();
-            long glAt = System.nanoTime();
             if (targets) buildTargets(w, h, quality);
             if (gl || targets) {
-                System.out.println("[Knox] the bar's frame: video card " + (glAt - startedAt) / 1000000 + " ms, targets "
-                    + (System.nanoTime() - glAt) / 1000000 + " ms");
                 cardOk("the build");
                 watchFrames = WATCH_FRAMES;
             }

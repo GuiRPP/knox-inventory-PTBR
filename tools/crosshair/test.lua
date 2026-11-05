@@ -205,6 +205,92 @@ local function rowNamed(n)
     for _, r in ipairs(P.rows) do if r.name == n then return r end end
 end
 
+-- a sink with little water (the author, 2026-11-05: the wheel left the list for the rows below)
+run("a list with grey rows", function()
+    VP.obj, VP.loot, VP.locked, VP.containers = {}, false, false, jlist({})
+    VP.actions = {{label = "Drink", on = true}, {label = "Wash: Yourself", on = true}, {label = "Wash: All", on = false}}
+    for i = 1, 7 do table.insert(VP.actions, {label = "Wash: Coat " .. i, on = false}) end
+    table.insert(VP.actions, {label = "Fill: Bottle", on = true})
+    ViewpointInteract = {actions = {}}
+    VP.version = (VP.version or 0) + 1
+    P.groups = {}
+    frames(30)
+    local function find(name)
+        for _, r in ipairs(P.rows) do if r.name == name then return r end end
+    end
+    chooseRow(function(r) return r.name == "Wash" end)
+    frames(2)
+    VP.pressed = 1
+    frames(30)
+    local before = #VP.ran
+    chooseRow(function(r) return r.name == "Yourself" end)
+    frames(2)
+    VP.wheel = 1
+    frames(3)
+    check("the wheel stops on a grey row", P.pick[P.sel] and P.pick[P.sel].name == "All", P.pick[P.sel] and P.pick[P.sel].name)
+    check("no key for it", P.hintCount == 0, P.hintCount)
+    VP.pressed = 1
+    frames(3)
+    check("a grey row runs nothing", #VP.ran == before, #VP.ran)
+    VP.wheel = 7
+    frames(10)
+    local last = find("Coat 7")
+    check("the window follows along them", P.pick[P.sel] == last and last.h > 0, P.pick[P.sel] and P.pick[P.sel].name)
+    VP.wheel = 1
+    frames(3)
+    check("past its end: the rows below", P.pick[P.sel] and P.pick[P.sel].name == "Fill: Bottle", P.pick[P.sel] and P.pick[P.sel].name)
+    -- "Yourself" gone once clean: the choice stays on its own row
+    chooseRow(function(r) return r.name == "Coat 3" end)
+    frames(2)
+    table.remove(VP.actions, 2)
+    VP.version = VP.version + 1
+    frames(10)
+    check("the choice stays by its name", P.pick[P.sel] and P.pick[P.sel].name == "Coat 3", P.pick[P.sel] and P.pick[P.sel].name)
+    -- all of a list grey: it still opens, to be read
+    VP.actions = {{label = "Drink", on = true}, {label = "Wash: A", on = false}, {label = "Wash: B", on = false}}
+    VP.version = VP.version + 1
+    P.groups = {}
+    frames(30)
+    check("a grey list can be chosen", chooseRow(function(r) return r.name == "Wash" end) ~= nil)
+    frames(2)
+    VP.pressed = 1
+    frames(30)
+    check("and opens", find("A") ~= nil and not find("A").closing)
+    P.groups = {}
+end)
+
+-- what is being done, when the row only queues a wait for getting up (a sink's washing:
+-- the real action comes when the wait ends; a player's report, 2026-11-05)
+run("the row of what is being done", function()
+    local Q = {queue = {}}
+    local saved = ISTimedActionQueue.getTimedActionQueue
+    local savedRun, savedLabel, savedProgress = knoxVpPanelRun, knoxVpPanelActionLabel, knoxVpPanelActionProgress
+    ISTimedActionQueue.getTimedActionQueue = function() return Q end
+    local labels = {[0] = "Wash: Yourself", [1] = "Wash: All"}
+    knoxVpPanelActionLabel = function(i) return labels[i] end
+    knoxVpPanelActionProgress = function() return 0.99 end
+    local function action(d) return {action = {getJobDelta = function() return d end}} end
+    local real = {[0] = action(0.25), [1] = action(0.5)}
+    knoxVpPanelRun = function(i)
+        table.insert(Q.queue, {action = {getJobDelta = function() return 0 end},
+            onCompleteFunc = function() table.insert(Q.queue, real[i]) end})
+    end
+    local L = P.LIVE
+    L.run(0)
+    L.run(1)
+    check("the first wait: its row", L.actionProgress(0) > 0 and L.actionProgress(1) == 0)
+    local wait = table.remove(Q.queue, 1)
+    wait.onCompleteFunc()
+    wait = table.remove(Q.queue, 1)
+    wait.onCompleteFunc()
+    check("two real ones in the queue", #Q.queue == 2 and Q.queue[1] == real[0], #Q.queue)
+    check("the first real one: the first row", L.actionProgress(0) == 0.25 and L.actionProgress(1) == 0, L.actionProgress(0))
+    table.remove(Q.queue, 1)
+    check("then the second", L.actionProgress(1) == 0.5 and L.actionProgress(0) == 0, L.actionProgress(1))
+    ISTimedActionQueue.getTimedActionQueue = saved
+    knoxVpPanelRun, knoxVpPanelActionLabel, knoxVpPanelActionProgress = savedRun, savedLabel, savedProgress
+end)
+
 run("groups", function()
     VP.obj, VP.loot, VP.locked, VP.containers = {}, false, false, jlist({})
     VP.actions = {{label = "Drink", on = true}, {label = "Wash: Yourself", on = true}, {label = "Wash: T-Shirt", on = true}}
@@ -522,6 +608,117 @@ run("news demo: cupboard, the bag looked into and taken", function()
     demoFrames(d, 200)
     check("filled again", demoCount(d) > 0, demoCount(d))
     check("not broken", not d.broken)
+end)
+
+-- Viewpoint 0.1.7 (the author, 2026-11-04): what is done only on purpose is never chosen
+-- by itself, and its place key sets down what Knox's panel has chosen, not its own row.
+run("knocking a wall down: only with the wheel", function()
+    VP.shown, VP.kind, VP.obj, VP.loot, VP.locked, VP.containers = true, 2, {}, false, false, jlist({})
+    VP.actions = {{label = "Destroy", on = true}, {label = "Open Window", on = true}}
+    ViewpointInteract = {actions = {{deliberate = true}, {}}}
+    VP.ran = {}
+    frames(30)
+    check("not chosen with another row there", P.pick[P.sel] and not P.pick[P.sel].deliberate, P.sel)
+    -- alone: nothing chosen, the take key is the game's
+    VP.obj, VP.actions = {}, {{label = "Destroy", on = true}}
+    ViewpointInteract = {actions = {{deliberate = true}}}
+    frames(30)
+    check("alone: none chosen", P.sel == 0, P.sel)
+    check("alone: the key is the game's", VP.wants == false)
+    VP.pressed = 1
+    frames(2)
+    check("alone: the key does nothing", #VP.ran == 0, #VP.ran)
+    VP.wheel = 1
+    frames(2)
+    check("the wheel chooses it", P.sel == 1, P.sel)
+    check("then the key is the panel's", VP.wants == true)
+    VP.pressed = 1
+    frames(2)
+    check("then it is done", #VP.ran == 1, #VP.ran)
+    ViewpointInteract = nil
+    VP.actions = {}
+end)
+
+run("the place key", function()
+    local placed = {}
+    ViewpointLoot = {place = function(_, it) table.insert(placed, it) end}
+    local a, k, inside = item("Apple", 0.2), item("Knife", 0.7), item("Pencil", 0.1)
+    k.noPlace = true
+    local pk = bag("Backpack", {inside})
+    VP.shown, VP.kind, VP.obj, VP.loot, VP.locked, VP.containers = true, 3, {}, true, false, jlist({container({a, k, pk}, "crate")})
+    frames(30)
+    chooseRow(function(r) return r.name == "Apple" end)
+    frames(2)
+    check("a thing that can: the key is the panel's", VP.places == true)
+    VP.pressed = 3
+    frames(2)
+    check("the row chosen is set down", #placed == 1 and placed[1] == a, #placed)
+    chooseRow(function(r) return r.name == "Knife" end)
+    frames(2)
+    check("a thing that can't: the key is the game's", VP.places == false)
+    VP.shown = false
+    frames(2)
+    check("looked away: the game's", VP.places == false)
+    ViewpointLoot = nil
+end)
+
+-- The place key's hint (the author's pick, 2026-11-04): two lines, each key in its place.
+run("the foot in two lines", function()
+    local function plate(h)
+        VP.obj = {}
+        VP.shown, VP.kind, VP.loot, VP.locked = true, 3, true, false
+        VP.placeKey = h
+        VP.containers = jlist({container({item("Apple", 0.2), item("Knife", 0.7), bag("Backpack", {item("Pencil", 0.1)})}, "crate")})
+        VP.actions = {{label = "Open Window", on = true}}
+        frames(30)
+    end
+    local function slotOf(label)
+        for i = 1, P.hintCount do if P.shownLabels[i] == label then return P.shownSlots[i], i end end
+        return nil
+    end
+    plate(false)
+    local oneH = P.L.H
+    check("no place key: one line", not P.footTwo and P.hintCount >= 1)
+    check("no place key: no hint", slotOf("IGUI_Knox_VPPlace") == nil)
+    plate(true)
+    check("two lines", P.footTwo == true)
+    check("taller by a line", P.L.H == oneH + P.Z.KH + P.Z.HINT_ROW, P.L.H - oneH)
+    check("within the plate's width", P.needW <= P.Z.MAXW, P.needW)
+    local c2 = P.col2
+    chooseRow(function(r) return r.name == "Apple" end)
+    frames(3)
+    local h = P.L.H
+    check("a thing: all four", P.hintCount == 4, P.hintCount)
+    check("take upper left", slotOf("IGUI_Knox_VPTake") == 1)
+    check("take all upper right", slotOf("IGUI_Knox_VPTakeAll") == 2)
+    check("place lower left", slotOf("IGUI_Knox_VPPlace") == 3)
+    check("open lower right", slotOf("IGUI_Knox_VPOpen") == 4)
+    frames(30)
+    local _, ip = slotOf("IGUI_Knox_VPPlace")
+    local _, io = slotOf("IGUI_Knox_VPOpen")
+    check("drawn in columns", P.hintAt[io * 2 - 1] - P.hintAt[ip * 2 - 1] == c2, P.hintAt[io * 2 - 1] - P.hintAt[ip * 2 - 1])
+    -- an action chosen: no such key, the rest where they were, the same height
+    chooseRow(function(r) return r.kind == "act" end)
+    frames(30)
+    check("an action: no place hint", slotOf("IGUI_Knox_VPPlace") == nil)
+    check("an action: open stays lower right", slotOf("IGUI_Knox_VPOpen") == 4)
+    -- (only the chosen item row's own growth goes: the foot keeps its two lines)
+    check("the same height", P.L.H == h - P.Z.GROW_H and P.footTwo == true, P.L.H - h)
+    check("the same columns", P.col2 == c2)
+    -- a thing that can't be set down: its place stays empty
+    local k = item("Knife", 0.7)
+    k.noPlace = true
+    VP.obj = {}
+    VP.containers = jlist({container({k}, "crate")})
+    VP.actions = {}
+    frames(30)
+    check("can't be set down: no hint", slotOf("IGUI_Knox_VPPlace") == nil and slotOf("IGUI_Knox_VPOpen") == 4)
+    -- taken, the list is empty: one line, the window's key alone
+    VP.obj = {}
+    VP.containers = jlist({container({}, "crate")})
+    frames(30)
+    check("empty: one line", not P.footTwo)
+    VP.placeKey, VP.actions = false, {}
 end)
 
 run("all along: no clip left on", function()

@@ -175,7 +175,12 @@ end
 --- Size of a container's grid. `limit` is set when its last row is not whole:
 --- only the first `limit` cells (row by row) are cells of the grid.
 --- @return number cols, number rows, number|nil limit
+-- (a container that says its own size: the live grid of a news post, KnoxNewsLive, the author 2026-11-05)
+KnoxGrid.fixedSize = {}
+
 function KnoxGrid.getSize(container, player)
+    local fixed = KnoxGrid.fixedSize[container]
+    if fixed then return fixed.cols, fixed.rows end
     local shape = KnoxGrid.shapeOf(container, player)
     if shape then return shape.cols, shape.rows end
     if player and container == player:getInventory() then
