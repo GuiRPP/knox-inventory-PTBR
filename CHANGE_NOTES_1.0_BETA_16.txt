@@ -1,0 +1,8 @@
+[h1]Knox Inventory 1.0 BETA - update 16: Discord in the news[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Knox has a Discord server now, and the plate at the top of the in-game news has a button for it, right under the Boosty one. Press it to join: [url=https://discord.gg/HKpREqdDqD]discord.gg/HKpREqdDqD[/url]
+[*]ZombieBuddy will ask about KnoxInventoryJava.jar once more: allow it, or the button won't open anything.
+[*]Set sizes for three more items: the rake, the closed tinted umbrella and the back-worn fanny pack.
+[/list]

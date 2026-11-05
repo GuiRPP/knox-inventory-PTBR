@@ -174,6 +174,9 @@ run("the button and the coin open Boosty", function()
     local n = #OPENED
     P.openBoosty()
     check("opened", #OPENED == n + 1 and OPENED[#OPENED] == "https://boosty.to/knoxinventory/donate", OPENED[#OPENED])
+    check("Discord's button under Boosty's, of its width", st.btn2 and st.btn2[1] == st.btn[1] and st.btn2[3] == st.btn[3] and st.btn2[2] >= st.btn[2] + st.btn[4])
+    P.openDiscord()
+    check("opened Discord", #OPENED == n + 2 and OPENED[#OPENED] == "https://discord.gg/HKpREqdDqD", OPENED[#OPENED])
 end)
 
 run("scrolled: the lane leaves the view cleanly", function()
@@ -436,6 +439,13 @@ run("a post in the pinned style, whole", function()
     o:prerender()
     o:onMouseDown(MOUSE.x, MOUSE.y)
     check("a click: Boosty, and the post stays", #OPENED == before + 1 and R.instance == o)
+    local btn2 = o.support.btn2
+    check("the Discord button placed", btn2 ~= nil and btn2[3] > 0)
+    MOUSE.x, MOUSE.y = btn2[1] + 3, btn2[2] + 3
+    clock = clock + 16
+    o:prerender()
+    o:onMouseDown(MOUSE.x, MOUSE.y)
+    check("a click: Discord, and the post stays", OPENED[#OPENED] == "https://discord.gg/HKpREqdDqD" and R.instance == o, OPENED[#OPENED])
     MOUSE.x, MOUSE.y = -1, -1
 
     -- the live post's context menu has the clicks

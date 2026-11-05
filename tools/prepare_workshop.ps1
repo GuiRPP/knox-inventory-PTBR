@@ -158,7 +158,7 @@ while ($desc.Count -and $desc[-1].Trim() -eq '') { $desc = $desc[0..($desc.Count
 if ($desc | Where-Object { $_ -match '^=' }) { throw "WORKSHOP_DESCRIPTION.txt: lines starting with '=' break workshop.txt" }
 if ($desc | Where-Object { $_ -match '\[img\]\{' }) { throw "WORKSHOP_DESCRIPTION.txt: [img]{...} placeholders are left - put the uploaded pictures' links in first" }
 $bytes = $utf8.GetByteCount(($desc -join "`n"))
-if ($bytes -gt 7800) { throw "WORKSHOP_DESCRIPTION.txt is $bytes bytes: over Steam's 8000-byte limit (keep it under 7800)" }
+if ($bytes -gt 7950) { throw "WORKSHOP_DESCRIPTION.txt is $bytes bytes: over Steam's 8000-byte limit (keep it under 7950, as upload_page.ps1 does)" }
 
 $wt = Join-Path $ws "workshop.txt"
 if (Test-Path $wt) {

@@ -22,7 +22,7 @@
 ;   @open settings                      - an "Open Knox's settings" button in the post's text
 ;   # | date | pinned | title           - the pinned post (the roadmap and Boosty): always the first card. "New" on it only when an @road line is added.
 ;   @lead text                           - the card's second line (when it is not the first paragraph)
-;   @boosty                              - the support block with the Boosty button
+;   @boosty                              - the support block with the Boosty and Discord buttons
 ;   @pinstyle                            - the pinned post's head and Boosty (from 05.11 every post); @boosty right under the head
 ;   @back blizzard                       - a drawn backdrop: the blizzard (update 11)
 ;   @inv                                 - the live inventory grid on real things (main menu only, KnoxNewsLive)

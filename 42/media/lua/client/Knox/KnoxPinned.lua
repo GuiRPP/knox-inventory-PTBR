@@ -26,6 +26,7 @@ local bez = M.bez
 local tex = M.tex
 
 P.URL = "https://boosty.to/knoxinventory/donate"
+P.DISCORD_URL = "https://discord.gg/HKpREqdDqD"
 local DOT = string.char(183)
 local SHINE = {r = 1, g = 226 / 255, b = 160 / 255}
 local SHINE_FRAME = {r = 1, g = 250 / 255, b = 232 / 255}
@@ -79,6 +80,12 @@ end
 function P.openBoosty()
     getSoundManager():playUISound("UIActivateButton")
     if knoxOpenUrl then knoxOpenUrl(P.URL) end
+end
+
+--- Knox's Discord server in the browser (the support block's second button, the author 2026-11-05).
+function P.openDiscord()
+    getSoundManager():playUISound("UIActivateButton")
+    if knoxOpenUrl then knoxOpenUrl(P.DISCORD_URL) end
 end
 
 -- The shimmer ----------------------------------------------------------------------
@@ -322,7 +329,7 @@ local function blocksOf(post, textW, font)
 end
 
 local paraR, paraOpts = {0, 0, 0, 0}, {align = "centre"}
-local btnR, btnOpts = {0, 0, 0, 0}, {align = "centre"}
+local btnOpts = {align = "centre"}
 local labR, labOpts = {0, 0, 0, 0}, {}
 local headR, headOpts = {0, 0, 0, 0}, {}
 
@@ -333,22 +340,47 @@ local function supportLayout(st, colW, s)
     st.fB = T.fontHeader
     st.fSpan = T.fontText
     st.fBtn = T.fontCaps
-    st.fUnder = T.javaFonts and T.makeFont("body", T.cell * 0.25) or T.fontTile
     st.btnText = T.upper(getText("IGUI_Knox_PinnedButton"))
-    st.under = getText("IGUI_Knox_PinnedUnder")
-    st.btnW = T.measure(st.fBtn, st.btnText) + 48 * s
-    st.rightW = math.max(st.btnW, T.measure(st.fUnder, st.under))
-    local txtW = colW - 4 - 40 * s - 64 * s - 20 * s - 20 * s - st.rightW
+    st.btn2Text = T.upper(getText("IGUI_Knox_PinnedDiscord"))
+    -- (two buttons of one width, the wider caption's)
+    st.btnW = math.max(T.measure(st.fBtn, st.btnText), T.measure(st.fBtn, st.btn2Text)) + 48 * s
+    local txtW = colW - 4 - 40 * s - 64 * s - 20 * s - 20 * s - st.btnW
     st.txtW = txtW
     st.spanLines = T.wrap(getText("IGUI_Knox_PinnedSupportText"), st.fSpan, txtW)
     local txtH = 24 * s + 2 * s + #st.spanLines * 20 * s
-    st.supInner = math.max(64 * s, txtH, 34 * s + 6 * s + 15 * s)
+    st.supInner = math.max(64 * s, txtH, 34 * s + 8 * s + 34 * s)
     st.supH = st.supInner + 30 * s + 4
+end
+
+--- One button of the support block, at its rect `r`; `hotKey` is where st keeps when the mouse came.
+local function supportButton(ui, st, r, hotKey, text, mx, my, now)
+    local hot = st.inView and T.inRect(mx, my, r)
+    if hot and not st[hotKey] then st[hotKey] = now end
+    if not hot then st[hotKey] = nil end
+    local C = st.color or GOLD
+    T.rect(ui, r[1], r[2], r[3], r[4], hot and (st.hotColor or BUTTON_HOT) or C)
+    -- under the mouse it shimmers as the card does: the same light, ~1 s over it, every 2.6 s,
+    -- under its caption (the letters stay sharp)
+    if hot and T.animOn() then
+        local p = shineAt((now - st[hotKey]) / 1000, 2.6)
+        if p > 0 then
+            T.clip(ui, r[1], r[2], r[3], r[4])
+            band(ui, r[1], r[2], r[3], r[4], p, 0.24, st.shine or SHINE, 0.62)
+            if st.clip then T.clip(ui, st.clip[1] + 2, st.clip[2], st.clip[3] - 4, st.clip[4]) end
+        end
+        T.border(ui, r[1], r[2], r[3], r[4], T.color.bright)
+        T.border(ui, r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, T.color.bright)
+    else
+        T.border(ui, r[1], r[2], r[3], r[4], C)
+    end
+    btnOpts.font = st.fBtn
+    T.label(ui, text, r, T.color.ink, btnOpts)
 end
 
 --- The support block at x, y (colW wide); returns its height. (In gold on the pinned post; a
 --- post in its style brings its own colours and logo: st.color, st.hotColor, st.shine, st.logo -
---- every post has it under its head from now on, the author 2026-11-05.)
+--- every post has it under its head from now on, the author 2026-11-05. Two buttons, Boosty over
+--- Discord, in one plate: the author chose it from the mockups, 2026-11-05.)
 function P.drawSupport(ui, st, x, y, colW, s, mx, my, now)
     supportLayout(st, colW, s)
     local h = st.supH
@@ -375,39 +407,18 @@ function P.drawSupport(ui, st, x, y, colW, s, mx, my, now)
         T.label(ui, l, labR, T.color.text, labOpts)
         ty = ty + 20 * s
     end
-    -- the button, "opens in your browser" under it
-    local colH = 34 * s + 6 * s + 15 * s
-    local rx = x + colW - 2 - 20 * s - st.rightW
+    -- the buttons, one over the other
+    local colH = 34 * s + 8 * s + 34 * s
     local by = iy + (inner - colH) / 2
     -- (on whole pixels: at a fraction its 1 px frames fell between pixels, uneven - "the button
     -- is crooked", the author 2026-10-25)
-    btnR[1], btnR[2] = math.floor(rx + st.rightW - st.btnW + 0.5), math.floor(by + 0.5)
-    btnR[3], btnR[4] = math.floor(st.btnW + 0.5), math.floor(34 * s + 0.5)
+    local bx, bw, bh = math.floor(x + colW - 2 - 20 * s - st.btnW + 0.5), math.floor(st.btnW + 0.5), math.floor(34 * s + 0.5)
     st.btn = st.btn or {0, 0, 0, 0}
-    st.btn[1], st.btn[2], st.btn[3], st.btn[4] = btnR[1], btnR[2], btnR[3], btnR[4]
-    local hot = st.inView and T.inRect(mx, my, btnR)
-    if hot and not st.btnHotAt then st.btnHotAt = now end
-    if not hot then st.btnHotAt = nil end
-    T.rect(ui, btnR[1], btnR[2], btnR[3], btnR[4], hot and (st.hotColor or BUTTON_HOT) or C)
-    -- under the mouse it shimmers as the card does: the same light, ~1 s over it, every 2.6 s,
-    -- under its caption (the letters stay sharp)
-    if hot and T.animOn() then
-        local p = shineAt((now - st.btnHotAt) / 1000, 2.6)
-        if p > 0 then
-            T.clip(ui, btnR[1], btnR[2], btnR[3], btnR[4])
-            band(ui, btnR[1], btnR[2], btnR[3], btnR[4], p, 0.24, st.shine or SHINE, 0.62)
-            if st.clip then T.clip(ui, st.clip[1] + 2, st.clip[2], st.clip[3] - 4, st.clip[4]) end
-        end
-        T.border(ui, btnR[1], btnR[2], btnR[3], btnR[4], T.color.bright)
-        T.border(ui, btnR[1] + 1, btnR[2] + 1, btnR[3] - 2, btnR[4] - 2, T.color.bright)
-    else
-        T.border(ui, btnR[1], btnR[2], btnR[3], btnR[4], C)
-    end
-    btnOpts.font = st.fBtn
-    T.label(ui, st.btnText, btnR, T.color.ink, btnOpts)
-    labR[1], labR[2], labR[3], labR[4] = rx, by + 40 * s, st.rightW, 15 * s
-    labOpts.font, labOpts.align = st.fUnder, "right"
-    T.label(ui, st.under, labR, T.color.dim, labOpts)
+    st.btn[1], st.btn[2], st.btn[3], st.btn[4] = bx, math.floor(by + 0.5), bw, bh
+    st.btn2 = st.btn2 or {0, 0, 0, 0}
+    st.btn2[1], st.btn2[2], st.btn2[3], st.btn2[4] = bx, st.btn[2] + bh + math.floor(8 * s + 0.5), bw, bh
+    supportButton(ui, st, st.btn, "btnHotAt", st.btnText, mx, my, now)
+    supportButton(ui, st, st.btn2, "btn2HotAt", st.btn2Text, mx, my, now)
     labOpts.align = nil
     return h
 end

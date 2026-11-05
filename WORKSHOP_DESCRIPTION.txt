@@ -3,6 +3,7 @@ Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
 [h1]Knox Inventory[/h1]
 [b]The whole Project Zomboid UI, redesigned in the style of Escape From Tarkov - one stage at a time.[/b]
 A grid inventory where every item takes its real space, your character in 3D, and a main menu that is a camp with the heroes of your saves by the fire.
+[b]Chat with us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].[/b]
 
 [img]https://images.steamusercontent.com/ugc/17471200081781262748/58D6572D5A1573EC011D4D04610A71F5174049DD/[/img]
 

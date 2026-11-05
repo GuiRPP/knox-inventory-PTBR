@@ -916,17 +916,25 @@ function R:onMouseDown(x, y)
     if self.switchTo then return true end
     -- (past the live post's context menu: it closes - the click isn't one on the post)
     if KnoxNewsLive and KnoxNewsLive.menuUp then return true end
-    -- the support plate's button in a post of the pinned style
+    -- the support plate's buttons in a post of the pinned style
     local sup = self.support
     if sup and sup.btn and sup.inView and T.inRect(x, y, sup.btn) then
         KnoxPinned.openBoosty()
         return true
     end
+    if sup and sup.btn2 and sup.inView and T.inRect(x, y, sup.btn2) then
+        KnoxPinned.openDiscord()
+        return true
+    end
     local pin = self.pin
     if pin then
-        -- the support block's button: Boosty in the browser
+        -- the support block's buttons: Boosty and Discord in the browser
         if pin.btn and pin.inView and T.inRect(x, y, pin.btn) then
             KnoxPinned.openBoosty()
+            return true
+        end
+        if pin.btn2 and pin.inView and T.inRect(x, y, pin.btn2) then
+            KnoxPinned.openDiscord()
             return true
         end
         -- the roadmap: the arrows, a drag, a card (in the view only)
