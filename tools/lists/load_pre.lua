@@ -26,6 +26,8 @@ SCRIPTS = {
     ["Base.Pistol"] = {cls = "HandWeapon", ranged = true, ammo = "Base.Bullets9mm", mag = "Base.9mmClip", box = "Base.Bullets9mmBox", max = 15, cat = "Weapon"},
     ["Base.Shotgun"] = {cls = "HandWeapon", ranged = true, ammo = "Base.ShotgunShells", box = "Base.ShotgunShellsBox", max = 6, cat = "Weapon"},
     ["Base.Axe"] = {cls = "HandWeapon", cat = "Weapon"},
+    -- (takes its rounds itself, in a Gunworks family in tools/lists/gunworks.lua)
+    ["Base.Revolver"] = {cls = "HandWeapon", ranged = true, ammo = "Base.Bullets9mm", max = 6, cat = "Weapon"},
     ["Base.9mmClip"] = {ammo = "Base.Bullets9mm", max = 15, cat = "Ammo", scriptAmmo = true},
     ["Base.Bullets9mm"] = {cat = "Ammo"},
     ["Base.Bullets9mmBox"] = {cat = "Ammo"},

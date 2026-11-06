@@ -738,7 +738,16 @@ function L.loadGun(player, gun, pile)
         if c ~= inv and not (c and c:isInCharacterInventory(player)) then toMain(player, it) end
         moved = moved + 1
     end
-    ISInventoryPaneContextMenu.onLoadBulletsIntoFirearm(player, gun)
+    -- (a Gunworks family: its own way, it sets the gun to these rounds - the plain one loads the
+    -- gun's own kind; the author 2026-11-06)
+    local first = pile.items[1]
+    local key = first and first:getFullType()
+    local diff = ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType
+    if diff and key and KnoxCompat and KnoxCompat.roundFits(gun, key) then
+        diff(player, gun, key)
+    else
+        ISInventoryPaneContextMenu.onLoadBulletsIntoFirearm(player, gun)
+    end
 end
 
 -- What the panel's cells say and do ------------------------------------------------
@@ -861,7 +870,7 @@ local function loadOf(ref, item, player)
         local Pf = KnoxPerf
         local pt = Pf and Pf.detail and Pf.now()
         if l.kind == "mag" then l.spares = magazines(player, g.mag, nil)
-        elseif m and m.rounds then l.spares = pilesOf(player, m.rounds)
+        elseif (m or g).rounds then l.spares = pilesOf(player, (m or g).rounds)
         else l.spares = piles(player, l.key) end
         if pt then Pf.part("load: spares", pt, #l.spares) end
     end

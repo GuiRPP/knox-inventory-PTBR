@@ -221,6 +221,26 @@ local function allRow(player, mags, item, rows)
     table.insert(rows, r)
 end
 
+--- A gun that takes its rounds itself, with more than one kind in its Gunworks family: a row
+--- for each kind carried, from `at` on - the choice of what goes in (the author 2026-11-06).
+--- Each is the gun's own row (load, unload twice) with its `round`. False: none carried.
+local function roundRows(player, gun, rows, at)
+    local g = L.index().gun[gun:getFullType()]
+    local keys = g and g.rounds
+    if not keys or #keys < 2 then return false end
+    local inv, n = player:getInventory(), 0
+    for _, key in ipairs(keys) do
+        local sample = inv:getItemCountRecurse(key) > 0 and L.sample(key)
+        if sample then
+            local r = newRow("self", sample, sample:getDisplayName())
+            r.m, r.key, r.round = gun, key, key
+            table.insert(rows, at + n, r)
+            n = n + 1
+        end
+    end
+    return n > 0
+end
+
 --- Rows and head for what is in hand. Returns nothing to show: no rows.
 function M.rowsOf(player)
     local s = strings()
@@ -247,7 +267,7 @@ function M.rowsOf(player)
         sortMags(mags)
         for _, m in ipairs(mags) do table.insert(rows, magRow(gun:isContainsClip() and "swap" or "insert", m)) end
         allRow(player, mags, L.sample(magType) or gun, rows)
-    else
+    elseif not roundRows(player, gun, rows, jam and 2 or 1) then
         -- (what it holds is in the head; the row is what it does: its name and scale there
         -- twice, the author 2026-11-05)
         local r = newRow("self", gun, s.load)
@@ -305,7 +325,8 @@ local function chooseStrip(player)
     local b = M.strip
     if gun then
         local at = gun:getAmmoType()
-        if at then b = stripFor(at:getItemKey(), gun:getMaxAmmo()) end
+        local key = (r and r.round) or (at and at:getItemKey())
+        if key then b = stripFor(key, gun:getMaxAmmo()) end
     elseif r and r.key then
         b = stripFor(r.key, r.m:getMaxAmmo())
     end
@@ -434,7 +455,13 @@ function M.countMags(player)
         local n = 0
         local t = gun:getMagazineType()
         if t and t ~= "" then n = player:getInventory():getAllTypeRecurse(t):size() end
-        return boxes + n * 4 + (gun:isContainsClip() and 1 or 0) + (gun:isJammed() and 2 or 0)
+        -- (which kinds of its rounds are carried: their rows, roundRows)
+        local g, kinds, bit = L.index().gun[gun:getFullType()], 0, 1
+        for _, key in ipairs(g and g.rounds or {}) do
+            if player:getInventory():getItemCountRecurse(key) > 0 then kinds = kinds + bit end
+            bit = bit * 2
+        end
+        return kinds * 1000000000 + boxes + n * 4 + (gun:isContainsClip() and 1 or 0) + (gun:isJammed() and 2 or 0)
     end
     local n = 0
     for ft in pairs(L.index().mag) do n = n + player:getInventory():getAllTypeRecurse(ft):size() end
@@ -537,6 +564,7 @@ end
 function M.abort()
     release()
     M.state, M.armed, M.armedItem, M.job, M.heldRack = nil, nil, nil, nil, nil
+    M.jobRound, M.armedRound = nil, nil
 end
 
 --- The element over the whole screen: it takes the clicks and the wheel while the menu is open.
@@ -641,16 +669,20 @@ end
 
 --- Load a magazine, or the gun that takes rounds itself. (The game's menus' way: as many
 --- rounds as go in brought to the main inventory, then the action.)
-function M.load(item)
+function M.load(item, round)
     local player = M.player
     if not player or not item then return false end
     local a, out = jobQueuedOn(player, item)
-    if a and not out then return true end   -- (already at it)
+    if a and not out and (not round or round == M.jobRound) then return true end   -- (already at it)
     local cap, n = item:getMaxAmmo(), item:getCurrentAmmoCount()
     local isGun = instanceof(item, "HandWeapon")
     local at = item:getAmmoType()
     local key = at and at:getItemKey()
-    if key and not isGun then key = L.roundFor(player, item) end
+    if round then
+        key = round   -- (the row of a kind of round: roundRows)
+    elseif key and not isGun then
+        key = L.roundFor(player, item)
+    end
     if not key or player:getInventory():getItemCountRecurse(key) <= 0 then return false end
     if isGun and item:isJammed() then return false end
     -- (one not known that is full: one round tried, the try is how it is found out - nothing
@@ -658,6 +690,14 @@ function M.load(item)
     local blind = not isGun and n >= cap and not K.is(item)
     if n >= cap and not blind then return false end
     clearBusy(player)
+    M.jobRound = round
+    -- (Gunworks' own way: it sets the gun to these rounds, the game's action would take the gun's)
+    local diff = round and ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType
+    if diff then
+        M.job = item
+        diff(player, item, round)
+        return true
+    end
     if not isGun then ISInventoryPaneContextMenu.transferIfNeeded(player, item) end
     local count = ISInventoryPaneContextMenu.transferBullets(player, key, blind and 0 or n, blind and 1 or cap)
     if count <= 0 then return false end
@@ -734,7 +774,7 @@ function M.lmb()
     if not r then return end
     if r.kind == "bag" then return end
     if r.kind == "self" then
-        if M.canLoad(r) then M.load(r.m) end
+        if M.canLoad(r) then M.load(r.m, r.round) end
         return
     end
     if r.kind == "all" then
@@ -774,11 +814,11 @@ function M.rmb()
             return
         end
         -- (another row chosen between the two: the first was one click, load it - QA 2026-10-31)
-        M.load(item)
+        M.load(item, M.armedRound)
         M.wasBusy = true
     end
     if not r or not r.m then return end
-    M.armed, M.armedItem = getTimestampMs(), r.m
+    M.armed, M.armedItem, M.armedRound = getTimestampMs(), r.m, r.round
 end
 
 --- Its time up: one click. (Also after R is let go: it was asked for.)
@@ -788,7 +828,7 @@ local function fireArmed(now)
     M.armed, M.armedItem = nil, nil
     local player = M.player
     if player and not player:isDead() and item then
-        M.load(item)
+        M.load(item, M.armedRound)
         M.wasBusy = true
     end
 end
@@ -1181,7 +1221,7 @@ local function readJob(player)
     local item = field and a[field]
     local box = a and a.action and a.Type == "ISHandcraftAction"
     for _, r in ipairs(M.rows) do
-        local on = (r.m and r.m == item) or (box and r.kind == "box" and opensBox(a, r.item:getFullType()))
+        local on = (r.m and r.m == item and (not r.round or r.round == M.jobRound)) or (box and r.kind == "box" and opensBox(a, r.item:getFullType()))
         if on and KnoxGrid.useDelta then
             local d = KnoxGrid.useDelta(a)
             local out = JOB_OUT[a.Type] == true

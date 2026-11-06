@@ -16,7 +16,7 @@ local PLAYER
 local INV = {getCountType = function(_, key) return carried[key] or 0 end}
 PLAYER = {getInventory = function() return INV end}
 local AMMO = {
-    ItemAmmoFamily = {["Base.9mmClip"] = "fam9", ["Base.Pistol"] = "fam9"},
+    ItemAmmoFamily = {["Base.9mmClip"] = "fam9", ["Base.Pistol"] = "fam9", ["Base.Revolver"] = "fam9"},
     GetFamilyForItem = function(item) return item.family or (item.ft == "Base.9mmClip" and "fam9") or nil end,
     GetBulletTypesForFamily = function(family)
         if family == "fam9" then return {"Base.Bullets9mm", "Base.308Bullets"} end
@@ -171,6 +171,26 @@ P.close()
 now = now + 1000
 P.sweep()
 L.sync()
+do
+    -- a gun that takes rounds itself: all the family too, loaded with the one clicked
+    local rev = newItem("Base.Revolver", GAME_INV, {n = 2, family = "fam9"})
+    local r3 = ref(rev)
+    L.panelFor = rev
+    L.offer(r3, rev, GAME_PLAYER, 0)
+    now = now + 130
+    L.offer(r3, rev, GAME_PLAYER, 0)
+    P.sync(nil)
+    local gl = P.instance and P.instance.load
+    check("a gun with no magazine: the family's piles", gl and #gl.spares == 3, gl and #gl.spares)
+    local loaded
+    ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType = function(_, _, key) loaded = key end
+    gl.act(3)
+    check("it loads the kind clicked", loaded == "Base.308Bullets", loaded)
+    ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType = nil
+    P.dismiss()
+    P.sync(nil)
+end
+
 check("the panel gone: no more", L.opened == false and not L.counting(clip), tostring(L.opened))
 
 print(string.format("gunworks: %d pass, %d fail", pass, fail))

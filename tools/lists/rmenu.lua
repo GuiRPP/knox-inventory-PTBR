@@ -457,6 +457,48 @@ bump(200) frames(1)
 check("no shells: LMB out", M.hints.noAct == true)
 check("none carried: all faint", M.strip.lit == 0)
 
+-- a gun that takes its rounds itself, several kinds in its family: a row for each kind carried
+clearAll()
+do
+    local rev = newItem("Base.Revolver", INV, {n = 2})
+    PLAYER.primary = rev
+    local g = KnoxLoad.index().gun["Base.Revolver"]
+    g.rounds = {"Base.Bullets9mm", "Base.ShotgunShells", "Base.308Bullets"}
+    rounds(3, "Base.Bullets9mm")
+    rounds(4, "Base.ShotgunShells")
+    check("kinds of rounds: opens", open())
+    KEYS[R] = true
+    check("a row for each kind carried", kinds() == "self,self" and M.rows[1].round == "Base.Bullets9mm"
+        and M.rows[2].round == "Base.ShotgunShells", kinds())
+    check("the row says the kind", M.rows[2].name == M.rows[2].item:getDisplayName())
+    M.wheel(1)
+    frames(1)
+    check("the rounds shown: the row's", M.strip.key == "Base.ShotgunShells" and M.strip.n == 4)
+    local loaded
+    ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType = function(_, gun, key) loaded = key end
+    M.lmb()
+    check("LMB loads that kind", loaded == "Base.ShotgunShells", loaded)
+    loaded = nil
+    M.wheel(-1)
+    frames(1)
+    M.rmb()
+    bump(400)
+    frames(1)
+    check("one RMB loads that kind", loaded == "Base.Bullets9mm", loaded)
+    ISInventoryPaneContextMenu.onLoadBulletsIntoFirearmFromDiffAmmoType = nil
+    for i = #INV.items, 1, -1 do if INV.items[i].ft == "Base.ShotgunShells" then table.remove(INV.items, i) end end
+    bump(2000)
+    frames(1)
+    check("a kind gone: its row goes", kinds() == "self" and M.rows[1].round == "Base.Bullets9mm", kinds())
+    for i = #INV.items, 1, -1 do if INV.items[i].ft == "Base.Bullets9mm" then table.remove(INV.items, i) end end
+    bump(2000)
+    frames(1)
+    check("none: the plain row", kinds() == "self" and M.rows[1].round == nil, kinds())
+    g.rounds = nil
+    M.close()
+    frames(1)
+end
+
 clearAll()
 PLAYER.primary = newItem("Base.Revolver", INV, {n = 6})
 check("opens", open())
