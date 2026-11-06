@@ -1673,6 +1673,23 @@ function T.wrap(text, font, width)
     return lines
 end
 
+--- T.wrap for a whole message: its paragraphs and blank lines stay, the result
+--- is one string with line breaks. (ISModalDialog wraps nothing and grows to its
+--- longest line, off the screen; a Discord player could not read the end of the
+--- Java message, the author 2026-11-06.)
+function T.wrapMessage(text, font, width)
+    text = string.gsub(text or "", "\\n", "\n") .. "\n"
+    local out, pos = {}, 1
+    while pos <= string.len(text) do
+        local stop = string.find(text, "\n", pos, true)
+        local lines = T.wrap(string.sub(text, pos, stop - 1), font, width)
+        if #lines == 0 then table.insert(out, "") end
+        for i = 1, #lines do table.insert(out, lines[i]) end
+        pos = stop + 1
+    end
+    return table.concat(out, "\n")
+end
+
 local fitCache, fitCount = {}, 0
 
 --- Text cut to fit `width`, with a trailing dot when shortened.

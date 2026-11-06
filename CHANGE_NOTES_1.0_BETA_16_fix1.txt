@@ -1,0 +1,9 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]If ZombieBuddy has stored a denial for Knox, the mod stays off and ZombieBuddy no longer asks. Reinstalling the game or the mods does not clear it. The message in the main menu now fits the screen and says what to do.
+[*]ZombieBuddy will ask about KnoxInventoryJava.jar once more: tick Yes on the Knox Inventory row and press OK. The row starts on No, so OK alone keeps the mod off.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

@@ -611,8 +611,13 @@ local function tellJavaMissing(inMenu)
     local key = KnoxTheme.javaVersion and "IGUI_Knox_JavaOld" or (inMenu and "IGUI_Knox_JavaRestart" or "IGUI_Knox_JavaMissing")
     local text = getText(key, tostring(KnoxTheme.javaVersion or ""), tostring(KnoxTheme.JAVA_NEEDED))
     local fontH = getTextManager():getFontHeight(UIFont.Small)
-    local w, h = math.max(640, fontH * 34), math.max(240, fontH * 14)
-    local modal = ISModalDialog:new((getCore():getScreenWidth() - w) / 2, (getCore():getScreenHeight() - h) / 2,
+    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local w = math.min(math.max(640, fontH * 34), screenW - 40)
+    text = KnoxTheme.wrapMessage(text, UIFont.Small, w - 40)
+    -- the dialog sizes itself to its text: centred by the size it will really have
+    local h
+    w, h = ISModalDialog.CalcSize(w, math.max(240, fontH * 14), text)
+    local modal = ISModalDialog:new((screenW - w) / 2, math.max(0, (screenH - h) / 2),
         w, h, text, false, nil, nil, 0)
     modal:initialise()
     modal:addToUIManager()
