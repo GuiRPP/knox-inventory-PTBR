@@ -356,7 +356,7 @@
     "IGUI_Knox_RMenu_Unjam": "Устранить осечку",
     "IGUI_Knox_RMenu_NoWeapon": "Без оружия",
     "IGUI_Knox_RMenu_MagsRounds": "Магазины и патроны",
-    "IGUI_Knox_RMenu_OpenBox": "Открыть коробку патронов",
+    "IGUI_Knox_RMenu_Open": "Открыть",
     "IGUI_Knox_RMenu_Rounds": "Патроны",
     "IGUI_Knox_Module_dashboard": "Приборная панель",
     "IGUI_Knox_Module_dashboard_Info": "Приборная панель машины в стиле Knox, как в настоящей машине: приборы и лампы, выключатели, замок зажигания с ключом, магнитола с кассетой для вашей музыки и печка.",

@@ -87,7 +87,7 @@ local function strings()
     STR = {wheel = tx("Wheel"), pick = tx("Pick"), lmb = tx("LMB"), rmb = tx("RMB"), rmb2 = tx("RMB2"),
            swap = tx("Swap"), insert = tx("Insert"), load = tx("Load"), unload = tx("Unload"), use = tx("Use"),
            eject = tx("Eject"), bolt = tx("RackBolt"), pump = tx("RackPump"), unjam = tx("Unjam"),
-           noGun = tx("NoWeapon"), magsRounds = tx("MagsRounds"), box = tx("OpenBox"), rounds = tx("Rounds"),
+           noGun = tx("NoWeapon"), magsRounds = tx("MagsRounds"), open = tx("Open"), rounds = tx("Rounds"),
            loadAll = tx("LoadAll")}
     return STR
 end
@@ -143,7 +143,7 @@ end
 
 local function newRow(kind, item, name, tex)
     local cat = item and T.category[T.categoryOf(item)] or T.category.misc
-    return {kind = kind, item = item, name = name, tex = tex or (item and item:getTex()), ink = inkOf(tex or (item and item:getTex())),
+    return {kind = kind, item = item, name = name, slide = {}, tex = tex or (item and item:getTex()), ink = inkOf(tex or (item and item:getTex())),
             cat = cat, edge = T.mix(cat, WHITE, 0.3), grow = 0, h = Z.ROW, y = 0, n = 0, cap = 0, lit = 0, known = false}
 end
 
@@ -177,24 +177,22 @@ local function allMags(player)
     return out
 end
 
-local function firstBox(player, mags)
-    local x = L.index()
-    local seen = {}
-    for _, m in ipairs(mags) do
-        local at = m:getAmmoType()
-        local key = at and at:getItemKey()
-        if key and not seen[key] then
-            seen[key] = true
-            local entry = x.ammo[key]
-            if entry then
-                for box in pairs(entry.boxes) do
-                    local got = player:getInventory():getAllTypeRecurse(box)
-                    if got:size() > 0 then return got:get(0) end
-                end
-            end
+--- A row for each type of box carried, by name (the author 2026-11-06): with no gun all of
+--- them, with one those of its rounds.
+local function boxRows(player, gun, rows)
+    M.boxTypes = L.boxTypes(gun)
+    local found = {}
+    for _, ft in ipairs(M.boxTypes) do
+        local got = player:getInventory():getAllTypeRecurse(ft)
+        if got:size() > 0 then
+            local box = got:get(0)
+            local name = box:getDisplayName()
+            if got:size() > 1 then name = name .. " x" .. got:size() end
+            table.insert(found, newRow("box", box, name))
         end
     end
-    return nil
+    table.sort(found, function(a, b) return a.name < b.name end)
+    for _, r in ipairs(found) do table.insert(rows, r) end
 end
 
 --- Can any of them take rounds that are carried? (All but those known to be full; rounds of
@@ -206,7 +204,7 @@ local function anyRounds(player, mags)
         local at = m:getAmmoType()
         local key = at and at:getItemKey()
         if key and key ~= last and not (K.is(m) and m:getCurrentAmmoCount() >= m:getMaxAmmo()) then
-            if inv:getItemCountRecurse(key) > 0 then return true end
+            if inv:getItemCountRecurse(L.roundFor(player, m)) > 0 then return true end
             last = key
         end
     end
@@ -234,8 +232,7 @@ function M.rowsOf(player)
         sortMags(mags)
         for _, m in ipairs(mags) do table.insert(rows, magRow("bag", m)) end
         allRow(player, mags, mags[1], rows)
-        local box = #mags > 0 and firstBox(player, mags) or nil
-        if box then table.insert(rows, newRow("box", box, s.box)) end
+        boxRows(player, nil, rows)
         return rows, nil
     end
     local magType = gun:getMagazineType()
@@ -250,12 +247,6 @@ function M.rowsOf(player)
         sortMags(mags)
         for _, m in ipairs(mags) do table.insert(rows, magRow(gun:isContainsClip() and "swap" or "insert", m)) end
         allRow(player, mags, L.sample(magType) or gun, rows)
-        if gun:isContainsClip() then
-            local sample = L.sample(magType)
-            local r = newRow("eject", sample or gun, s.eject)
-            r.red = true
-            table.insert(rows, r)
-        end
     else
         -- (what it holds is in the head; the row is what it does: its name and scale there
         -- twice, the author 2026-11-05)
@@ -269,6 +260,13 @@ function M.rowsOf(player)
         local shells = at and at:getItemKey() == L.SHELLS
         table.insert(rows, newRow("rack", gun, shells and s.pump or s.bolt))
     end
+    -- (after the bolt's row: the author 2026-11-06)
+    if magType and magType ~= "" and gun:isContainsClip() then
+        local r = newRow("eject", L.sample(magType) or gun, s.eject)
+        r.red = true
+        table.insert(rows, r)
+    end
+    boxRows(player, gun, rows)
     return rows, gun
 end
 
@@ -293,6 +291,12 @@ local function readStrip(player)
     if not b then return end
     b.n = player:getInventory():getItemCountRecurse(b.key)
     b.lit = M.reserveLit(b.n, b.cap)
+end
+
+--- The height of the rounds' block with its thin line: none with no rounds to show, only
+--- boxes carried and no gun (the author 2026-11-06: an empty place in the plate).
+local function stripH()
+    return M.strip and (1 + Z.GAP + Z.ROUNDS + Z.GAP) or 0
 end
 
 local function chooseStrip(player)
@@ -376,7 +380,7 @@ local function fitRows(wasW)
     for _, r in ipairs(M.rows) do
         local nx = Z.TX + math.floor(Z.GROW_CELL / 2)
         local room = W - nx - Z.L - (M.hasScale(r) and (Z.P16 + Z.SCW) or 0)
-        r.fit, r.fitBig = T.fit(r.name, T.fontText, room), T.fit(r.name, Z.big, room)
+        r.room, r.fit, r.fitBig = room, T.fit(r.name, T.fontText, room), T.fit(r.name, Z.big, room)
     end
 end
 
@@ -412,6 +416,7 @@ function M.build(player, keepW)
         M.title, M.sub = s.noGun, s.magsRounds
         M.tex, M.ink = nil, nil
     end
+    M.titleSlide, M.subSlide = M.titleSlide or {}, M.subSlide or {}
     fitRows(keepW and M.W or nil)
     chooseStrip(player)
     readRows(player)
@@ -419,18 +424,21 @@ function M.build(player, keepW)
     return true
 end
 
---- What says a rebuild is due: the magazines carried, what is in the gun.
+--- What says a rebuild is due: the magazines and boxes carried, what is in the gun.
 function M.countMags(player)
     local gun = M.gun
+    local boxes = 0
+    for _, ft in ipairs(M.boxTypes or {}) do boxes = boxes + player:getInventory():getAllTypeRecurse(ft):size() end
+    boxes = boxes * 100000
     if gun then
         local n = 0
         local t = gun:getMagazineType()
         if t and t ~= "" then n = player:getInventory():getAllTypeRecurse(t):size() end
-        return n * 4 + (gun:isContainsClip() and 1 or 0) + (gun:isJammed() and 2 or 0)
+        return boxes + n * 4 + (gun:isContainsClip() and 1 or 0) + (gun:isJammed() and 2 or 0)
     end
     local n = 0
     for ft in pairs(L.index().mag) do n = n + player:getInventory():getAllTypeRecurse(ft):size() end
-    return n
+    return boxes + n
 end
 
 -- May it open? ----------------------------------------------------------------------------
@@ -479,6 +487,20 @@ local function inWorld()
     return true
 end
 
+--- Is this action a recipe working on a box: of the type `ft`, or with no `ft` any box known?
+--- (The author 2026-11-06: the bar of a box being opened. The recipe's action keeps what it
+--- works on in its list `items`.)
+local function opensBox(a, ft)
+    local items = a.Type == "ISHandcraftAction" and a.items
+    if not items then return false end
+    for i = 0, items:size() - 1 do
+        local it = items:get(i)
+        local got = it and it:getFullType()
+        if got and (got == ft or (not ft and L.index().box[got])) then return true end
+    end
+    return false
+end
+
 local function canHold(player)
     if not player or player:isDead() then return false end
     local sc = UIManager.getSpeedControls and UIManager.getSpeedControls()
@@ -489,7 +511,7 @@ local function canHold(player)
     if not inWorld() then return false end
     local q = queueOf(player)
     local a = q and q[1]
-    if a and not ITS_OWN[a.Type or ""] and not M.jobQueued(player) then return false end
+    if a and not ITS_OWN[a.Type or ""] and not M.jobQueued(player) and not opensBox(a) then return false end
     return true
 end
 
@@ -556,7 +578,7 @@ function M.open(player, key)
     M.wasBusy = isBusy(player)
     -- (the top stays where it is, whatever happens to the rows)
     local rowsH = math.min(#M.rows, MAX_ROWS) * Z.ROW + Z.GROW_H + (#M.rows > MAX_ROWS and 2 * Z.STRIP or 0)
-    local H = Z.GAP + Z.PH + Z.GAP + rowsH + Z.GAP + 1 + Z.GAP + Z.ROUNDS + Z.GAP + 1 + Z.GAP + Z.KH + Z.GAP
+    local H = Z.GAP + Z.PH + Z.GAP + rowsH + Z.GAP + stripH() + 1 + Z.GAP + Z.KH + Z.GAP
     M.ox, M.oy = Z.LEFT, math.floor((getCore():getScreenHeight() - H) / 2)
     M.openH = H
     if not M.catch then
@@ -625,10 +647,11 @@ function M.load(item)
     local a, out = jobQueuedOn(player, item)
     if a and not out then return true end   -- (already at it)
     local cap, n = item:getMaxAmmo(), item:getCurrentAmmoCount()
+    local isGun = instanceof(item, "HandWeapon")
     local at = item:getAmmoType()
     local key = at and at:getItemKey()
+    if key and not isGun then key = L.roundFor(player, item) end
     if not key or player:getInventory():getItemCountRecurse(key) <= 0 then return false end
-    local isGun = instanceof(item, "HandWeapon")
     if isGun and item:isJammed() then return false end
     -- (one not known that is full: one round tried, the try is how it is found out - nothing
     -- done at all would tell it free; QA 2026-10-31. Known: from the first round in, KnoxMagKnown.)
@@ -642,7 +665,7 @@ function M.load(item)
     if isGun then
         ISTimedActionQueue.add(ISReloadWeaponAction:new(player, item))
     else
-        ISTimedActionQueue.add(ISLoadBulletsInMagazine:new(player, item, count))
+        L.queueLoad(player, item, count, key)
     end
     return true
 end
@@ -677,14 +700,14 @@ function M.loadAll(mags)
     for _, mag in ipairs(mags) do
         local n, cap = mag:getCurrentAmmoCount(), mag:getMaxAmmo()
         local at = mag:getAmmoType()
-        local key = at and at:getItemKey()
+        local key = at and L.roundFor(player, mag)
         if key and mag:getContainer() and not (K.is(mag) and n >= cap) then
             if have[key] == nil then have[key] = inv:getItemCountRecurse(key) end
             if have[key] > 0 then
                 local count = n < cap and math.min(cap - n, have[key]) or 1
                 if n < cap then have[key] = have[key] - count end
                 bring[key] = n < cap and (bring[key] or 0) + count or math.max(bring[key] or 0, 1)
-                table.insert(plan, {mag = mag, count = count})
+                table.insert(plan, {mag = mag, count = count, key = key})
             end
         end
     end
@@ -695,7 +718,7 @@ function M.loadAll(mags)
     end
     for _, p in ipairs(plan) do
         ISInventoryPaneContextMenu.transferIfNeeded(player, p.mag)
-        ISTimedActionQueue.add(ISLoadBulletsInMagazine:new(player, p.mag, p.count))
+        L.queueLoad(player, p.mag, p.count, p.key)
     end
     M.job = plan[#plan].mag   -- (the menu may come up over the whole of it: M.jobQueued)
     return true
@@ -717,6 +740,11 @@ function M.lmb()
     if r.kind == "all" then
         M.loadAll(r.mags)
     elseif r.kind == "box" then
+        -- (pressed again while it is being opened: the same box is not begun anew)
+        local q, ft = queueOf(player), r.item:getFullType()
+        for i = 1, q and #q or 0 do
+            if opensBox(q[i], ft) then return end
+        end
         clearBusy(player)
         L.openBox(player, r.item)
     elseif r.kind == "swap" or r.kind == "insert" then
@@ -868,6 +896,16 @@ local function label(ui, s, x, y, w, h, c, font, a)
     return T.label(ui, s, band, c, labelOpts)
 end
 
+--- A line that may be too long (the author 2026-11-06): as T.label, or if cut to fit (`fitted`
+--- is not all of `s`) it slides as the other windows' names do. `whole` false: not all of it
+--- in the list's window, where a slide's own clip would let it out - cut, as it stands.
+local listClip = {0, 0, 0, 0}
+local function line(ui, st, s, fitted, whole, x, y, w, h, c, font, a)
+    if fitted == s or not whole then return label(ui, fitted, x, y, w, h, c, font, a) end
+    local _, ty = T.inkOrigin(s, x, y, w, h, font)
+    T.marquee(ui, st, s, x, ty, w, c, font, a, M.clipped and listClip or nil)
+end
+
 --- The five parts: `lit` of them, in sand or, two and less, in red; none lit: all faint red.
 --- Not known: a thin line in their place.
 local function drawScale(ui, x, y, lit, known, a)
@@ -926,17 +964,21 @@ local function drawHead(ui, ox, oy, W, a)
     local tw = hx + hw - Z.M - tx
     local cap = T.capH(T.fontHeader)
     local title = T.fit(M.title, T.fontHeader, tw)
+    local clipped = M.clipped
+    M.clipped = false   -- (the head is over the list's window: no clip of it to give back)
     local mid = cy + cell / 2
     if M.sub then
         -- the name and what is under it, about the picture's middle
         local top = math.floor(mid - (cap + Z.P20) / 2)
-        label(ui, title, tx, top, tw, cap, C.bright, T.fontHeader, a)
+        line(ui, M.titleSlide, M.title, title, true, tx, top, tw, cap, C.bright, T.fontHeader, a)
         local subCap = T.capH(T.fontTile)
-        label(ui, T.fit(M.sub, T.fontTile, tw), tx, top + cap + Z.P20 - subCap, tw, subCap, C.dim, T.fontTile, a)
+        line(ui, M.subSlide, M.sub, T.fit(M.sub, T.fontTile, tw), true, tx, top + cap + Z.P20 - subCap, tw, subCap, C.dim, T.fontTile, a)
+        M.clipped = clipped
         return
     end
     local top = math.floor(mid - (cap + Z.P9 + Z.SH) / 2)
-    label(ui, title, tx, top, tw, cap, C.bright, T.fontHeader, a)
+    line(ui, M.titleSlide, M.title, title, true, tx, top, tw, cap, C.bright, T.fontHeader, a)
+    M.clipped = clipped
     local sy = top + cap + Z.P9
     drawScale(ui, tx, sy, M.gunLit, not M.gunNone, a)
     if M.chamber then drawChamber(ui, tx + Z.SCW + Z.P8, sy, M.chamberOn, M.jam, a) end
@@ -966,7 +1008,8 @@ local function drawRow(ui, r, ox, y, W, chosen, a)
     local nx = ox + Z.TX + math.floor(Z.GROW_CELL / 2 * g + 0.5)
     local col = r.red and RED or (chosen and C.bright or C.text)
     local big = g > 0.5
-    label(ui, big and r.fitBig or r.fit, nx, y, W - (nx - ox), h, col, big and Z.big or T.fontText, a)
+    local whole = not M.clipped or (y >= listClip[2] and y + h <= listClip[2] + listClip[4])
+    line(ui, r.slide, r.name, big and r.fitBig or r.fit, whole, nx, y, r.room, h, col, big and Z.big or T.fontText, a)
     if M.hasScale(r) then
         drawScale(ui, ox + W - Z.L - Z.SCW, y + math.floor((h - Z.SH) / 2 + 0.5), r.lit, r.known, a)
     end
@@ -999,6 +1042,7 @@ local function chooseHints(now)
         elseif r.kind == "bag" then lmb, noAct = s.swap, true
         elseif r.kind == "self" then lmb, noAct = s.load, not M.canLoad(r)
         elseif r.kind == "all" then lmb = s.load
+        elseif r.kind == "box" then lmb = s.open
         elseif r.kind == "rack" or r.kind == "unjam" then noAct = not M.canRack
         end
     end
@@ -1049,7 +1093,7 @@ local function layout(dt)
     local listY = Z.GAP + Z.PH + Z.GAP
     M.clipped, M.viewH, M.regionH, M.listY, M.total = clipped, viewH, regionH, listY, total
     M.viewY = listY + (clipped and Z.STRIP or 0)
-    M.footY = listY + regionH + Z.GAP + 1 + Z.GAP + Z.ROUNDS + Z.GAP
+    M.footY = listY + regionH + Z.GAP + stripH()
     M.H = M.footY + 1 + Z.GAP + Z.KH + Z.GAP
 end
 
@@ -1077,7 +1121,10 @@ local function draw(ui, now)
     T.border(ui, ox, oy, W, H, EDGE, 1)
     drawHead(ui, ox, oy, W, a)
     -- the list: the highlight glides under it
-    if M.clipped then ui:setStencilRect(ox, oy + M.viewY, W, M.viewH) end
+    if M.clipped then
+        listClip[1], listClip[2], listClip[3], listClip[4] = ox, oy + M.viewY, W, M.viewH
+        ui:setStencilRect(ox, oy + M.viewY, W, M.viewH)
+    end
     local ly = oy + M.viewY - math.floor(M.scroll + 0.5)
     if M.hiA > 0.02 then
         local by, bh = ly + math.floor(M.hiY + 0.5), math.floor(M.hiH + 0.5)
@@ -1097,9 +1144,9 @@ local function draw(ui, now)
     end
     -- the rounds, under a thin line
     local b = M.strip
-    local sy = oy + M.footY - Z.GAP - Z.ROUNDS
-    T.rect(ui, ox + Z.L, sy - Z.GAP - 1, W - 2 * Z.L, 1, C.border, a)
     if b then
+        local sy = oy + M.footY - Z.GAP - Z.ROUNDS
+        T.rect(ui, ox + Z.L, sy - Z.GAP - 1, W - 2 * Z.L, 1, C.border, a)
         local tx0, ty0 = ox + Z.L, sy + math.floor((Z.ROUNDS - Z.CELL) / 2)
         T.rect(ui, tx0, ty0, Z.CELL, Z.CELL, b.cat, a)
         picture(ui, b.tex, b.ink, tx0 + math.floor((Z.CELL - Z.IC) / 2), ty0 + math.floor((Z.CELL - Z.IC) / 2), Z.IC, a)
@@ -1132,8 +1179,10 @@ local function readJob(player)
     local a = jobAction(player)
     local field = a and a.action and JOB[a.Type or ""]
     local item = field and a[field]
+    local box = a and a.action and a.Type == "ISHandcraftAction"
     for _, r in ipairs(M.rows) do
-        if r.m and r.m == item and KnoxGrid.useDelta then
+        local on = (r.m and r.m == item) or (box and r.kind == "box" and opensBox(a, r.item:getFullType()))
+        if on and KnoxGrid.useDelta then
             local d = KnoxGrid.useDelta(a)
             local out = JOB_OUT[a.Type] == true
             r.prog, r.out = out and 1 - d or d, out

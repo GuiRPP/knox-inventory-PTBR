@@ -950,7 +950,7 @@ local function roundsOf(a, it, start)
     if ROUNDS_OUT[a.Type] then return start end
     local n = math.min(a.ammoCount or 0, it:getMaxAmmo() - start)
     local ok, have = pcall(function()
-        return a.character:getInventory():getItemCountRecurse(it:getAmmoType():getItemKey())
+        return a.character:getInventory():getItemCountRecurse(a.ammoTypeOverride or it:getAmmoType():getItemKey())
     end)
     if ok and have then n = math.min(n, have) end
     return n

@@ -20,6 +20,9 @@ try {
         (Join-Path $here 'grid_pre.lua') (Join-Path $knox 'KnoxSelect.lua') (Join-Path $knox 'KnoxGridView.lua') (Join-Path $here 'grid.lua')
     # rounds dropped onto a magazine (2026-11-05)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') (Join-Path $here 'dragmag_pre.lua') (Join-Path $knox 'KnoxDrag.lua') (Join-Path $here 'dragmag.lua')
+    # Gunworks' families of rounds: Escape From Zomboid Firearms (2026-11-06)
+    & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') (Join-Path $here 'load_pre.lua') (Join-Path $here 'dragmag_pre.lua') (Join-Path $here 'gunworks_pre.lua') `
+        (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $knox 'KnoxLoad.lua') (Join-Path $knox 'KnoxCompat.lua') (Join-Path $knox 'KnoxDrag.lua') (Join-Path $here 'gunworks.lua')
     # the battery panel: the one in it and the character's to choose from (2026-10-29)
     & $java -cp "$game\projectzomboid.jar" $run (Join-Path $mod 'tools\settings\stubs.lua') (Join-Path $knox 'KnoxTheme.lua') `
         (Join-Path $here 'picker_pre.lua') (Join-Path $knox 'KnoxSlotPicker.lua') (Join-Path $here 'picker.lua')

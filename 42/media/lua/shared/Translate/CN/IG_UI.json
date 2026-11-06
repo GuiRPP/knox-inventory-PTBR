@@ -323,7 +323,7 @@
     "IGUI_Knox_RMenu_Unjam": "排除卡壳",
     "IGUI_Knox_RMenu_NoWeapon": "没有武器",
     "IGUI_Knox_RMenu_MagsRounds": "弹匣和弹药",
-    "IGUI_Knox_RMenu_OpenBox": "打开弹药盒",
+    "IGUI_Knox_RMenu_Open": "打开",
     "IGUI_Knox_RMenu_Rounds": "弹药",
     "IGUI_Knox_Module_dashboard": "汽车仪表盘",
     "IGUI_Knox_Module_dashboard_Info": "Knox 风格的汽车仪表盘：仪表、指示灯、点火钥匙，以及也能播放你自己音乐的收音机。",

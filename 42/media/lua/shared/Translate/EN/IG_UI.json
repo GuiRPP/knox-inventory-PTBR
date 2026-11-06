@@ -356,7 +356,7 @@
     "IGUI_Knox_RMenu_Unjam": "Unjam",
     "IGUI_Knox_RMenu_NoWeapon": "No weapon",
     "IGUI_Knox_RMenu_MagsRounds": "Magazines and rounds",
-    "IGUI_Knox_RMenu_OpenBox": "Open Ammo Box",
+    "IGUI_Knox_RMenu_Open": "Open",
     "IGUI_Knox_RMenu_Rounds": "Rounds",
     "IGUI_Knox_Module_dashboard": "Car dashboard",
     "IGUI_Knox_Module_dashboard_Info": "The car's dashboard in Knox's look, as a real car's: gauges and lamps, switches, the ignition with its key, a radio with a tape for your own music, and the heater.",

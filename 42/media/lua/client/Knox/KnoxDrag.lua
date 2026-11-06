@@ -186,7 +186,7 @@ local function magFor(t, key)
     for _, m in ipairs(t.items) do
         if (K and K.hide and not K.is(m)) or m:getCurrentAmmoCount() < m:getMaxAmmo() then
             local at = m:getAmmoType()
-            if at and at:getItemKey() == key then return m end
+            if at and (at:getItemKey() == key or (KnoxCompat and KnoxCompat.roundFits(m, key))) then return m end
         end
     end
     return nil

@@ -45,6 +45,7 @@ end
 -- The quick items' key switches (the author, 2026-10-30): the tooltip by default;
 -- pressed over a thing with a panel - its panel; pressed again - the tooltip back.
 L.panelFor = nil   -- the thing the key asked the panel for
+L.opened = false   -- the thing whose magazine panel is up (L.sync)
 local keyWas, keyMs, keyHit = false, -1, false
 local KEY_GAP_MS = 250   -- not asked this long: the mouse has only just come onto a thing
 --- Was the key pressed down just now? (the same answer to every caller in a frame)
@@ -86,11 +87,13 @@ function L.index()
     local Pf = KnoxPerf
     local pt = Pf and Pf.detail and Pf.now()
     idx = {gun = {}, mag = {}, part = {}, ammo = {}, box = {}, sample = {}, anyPart = {}}
+    local openers = {}   -- item type -> the recipe its double click runs
     local all = getScriptManager():getAllItems()
     for i = 0, all:size() - 1 do
         local s = all:get(i)
         pcall(function()
             local ft = s:getFullName()
+            openers[ft] = s:getDoubleClickRecipe()
             if s:isRanged() then
                 local it = instanceItem(ft)
                 local at = it and instanceof(it, "HandWeapon") and it:getAmmoType()
@@ -113,6 +116,15 @@ function L.index()
                     for k = 0, n - 1 do on[list:get(k)] = true end
                     idx.part[ft] = {type = it:getPartType(), on = n > 0 and on or false}
                     if n == 0 then idx.anyPart[ft] = true end
+                    -- (a part that holds rounds is a magazine too: Escape From Zomboid's are
+                    -- parts of the Clip place, with rounds of their own, and got no panel;
+                    -- the author 2026-11-06. It stays a part: that is how a gun finds all
+                    -- the sizes it takes.)
+                    local at = s:getAmmoType() or it:getAmmoType()
+                    if at and (it:getMaxAmmo() or 0) > 0 then
+                        idx.mag[ft] = {ammo = at:getItemKey(), guns = on}
+                        idx.sample[ft] = it
+                    end
                 end
             elseif s:getAmmoType() then
                 local it = instanceItem(ft)
@@ -128,8 +140,70 @@ function L.index()
         if m then m.guns[gft] = true end
     end
     for mft, m in pairs(idx.mag) do ammoEntry(m.ammo).mags[mft] = true end
+    -- (a Gunworks family: all its rounds go in, the thing's own first - the author 2026-11-06)
+    local function family(ft, own)
+        local rounds = KnoxCompat and KnoxCompat.roundsOfType(ft)
+        if not rounds then return nil end
+        local list = {own}
+        for _, key in ipairs(rounds) do
+            if key ~= own then table.insert(list, key) end
+        end
+        return list
+    end
+    for mft, m in pairs(idx.mag) do
+        m.rounds = family(mft, m.ammo)
+        for _, key in ipairs(m.rounds or EMPTY) do ammoEntry(key).mags[mft] = true end
+    end
+    for gft, g in pairs(idx.gun) do
+        g.rounds = family(gft, g.ammo)
+        for _, key in ipairs(g.rounds or EMPTY) do ammoEntry(key).guns[gft] = true end
+    end
+    -- (a box no gun names, as a pack's boxes of its other rounds: its opening recipe says what
+    -- comes out, if only one thing does - the author 2026-11-06)
+    for ft, name in pairs(openers) do
+        if not idx.box[ft] then
+            pcall(function()
+                local recipe = getScriptManager():getCraftRecipe(name)
+                local outs = recipe and recipe:getOutputs()
+                local made = outs and outs:size() == 1 and outs:get(0):getPossibleResultItems()
+                if made and made:size() == 1 then
+                    local key = made:get(0):getFullName()
+                    if idx.ammo[key] then
+                        idx.ammo[key].boxes[ft] = true
+                        idx.box[ft] = key
+                    end
+                end
+            end)
+        end
+    end
     if pt then Pf.part("load: index", pt) end
     return idx
+end
+
+--- The box types of the rounds this gun takes; with no gun, all there are.
+function L.boxTypes(gun)
+    local x = L.index()
+    local out, seen = {}, {}
+    local function add(key)
+        local a = x.ammo[key]
+        for b in pairs(a and a.boxes or EMPTY) do
+            if not seen[b] then
+                seen[b] = true
+                table.insert(out, b)
+            end
+        end
+    end
+    if not gun then
+        for b in pairs(x.box) do table.insert(out, b) end
+        return out
+    end
+    local g = x.gun[gun:getFullType()]
+    if not g then return out end
+    add(g.ammo)
+    for _, key in ipairs(g.rounds or EMPTY) do add(key) end
+    local m = g.mag and x.mag[g.mag]
+    for _, key in ipairs(m and m.rounds or EMPTY) do add(key) end
+    return out
 end
 
 --- What the item is here: "gun", "mag", "ammo", "box", "part", or nil.
@@ -170,11 +244,15 @@ function L.fitsOf(ft)
     local g, m, p = x.gun[ft], x.mag[ft], x.part[ft]
     if g then
         if g.mag then f[g.mag] = true else addAmmo(g.ammo) end
+        if not g.mag then
+            for _, key in ipairs(g.rounds or EMPTY) do addAmmo(key) end
+        end
         for pft, part in pairs(x.part) do
             if not part.on or part.on[ft] then f[pft] = true end
         end
     elseif m then
         addAmmo(m.ammo)
+        for _, key in ipairs(m.rounds or EMPTY) do addAmmo(key) end
         for gft in pairs(m.guns) do f[gft] = true end
     elseif x.ammo[ft] then
         intoOf(ft)
@@ -195,6 +273,7 @@ end
 --- part also needs its place on the gun free and itself whole (as the game's menu).
 local function fitsNow(item, ft, other, oft)
     local x = idx
+    if x.mag[oft] or x.mag[ft] then return true end   -- (a magazine swaps for the one in the gun)
     local part = x.part[oft]
     if part and x.gun[ft] then
         return not other:isBroken() and item:getWeaponPart(part.type) == nil
@@ -298,6 +377,8 @@ local fadeMs = 0
 --- fading in and out.
 function L.sync()
     local now = getTimestampMs()
+    local p = KnoxSlotPicker.instance
+    L.opened = p ~= nil and p.load ~= nil and p.owner ~= nil and p.owner.item or false
     track(now)
     local on = L.lit ~= EMPTY and not L.picking
     if on then L.shown = L.lit end
@@ -384,6 +465,16 @@ local function piles(player, key)
     return out
 end
 
+--- The piles of all these kinds of round, kind by kind; boxes last.
+local function pilesOf(player, keys)
+    local out, boxes = {}, {}
+    for _, key in ipairs(keys) do
+        for _, g in ipairs(piles(player, key)) do table.insert(g.box and boxes or out, g) end
+    end
+    for _, g in ipairs(boxes) do table.insert(out, g) end
+    return out
+end
+
 --- Magazines of type `mt`, one cell each, the fullest first.
 local function magazines(player, mt, except)
     local out, seen = {}, {}
@@ -421,10 +512,30 @@ end
 
 -- The game's actions -----------------------------------------------------------------
 
+--- The rounds to load into this magazine by themselves: the magazine's own, or with a
+--- Gunworks family the ones it would choose (KnoxCompat).
+function L.roundFor(player, mag)
+    local at = mag:getAmmoType()
+    local key = KnoxCompat and KnoxCompat.nextRound(player, mag)
+    return key or (at and at:getItemKey())
+end
+
+--- The game's action. Rounds of a Gunworks family are named to it, or it would load the
+--- magazine's own type.
+function L.queueLoad(player, mag, count, key)
+    if key and KnoxCompat and KnoxCompat.roundFits(mag, key) then
+        ISTimedActionQueue.add(ISLoadBulletsInMagazine:new(player, mag, count, count, key))
+    else
+        ISTimedActionQueue.add(ISLoadBulletsInMagazine:new(player, mag, count))
+    end
+end
+
 --- Rounds of `pile` into the magazine (as the game's "Load": in the main inventory,
 --- as many as go in; those already in the main inventory go in too).
 function L.loadMagazine(player, mag, pile)
     local key = mag:getAmmoType():getItemKey()
+    local first = pile.items[1]
+    if first and KnoxCompat and KnoxCompat.roundFits(mag, first:getFullType()) then key = first:getFullType() end
     local need = mag:getMaxAmmo() - mag:getCurrentAmmoCount()
     -- (a full one not known: one round tried, the try is how it is found out - nothing done
     -- at all would tell it free; QA 2026-10-31)
@@ -440,7 +551,7 @@ function L.loadMagazine(player, mag, pile)
         moved = moved + 1
     end
     local count = math.min(need, moved + player:getInventory():getCountType(key) - there)
-    if count > 0 then ISTimedActionQueue.add(ISLoadBulletsInMagazine:new(player, mag, count)) end
+    if count > 0 then L.queueLoad(player, mag, count, key) end
 end
 
 function L.unloadMagazine(player, mag)
@@ -573,15 +684,20 @@ end
 if ISLoadBulletsInMagazine and not L.loadWrapped then
     L.loadWrapped = true
     local new = ISLoadBulletsInMagazine.new
-    function ISLoadBulletsInMagazine:new(character, magazine, ammoCount)
+    -- (all its arguments: Gunworks' limit and kind of round came after these three and were
+    -- lost here, so its packs' own menus loaded the plain round; the author 2026-11-06)
+    function ISLoadBulletsInMagazine:new(character, magazine, ...)
         noteLoading(character, magazine)
-        return new(self, character, magazine, ammoCount)
+        return new(self, character, magazine, ...)
     end
 end
 
---- A box opened (its recipe, as the game's menu on the box).
+--- A box opened (its recipe, as the game's menu on the box: its own first, as its double
+--- click; a pack's boxes have one each - the author 2026-11-06).
 function L.openBox(player, box)
-    for _, name in ipairs(OPEN_BOX) do
+    local names = {box:getDoubleClickRecipe()}
+    for _, name in ipairs(OPEN_BOX) do table.insert(names, name) end
+    for _, name in ipairs(names) do
         local recipe = getScriptManager():getCraftRecipe(name)
         -- (a plain answer: an error() caught by pcall is still logged by the game
         -- as an error - the author's bench, 2026-10-30, two for a box of shells)
@@ -745,10 +861,28 @@ local function loadOf(ref, item, player)
         local Pf = KnoxPerf
         local pt = Pf and Pf.detail and Pf.now()
         if l.kind == "mag" then l.spares = magazines(player, g.mag, nil)
+        elseif m and m.rounds then l.spares = pilesOf(player, m.rounds)
         else l.spares = piles(player, l.key) end
         if pt then Pf.part("load: spares", pt, #l.spares) end
     end
     return l
+end
+
+local loadFailed = false
+
+--- The tile under the mouse now holds `ref`'s thing, but another leads it: a magazine just
+--- told (its rounds no secret any more) joined its like. The key's press and the open panel
+--- go with the tile; asked for the old leader they were lost (the author 2026-11-06).
+function L.follow(ref, e)
+    local was = ref and ref.item
+    if not was or was == e.item or (L.panelFor ~= was and not KnoxSlotPicker.isOpenFor(ref)) then return end
+    for _, it in ipairs(e.items) do
+        if it == was then
+            if L.panelFor == was then L.panelFor = e.item end
+            ref.item, ref.ft, ref.load = e.item, nil, nil
+            return
+        end
+    end
 end
 
 --- A thing under the mouse that may be a magazine or a gun: its panel next to
@@ -766,6 +900,11 @@ function L.offer(ref, item, player, playerNum, side)
     -- is on the thing or the panel, or until the key is pressed again)
     if not KnoxSlotPicker.isOpenFor(ref) and (L.panelFor ~= item or now - ref.sinceMs < HOVER_MS) then return end
     local ok, l = pcall(loadOf, ref, item, player)
+    if not ok and not loadFailed then
+        -- (said once: this pcall kept a failure out of console.txt - the author 2026-11-06)
+        loadFailed = true
+        print("[Knox] magazine panel failed: " .. tostring(l))
+    end
     if not ok or not l then return end
     KnoxSlotPicker.wantLoad(ref, l.title, l, playerNum, side)
 end
@@ -806,6 +945,12 @@ function L.panelOf(item)
         if ok and (k == "gun" or k == "mag") then panelKind = k end
     end
     return panelKind
+end
+
+--- Are this magazine's rounds told? From the key's press over it, as its panel opens, for
+--- as long as the panel stays (the author 2026-11-06: not while the key is held).
+function L.counting(item)
+    return L.opened == item or L.panelFor == item
 end
 
 --- Is the panel open for this item?

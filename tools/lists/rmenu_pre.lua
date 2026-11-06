@@ -119,7 +119,10 @@ JoypadState = {players = {}}
 function getCell() return {getDrag = function() return nil end} end
 ISMouseDrag = {dragging = nil}
 UIManager = {getSpeedControls = function() return {getCurrentGameSpeed = function() return GAME_SPEED or 1 end} end}
-KnoxCompat = {windowOpen = function() return WINDOW == true end}
+KnoxCompat = {windowOpen = function() return WINDOW == true end,
+    roundsOfType = function() return nil end,
+    nextRound = function(_, m) return FAMILY_MAG == m and FAMILY_ROUND or nil end,
+    roundFits = function(m, key) return FAMILY_MAG == m and FAMILY_ROUND == key end}
 KnoxGrid.useDelta = function(a) return a.delta or 0 end
 
 -- an element: what it was told

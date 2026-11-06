@@ -60,11 +60,11 @@ local m1, m2, m3, m4 = mag(4, true), mag(15, true), mag(9), mag(0, true)
 rounds(20)
 check("opens", open() == true and M.state == "open")
 check("the mouse held, the cursor hidden", RMENU_FLAG == true and M.catch:getIsVisible() == true)
-check("a pistol's rows", kinds() == "swap,swap,swap,swap,all,eject,rack", kinds())
+check("a pistol's rows", kinds() == "swap,swap,swap,swap,all,rack,eject", kinds())
 check("known fuller first, not known last", M.rows[1].m == m2 and M.rows[2].m == m1 and M.rows[3].m == m4 and M.rows[4].m == m3)
 check("not known: a line", M.rows[4].known == false and M.rows[1].known == true)
 check("lit: full, low, none", M.rows[1].lit == 5 and M.rows[2].lit == 2 and M.rows[3].lit == 0)
-check("eject red, last but one", M.rows[6].red == true and M.rows[7].kind == "rack")
+check("the bolt, then eject in red", M.rows[6].kind == "rack" and M.rows[7].red == true)
 check("head", M.gun == pistol and M.title == "Base.Pistol" and M.gunNone == false)
 check("the gun's scale", M.gunLit == 3, M.gunLit)
 check("the chamber", M.chamber == true and M.chamberOn == false and M.jam == false)
@@ -521,6 +521,83 @@ check("the rounds stay on the box's row", M.strip.key == "Base.Bullets9mm")
 M.lmb()
 check("the box: opened", DONE[#DONE][1] == "craft", DONE[#DONE] and DONE[#DONE][1])
 
+-- the boxes (the author 2026-11-06): with no gun all those carried, with one those of its rounds
+clearAll()
+newItem("Base.Bullets9mmBox", INV)
+newItem("Base.Bullets9mmBox", INV)
+newItem("Base.ShotgunShellsBox", INV)
+check("no gun, no magazines: opens on the boxes", open())
+check("a row for each type", kinds() == "box,box", kinds())
+KEYS[R] = true
+frames(40)
+-- a box being opened: its bar on its row, and pressed again it is not begun anew
+do
+    local box = M.rows[1].item
+    local other = M.rows[2]
+    local list = {size = function() return 1 end, get = function() return box end}
+    local job = {Type = "ISHandcraftAction", action = {}, items = list, delta = 0.4}
+    QUEUE[1] = job
+    frames(1)
+    check("the box's row: its bar", M.rows[1].prog == 0.4 and M.rows[1].out == false, M.rows[1].prog)
+    check("the other box's row: none", other.prog == nil)
+    M.sel = 1
+    local n = #DONE
+    M.lmb()
+    check("pressed again: not begun anew", #DONE == n and QUEUE[1] == job)
+    job.action = nil
+    frames(1)
+    check("not under way yet: no bar", M.rows[1].prog == nil)
+    QUEUE[1] = nil
+    frames(1)
+end
+local onlyBoxesH = M.footY - M.listY - M.regionH
+check("only boxes: no empty place for the rounds", M.strip == nil and onlyBoxesH == M.Z.GAP, onlyBoxesH)
+local twice = false
+for _, r in ipairs(M.rows) do twice = twice or string.find(r.name, " x2", 1, true) ~= nil end
+check("the count of a type", twice)
+frames(1)
+check("LMB says open", M.hints.lmb == "IGUI_Knox_RMenu_Open IGUI_Knox_RMenu_Open", M.hints.lmb)
+M.close()
+frames(1)
+clearAll()
+newItem("Base.Bullets9mmBox", INV)
+newItem("Base.ShotgunShellsBox", INV)
+PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
+check("a gun in hand: opens", open())
+local boxes = {}
+for _, r in ipairs(M.rows) do if r.kind == "box" then table.insert(boxes, r.item:getFullType()) end end
+check("only the boxes of its rounds", #boxes == 1 and boxes[1] == "Base.Bullets9mmBox", #boxes)
+M.close()
+frames(1)
+PLAYER.primary = nil
+
+-- a name too long slides, in the head and in its row (the author 2026-11-06)
+clearAll()
+do
+    local long = string.rep("Very long name ", 60)
+    local gunL = newItem("Base.Pistol", INV, {n = 7, clip = true})
+    gunL.getDisplayName = function() return long end
+    PLAYER.primary = gunL
+    local clipL = mag(5, true)
+    clipL.getDisplayName = function() return long end
+    local slid, real = {}, T.marquee
+    T.marquee = function(a1, st, s, ...) table.insert(slid, st) return real(a1, st, s, ...) end
+    check("a long name: opens", open())
+    KEYS[R] = true
+    frames(40)
+    T.marquee = real
+    local head, row = false, false
+    for _, st in ipairs(slid) do
+        if st == M.titleSlide then head = true end
+        if M.rows[1] and st == M.rows[1].slide then row = true end
+    end
+    check("the gun's name slides", head)
+    check("the magazine's name slides", row)
+    M.close()
+    frames(1)
+    PLAYER.primary = nil
+end
+
 -- many rows: the list scrolls, the width stays ------------------------------------------
 clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
@@ -724,7 +801,7 @@ PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
 local fullK, lowK, midK, oddU = mag(15, true), mag(4, true), mag(9, true), mag(15)
 rounds(18)
 check("opens", open())
-check("the row: after the magazines, before eject", kinds() == "swap,swap,swap,swap,all,eject,rack", kinds())
+check("the row: after the magazines, before eject", kinds() == "swap,swap,swap,swap,all,rack,eject", kinds())
 M.sel = 5
 KEYS[R] = true
 frames(1)
@@ -744,17 +821,17 @@ check("all: as far as the rounds go", #loads == 2 and loads[2].magazine == lowK 
 for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
 for i = #INV.items, 1, -1 do if INV.items[i].ft == "Base.Bullets9mm" then table.remove(INV.items, i) end end
 bump(600) frames(1)
-check("no rounds: the row goes", kinds() == "swap,swap,swap,swap,eject,rack", kinds())
+check("no rounds: the row goes", kinds() == "swap,swap,swap,swap,rack,eject", kinds())
 check("no rounds: the choice on the magazine before it, not on the red row", M.sel == 4, M.sel)
 rounds(3)
 bump(600) frames(1)
-check("rounds again: the row is back", kinds() == "swap,swap,swap,swap,all,eject,rack", kinds())
+check("rounds again: the row is back", kinds() == "swap,swap,swap,swap,all,rack,eject", kinds())
 check("rounds again: the choice stays", M.sel == 4, M.sel)
 clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
 rounds(5)
 check("opens", open())
-check("no magazines, rounds: no row", kinds() == "eject,rack", kinds())
+check("no magazines, rounds: no row", kinds() == "rack,eject", kinds())
 clearAll()
 mag(3, true) mag(5, true)
 check("opens", open())
@@ -770,22 +847,22 @@ check("opens", open())
 KEYS[R] = true
 frames(1)
 M.sel = 1
-check("under an action: as it was", kinds() == "swap,swap,eject,rack" and M.rows[1].m == firstMag, kinds())
+check("under an action: as it was", kinds() == "swap,swap,rack,eject" and M.rows[1].m == firstMag, kinds())
 M.rmb() bump(50) frame() M.rmb()
 check("under an action: it is on", queued("ISUnloadBulletsFromMagazine") ~= nil)
 firstMag.n = 2
 rounds(3)
 bump(600) frames(1)
-check("under an action: the rows stay", kinds() == "swap,swap,eject,rack" and M.rows[1].m == firstMag, kinds())
+check("under an action: the rows stay", kinds() == "swap,swap,rack,eject" and M.rows[1].m == firstMag, kinds())
 for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
 bump(600) frames(1)
-check("after it: the row, the order anew", kinds() == "swap,swap,all,eject,rack" and M.rows[1].m == secondMag, kinds())
+check("after it: the row, the order anew", kinds() == "swap,swap,all,rack,eject" and M.rows[1].m == secondMag, kinds())
 clearAll()
 PLAYER.primary = newItem("Base.Pistol", INV, {n = 7, clip = true})
 mag(15, true)
 rounds(5)
 check("opens", open())
-check("all known full: no row", kinds() == "swap,eject,rack", kinds())
+check("all known full: no row", kinds() == "swap,rack,eject", kinds())
 clearAll()
 mag(3, true) mag(5, true)
 rounds(30)
@@ -924,5 +1001,16 @@ m11.container = nil
 looks()
 check("gone into the gun: left alone", m11.container == nil and ROOM[rig] == 5)
 for i = #WORN, 1, -1 do WORN[i] = nil end
+
+-- Gunworks: R loads the family's rounds carried, not only the magazine's own (2026-11-06)
+for i = #QUEUE, 1, -1 do QUEUE[i] = nil end
+for i = #INV.items, 1, -1 do INV.items[i].container = nil table.remove(INV.items, i) end
+FAMILY_MAG, FAMILY_ROUND = mag(0, true), "Base.ShotgunShells"
+rounds(4, FAMILY_ROUND)
+M.player = PLAYER
+local fromFamily = M.load(FAMILY_MAG)
+local got = queued("ISLoadBulletsInMagazine")
+check("R: the family's rounds go in, named to the action", fromFamily == true and got ~= nil, tostring(fromFamily))
+FAMILY_MAG, FAMILY_ROUND = nil, nil
 
 print(string.format("rmenu: %d pass, %d fail", pass, fail))

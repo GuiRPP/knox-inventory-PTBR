@@ -32,8 +32,12 @@ SCRIPTS = {
     ["Base.ShotgunShells"] = {cat = "Ammo"},
     ["Base.ShotgunShellsBox"] = {cat = "Ammo"},
     ["Base.308Bullets"] = {cat = "Ammo"},
+    ["Base.Box308"] = {cat = "Ammo", opens = "OpenBox308"},   -- (no gun names it: its recipe does)
     ["Base.Laser"] = {cls = "WeaponPart", part = "Laser", on = {"Base.Pistol"}, cat = "WeaponPart"},
     ["Base.Sling"] = {cls = "WeaponPart", part = "Sling", on = {}, cat = "WeaponPart"},
+    -- (as Escape From Zomboid's magazines: a part that holds rounds)
+    ["Base.PartMag"] = {cls = "WeaponPart", part = "Clip", on = {"Base.Pistol"}, cat = "WeaponPart",
+                        ammo = "Base.Bullets9mm", max = 30, scriptAmmo = true},
     ["Base.Beans"] = {cat = "Food"},
 }
 
@@ -48,6 +52,7 @@ function Item:getAmmoType()
     local key = SCRIPTS[self.ft].ammo
     return key and {getItemKey = function() return key end} or nil
 end
+function Item:getDoubleClickRecipe() return SCRIPTS[self.ft].opens end
 function Item:getMaxAmmo() return SCRIPTS[self.ft].max or 0 end
 function Item:getCurrentAmmoCount() return self.n or 0 end
 function Item:getMagazineType() return SCRIPTS[self.ft].mag end
@@ -127,6 +132,7 @@ function PLAYER:getInventory() return INV end
 local function script(ft)
     local s = SCRIPTS[ft]
     return {getFullName = function() return ft end, isRanged = function() return s.ranged == true end,
+            getDoubleClickRecipe = function() return s.opens end,
             getItemType = function() return s.cls == "WeaponPart" and "base:weaponpart" or "base:normal" end,
             getAmmoType = function()
                 if not s.scriptAmmo and not s.ranged then return nil end
@@ -137,13 +143,24 @@ local scripts = {}
 for ft in pairs(SCRIPTS) do table.insert(scripts, script(ft)) end
 table.sort(scripts, function(a, b) return a.getFullName() < b.getFullName() end)
 
-RECIPES = {OpenBoxOfBullets50 = {"Base.Bullets9mmBox"}, OpenBoxOfShotgunShells = {"Base.ShotgunShellsBox"}}
+RECIPES = {OpenBoxOfBullets50 = {"Base.Bullets9mmBox"}, OpenBoxOfShotgunShells = {"Base.ShotgunShellsBox"},
+    OpenBox308 = {"Base.Box308"}}
+RECIPE_MAKES = {OpenBox308 = {"Base.308Bullets"}}
 function getScriptManager()
     return {getAllItems = function() return list(scripts) end,
             getCraftRecipe = function(_, name)
                 local takes = RECIPES[name]
                 if not takes then return nil end
-                return {name = name, getInputs = function()
+                local function makes()
+                    local out = {}
+                    for _, ft in ipairs(RECIPE_MAKES[name] or {}) do
+                        table.insert(out, {getFullName = function() return ft end})
+                    end
+                    return list(out)
+                end
+                return {name = name, getOutputs = function()
+                    return list({{getPossibleResultItems = makes}})
+                end, getInputs = function()
                     return list({{canUseItem = function(_, it)
                         for _, t in ipairs(takes) do if it.ft == t then return true end end
                         return false

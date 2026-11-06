@@ -25,6 +25,58 @@ local function words(s)
     return out
 end
 
+-- Gunworks (SWMG, Workshop 3722064198) and the packs on it, Escape From Zomboid Firearms
+-- (3824755284) among them: a magazine takes a family of rounds, its AmmoType names only
+-- one (a Discord player's request, the author 2026-11-06). Their rounds go in by the
+-- action's own argument, as the packs' menus do it. Without the mod nothing changes.
+local gunworks = nil     -- its Ammo module, false when it isn't here
+local familyRounds = {}  -- family -> {round type = true}, made once a family
+
+local function gunworksAmmo()
+    if gunworks == nil then
+        gunworks = false
+        local mods = getActivatedMods and getActivatedMods()
+        if mods and (mods:contains("SWMG") or mods:contains("\\SWMG")) then
+            local ok, ammo = pcall(require, "WeaponSystems/Utils/Ammo")
+            if ok and type(ammo) == "table" and ammo.GetFamilyForItem and ammo.GetBulletTypesForFamily
+                    and ammo.GetAutomaticReloadAmmoType then
+                gunworks = ammo
+            end
+        end
+    end
+    return gunworks
+end
+
+--- The round types of a magazine's or a gun's Gunworks family, by the item's type; nil
+--- when it has none.
+function C.roundsOfType(ft)
+    local ammo = gunworksAmmo()
+    local family = ammo and ammo.ItemAmmoFamily and ammo.ItemAmmoFamily[ft]
+    return family and ammo.GetBulletTypesForFamily(family) or nil
+end
+
+--- Does the item (a magazine) take rounds of this type by its Gunworks family?
+function C.roundFits(item, key)
+    local ammo = gunworksAmmo()
+    local family = ammo and ammo.GetFamilyForItem(item)
+    if not family then return false end
+    local set = familyRounds[family]
+    if not set then
+        set = {}
+        for _, t in ipairs(ammo.GetBulletTypesForFamily(family) or {}) do set[t] = true end
+        familyRounds[family] = set
+    end
+    return set[key] == true
+end
+
+--- The rounds Gunworks would load next into this magazine, by the player's own order of
+--- the family; nil when the magazine has no family or none of them is carried.
+function C.nextRound(player, item)
+    local ammo = gunworksAmmo()
+    if ammo and ammo.GetFamilyForItem(item) then return ammo.GetAutomaticReloadAmmoType(player, item) end
+    return nil
+end
+
 local vp = nil
 
 --- What there is of Viewpoint: {present, version, oldpoint, oldpointVersion,

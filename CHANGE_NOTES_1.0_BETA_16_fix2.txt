@@ -1,0 +1,11 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Escape From Zomboid Firearms and Gunworks: magazines take every round of their family, the Shift panel opens on them and shows those rounds with their boxes, and the highlight works both ways.
+[*]The rounds counter on a magazine's tile now shows when you press Shift, as the panel opens, instead of while the key is held.
+[*]Menu on R: with no gun it lists all the boxes of rounds you carry, with a gun only the boxes that fit it. Click a box to open it, a bar shows the progress.
+[*]Menu on R: long names of guns, magazines and rounds now slide like in the other windows, and Eject Magazine sits after Rack.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

@@ -346,8 +346,8 @@ end
 -- so the grid is also rebuilt every so often.
 local REBUILD_MS = 250
 
---- Shift held with the mouse on a tile of magazines (the author, 2026-11-05): they are
---- checked from now on, the stripes give way to their level at once.
+--- The panel asked for with the mouse on a tile of magazines (the author, 2026-11-05 and
+--- 2026-11-06): they are checked from now on, the stripes give way to their level at once.
 function KnoxGridView.checkMags(e)
     local K = KnoxMagKnown
     if not K then return end
@@ -361,7 +361,7 @@ function KnoxGridView.checkMags(e)
     if any then e.draw = nil end
 end
 
---- Rounds in a tile's magazines and what they can hold, for the mouse with Shift.
+--- Rounds in a tile's magazines and what they can hold, while their panel is up.
 function KnoxGridView.magRounds(e)
     local n, cap = 0, 0
     for _, it in ipairs(e.items) do
@@ -374,7 +374,7 @@ end
 function KnoxGridView:prerender()
     local now = getTimestampMs()
     local over = self.hovered
-    if over and over.draw and over.draw.mag and isShiftKeyDown() and not KnoxDrag.isActive() then
+    if over and over.draw and over.draw.mag and KnoxLoad and KnoxLoad.counting(over.item) and not KnoxDrag.isActive() then
         KnoxGridView.checkMags(over)
     end
     self.prerenderMs = now   -- (the grid is up and built: its bag's meter counts by it, KnoxInventoryPanel)
@@ -767,6 +767,7 @@ function KnoxGridView:isQuiet(e)
     end
     if KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then return false end
     if KnoxLoad and KnoxLoad.shown[item] then return false end   -- (lit up, or fading out)
+    if KnoxLoad and KnoxLoad.opened == item then return false end   -- (its rounds told, its panel up)
     if KnoxGrid.useOf(e.items) then return false end
     -- (a favorite's star, the heat tint and a frozen tile's blue frame are drawn
     -- here, not by the Java part: the frame showed only under the mouse - 2026-10-18)
@@ -891,8 +892,9 @@ function KnoxGridView:drawTile(e, alpha)
     end
 
     -- a stack's count as outlined text in the corner, like Tarkov
-    if hovered and d.mag and isShiftKeyDown() then
-        -- (magazines with Shift: rounds in them / what they can hold - the author, 2026-11-05)
+    if d.mag and KnoxLoad and ((hovered and KnoxLoad.panelFor == item) or KnoxLoad.opened == item) then
+        -- (magazines with their panel: rounds in them / what they can hold - the author, 2026-11-05;
+        -- by the key's press, and on with the mouse on the panel, 2026-11-06)
         T.outlinedRight(self, KnoxGridView.magRounds(e), x + pw - 4, y + ph - fh - 3, T.color.bright, f, alpha)
     elseif #e.items > 1 then
         -- (in sand: not all alike - the mouse on it shows them one by one)
@@ -1256,12 +1258,13 @@ function KnoxGridView:renderGrid()
         -- (what fits the thing under the mouse, lit green: those tiles aren't quiet - the list kept them
         -- unlit till something else changed, then they came at full strength - QA, 2026-11-04)
         local lit = KnoxLoad and KnoxLoad.shown or false
-        if run.ok and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
+        local opened = KnoxLoad and KnoxLoad.opened or false
+        if run.ok and run.opened == opened and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
                 and run.epoch == tilesEpoch and run.sel == KnoxSelect.items and run.toggles == KnoxSelect.toggles
                 and run.fresh == KnoxGridView.fresh and run.lit == lit then
             mode = run.mode
         else
-            run.ok, run.list, run.layout, run.rows, run.hov = true, TL, L, rows, hov
+            run.ok, run.list, run.layout, run.rows, run.hov, run.opened = true, TL, L, rows, hov, opened
             run.epoch, run.sel, run.toggles, run.fresh, run.lit = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh, lit
             run.stamp = run.stamp + 1
             run.nl = 0
@@ -2046,6 +2049,7 @@ function KnoxGridView:offerLoad()
     KnoxLoad.hover(e.item)
     -- (a stack showing its kinds keeps its own panel)
     if self.kindsRef and KnoxSlotPicker.isOpenFor(self.kindsRef) then return end
+    KnoxLoad.follow(self.loadRef, e)
     local ref = self.loadRef
     if not ref or ref.item ~= e.item then
         ref = setmetatable({view = self, item = e.item, sinceMs = getTimestampMs()}, TileRef)

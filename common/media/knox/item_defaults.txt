@@ -86,3 +86,4 @@ Base.Wrench = 1x2
 DGVPosters.GooniesPoster = 2x2
 DGVPosters.KarateKidPoster = 2x2
 DGVPosters.ShinMegamiPoster = 2x2
+EscapeFromZomboidFirearms.P_62e7c98b550c8218d602cbb4 = 1x2 stack 1

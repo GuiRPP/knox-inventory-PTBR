@@ -279,7 +279,7 @@ do
     check("bag: played again", frame(bag) == 0 and J.played == 2)
 end
 
--- magazines with Shift (the author, 2026-11-05)
+-- magazines as their panel opens (the author, 2026-11-05 and 2026-11-06)
 do
     local marked = {}
     KnoxMagKnown = {is = function(m) return marked[m] == true end, mark = function(m) marked[m] = true end}
