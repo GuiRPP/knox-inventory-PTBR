@@ -1,4 +1,4 @@
-[h1]Knox Inventory 1.0 BETA - update 17: things go back where they were[/h1]
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
 Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
 
 [list]
