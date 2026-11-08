@@ -1,0 +1,8 @@
+[h1]Knox Inventory: a new look in the mod list[/h1]
+Knox has a fresh icon and picture in the game's mod list: the Knox badge in winter blue and the bar in the blizzard, where your inventory lives now.
+
+[list]
+[*]Nothing in the game itself changes.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

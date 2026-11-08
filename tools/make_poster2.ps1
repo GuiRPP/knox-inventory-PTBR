@@ -5,7 +5,8 @@
 #   band   - VIEWPOINT COMPATIBLE
 # THE poster since 2026-10-14 (replaced make_poster.ps1's four tiles). Writes
 # tools\art\poster2_1024.png / poster_1024.png, tools\art\preview_workshop.jpg (the
-# Workshop page, upload_page.ps1), 42\poster.png (256, the game's mod list) and
+# Workshop page, upload_page.ps1), tools\art\poster2_256.png (256; the mod list's poster is
+# tools\make_modlist_art.ps1's since 2026-11-08) and
 # tools\art\poster2_322.png (how it reads in the Workshop's tile).
 #
 # Usage: powershell -ExecutionPolicy Bypass -File tools\make_poster2.ps1
@@ -320,7 +321,7 @@ $g3.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualit
 $g3.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 $g3.DrawImage($bmp, 0, 0, 256, 256)
 $g3.Dispose()
-$p256.Save((Join-Path $root "42\poster.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+$p256.Save((Join-Path $art "poster2_256.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $p256.Dispose()
 # how it reads in the Workshop's 322 px tile
 $small = New-Object System.Drawing.Bitmap 322, 322
