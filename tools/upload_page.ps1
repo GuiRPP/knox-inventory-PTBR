@@ -46,13 +46,12 @@ if ($Description) {
     # The game's own uploader ends a mod's page with its Workshop ID and Mod ID;
     # SteamCMD sends the text as it is, and they were gone from the page (the
     # author, 2026-10-18: "they must always be there"). So they are added here,
-    # always last, the Mod ID from 42\mod.info.
+    # always last, the Mod ID the Workshop copy has.
     $desc = @($desc | Where-Object { $_ -notmatch '^\s*(Workshop ID|Mod ID):' })
     while ($desc.Count -and $desc[-1].Trim() -eq '') { $desc = $desc[0..($desc.Count - 2)] }
-    $modId = (Select-String -Path (Join-Path $root "42\mod.info") -Pattern '^id=(.+)$').Matches[0].Groups[1].Value.Trim()
-    # (the item carries two mods while the 1.0 beta is out: both ids, as the game's
-    # uploader lists every mod of an item - see prepare_workshop.ps1)
-    $desc += @('', 'Workshop ID: 3816775774', "Mod ID: $modId", "Mod ID: KnoxInventoryBeta")
+    # (one mod since 2026-11-08: the work's folder says KnoxInventory, the Workshop copy
+    # is KnoxInventoryBeta - see prepare_workshop.ps1)
+    $desc += @('', 'Workshop ID: 3816775774', "Mod ID: KnoxInventoryBeta")
     $text = $desc -join "`n"
     if ($utf8.GetByteCount($text) -gt 7950) { throw "the description is over Steam's 8000-byte limit" }
     # SteamCMD reads this file without escape sequences: a \" ends the value

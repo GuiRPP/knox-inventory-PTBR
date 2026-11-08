@@ -7,9 +7,9 @@ A grid inventory where every item takes its real space, your character in 3D, an
 
 [img]https://images.steamusercontent.com/ugc/17471200081781262748/58D6572D5A1573EC011D4D04610A71F5174049DD/[/img]
 
-[h1]NEW: 1.0 BETA - a test version[/h1]
-[b]This item now has two mods: "Knox Inventory" (0.9.8.7, as before) and "Knox Inventory 1.0 BETA". Enable only one.[/b]
-The beta is for trying the new features and reporting bugs, [b]not for a full playthrough[/b] - back up your saves. For an existing save: Load, pick it, Mods, swap Knox Inventory for the beta.
+[h1]1.0 BETA[/h1]
+[b]Knox Inventory 1.0 BETA is now the one and only version of the mod.[/b]
+It is still in testing - back up your saves and tell us what breaks. Played the old 0.9.8.7? Its saves just need Knox turned on again: Load, pick the save, Mods, enable Knox Inventory.
 [list]
 [*][b]Rigs[/b]: bags with compartments, bags in bags, a bag size slider (50-200%).
 [*][b]A new right-click menu[/b] with groups and 81 icons, a world menu, alarm clock and fluid windows.
@@ -97,7 +97,7 @@ Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, 
 [*][b]Source code?[/b] Open on [url=https://github.com/SVNTHETIK/knox-inventory]GitHub[/url]. Addons, patches, translations welcome; no re-uploads.
 [*][b]Existing save?[/b] Yes, add it any time.
 [*][b]My hero is a dark figure in the menu?[/b] Load that save once: the hero's look is recorded while you play.
-[*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers, in testing - tell us how it goes.
+[*][b]Multiplayer?[/b] Yes, Knox works on servers - still in testing, tell us how it goes.
 [*][b]A windowed inventory?[/b] Not planned - the opacity sliders in Settings > Look let you see the world through it.
 [*][b]An item's size or sound?[/b] Set your own in Zomboid/Lua/knox_overrides.txt.
 [*][b]Controller?[/b] Controller and split-screen keep the game's inventory.

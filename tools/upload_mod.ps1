@@ -23,9 +23,9 @@ if (-not (Test-Path $steamcmd)) { throw "SteamCMD is not installed: unpack steam
 if (Get-Process ProjectZomboid64 -ErrorAction SilentlyContinue) { throw "Project Zomboid is running: close the game first." }
 
 $contents = Join-Path $env:USERPROFILE "Zomboid\Workshop\KnoxInventory\Contents"
-# (the release and, since 2026-10-20, the 1.0 beta next to it: see prepare_workshop.ps1)
+# (one mod again since 2026-11-08: the 0.9.8.7 release is gone, see prepare_workshop.ps1)
 $version = @()
-foreach ($m in "KnoxInventory", "KnoxInventoryBeta") {
+foreach ($m in @("KnoxInventoryBeta")) {
     $mod = Join-Path $contents "mods\$m"
     foreach ($need in "42\mod.info", "42\media\java\client\KnoxInventoryJava.jar", "42\media\lua\client\Knox\KnoxMain.lua") {
         if (-not (Test-Path (Join-Path $mod $need))) { throw "The built folder is not complete ($m\$need is missing): run prepare_workshop.ps1 first." }
@@ -54,7 +54,7 @@ $code = $LASTEXITCODE
 Write-Host "SteamCMD finished with code $code (0 = done)."
 # The built folder away at once (prepare_workshop.ps1 -Clean): the game loads mods
 # from Zomboid\Workshop too and prefers that copy - left there after a news-only
-# upload, the author's game ran the released 0.9.8.7 instead of the work (2026-10-18).
+# upload, the author's game ran the Workshop copy instead of the work (2026-10-18).
 $built = Join-Path $env:USERPROFILE "Zomboid\Workshop\KnoxInventory\Contents"
 if (Test-Path $built) { Remove-Item -LiteralPath $built -Recurse -Force; Write-Host "Removed $built (the game loads Zomboid\mods\Knox Inventory again)." }
 exit $code
