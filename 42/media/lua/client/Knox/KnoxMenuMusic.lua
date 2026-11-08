@@ -1213,6 +1213,7 @@ local function look()
 end
 
 Events.OnPreUIDraw.Add(look)
+T.offInGame(Events.OnPreUIDraw, look, "dashboard")   -- (in a game it runs the car's music)
 
 -- Into a game (the author, 2026-10-15). The loading screen: the camp is gone, so
 -- is the radio's hiss; the track goes on (Lua sleeps there), over "Click to

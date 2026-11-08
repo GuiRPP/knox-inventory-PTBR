@@ -4,6 +4,7 @@
 -- `entity.slotId` names the slot it came from. Dragging a selected tile drags
 -- the other selected tiles along (`extras`).
 
+require "Knox/KnoxTheme"
 require "Knox/KnoxGrid"
 require "TimedActions/ISInventoryTransferUtil"
 
@@ -436,8 +437,17 @@ function D.canDrop(layout, x, y, player, merge)
     local w, h = D.dims()
     if y + h > (layout.baseRows or layout.rows) then return false end   -- the overflow rows take nothing
     -- (its own cells are free for a tile moved within its grid; not for some of
-    -- a stack taken out of it: the stack stays where it is)
-    if not layout:fits(x, y, w, h, (sameGrid and not e.part) and e or nil) then return false end
+    -- a stack taken out of it: the stack stays where it is. From elsewhere, its
+    -- own place waiting for it there - KnoxHome's silhouette - is free to it too)
+    local ignore = nil
+    if sameGrid then
+        if not e.part then ignore = e end
+    else
+        ignore = e
+    end
+    -- (a place held for another thing - its silhouette - may be covered: that thing goes back
+    -- as near to it as it can; the author's bench 2026-11-08)
+    if not layout:fits(x, y, w, h, ignore, true) then return false end
     if sameGrid then return true end
     return D.allowedIn(e.item, dest, player)
 end
@@ -650,7 +660,7 @@ end
 
 -- Kept up to date before the UI is drawn (top-level elements may be added or
 -- removed only outside of drawing).
-Events.OnPreUIDraw.Add(function()
+local function watchHanded()
     local h = D.handed
     if not h then return end
     local ours = ISMouseDrag.dragging == h.items
@@ -675,6 +685,8 @@ Events.OnPreUIDraw.Add(function()
         h.layer:addToUIManager()
     end
     h.layer:bringToTop()
-end)
+end
+Events.OnPreUIDraw.Add(watchHanded)
+KnoxTheme.offInGame(Events.OnPreUIDraw, watchHanded, "inventory", "hotbar")
 
 return KnoxDrag

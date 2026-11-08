@@ -974,7 +974,10 @@ local function finishRun()
 end
 
 local function onTick()
-    if not run then return end
+    if not run then
+        Events.OnTick.Remove(onTick)
+        return
+    end
     local step = steps[run.i]
     if not step then return finishRun() end
     run.i = run.i + 1
@@ -988,10 +991,11 @@ function ST.run(playerNum)
     if not T.cell then T.refresh() end
     run = {i = 1, pass = 0, fail = 0, skip = 0, player = p, fresh = true}
     log("Knox self-test, game hour " .. math.floor(getGameTime():getWorldAgeHours()))
+    -- (on the event only while it runs: 2026-11-06)
+    Events.OnTick.Remove(onTick)
+    Events.OnTick.Add(onTick)
 end
 
 function ST.isRunning() return run ~= nil end
-
-Events.OnTick.Add(onTick)
 
 return KnoxSelfTest

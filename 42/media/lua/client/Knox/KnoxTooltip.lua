@@ -344,7 +344,7 @@ local function hints()
             end
         end
         for _, h in ipairs(list) do
-            h.w = T.measure(T.fontTile, h.key) + 10 + 6 + T.measure(T.fontText, h.label)
+            h.w = T.keyW(h.key) + 6 + T.measure(T.fontText, h.label)
             table.insert(hintCache, h)
         end
     end
@@ -367,7 +367,7 @@ local function quickHint()
         local g = KnoxControls and KnoxControls.get("quickItems") or ""
         if g ~= "" then
             local h = {key = KnoxControls.label(g), label = getText("IGUI_Knox_TipHint_quickItems")}
-            h.w = T.measure(T.fontTile, h.key) + 10 + 6 + T.measure(T.fontText, h.label)
+            h.w = T.keyW(h.key) + 6 + T.measure(T.fontText, h.label)
             quickCache = h
         end
     end

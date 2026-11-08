@@ -197,7 +197,8 @@ function C.label(gesture)
         name = getText("IGUI_Knox_MMB")
     else
         local key = tonumber(string.match(base, "^key:(%d+)$"))
-        name = key and getKeyName(key) or base
+        -- (Latin, whatever layout the game started with: knoxKeyName, the author 2026-11-08)
+        name = key and (knoxKeyName and knoxKeyName(key) or getKeyName(key)) or base
     end
     table.insert(parts, name)
     return table.concat(parts, "+")

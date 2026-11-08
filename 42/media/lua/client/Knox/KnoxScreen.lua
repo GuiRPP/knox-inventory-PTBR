@@ -610,7 +610,7 @@ function KnoxScreen:closeRect()
     local c = self.closeFor
     if not (c and c.key == key and c.tile == T.fontTile and c.caps == T.fontCaps and c.cell == T.cell) then
         local text = getText("IGUI_Knox_Close")
-        local keyW = T.measure(T.fontTile, key) + 10
+        local keyW = T.keyW(key)
         c = {key = key, tile = T.fontTile, caps = T.fontCaps, cell = T.cell, text = text, keyW = keyW,
              w = keyW + 8 + T.buttonW(text), h = math.floor(T.cell * 0.62 + 0.5)}
         self.closeFor = c
@@ -887,7 +887,9 @@ function KnoxScreen:prerender()
         local kx, ky = cx + T.pad, cy + math.floor((ch - kh) / 2)
         T.rect(self, kx, ky, keyW, kh, T.color.header)
         T.border(self, kx, ky, keyW, kh, T.color.tileEdge)
-        T.text(self, self:closeKey(), kx + 5, ky + 2, T.color.text, T.fontTile)
+        -- (by its ink: one letter's plate is as wide as M's - T.keyW, the author 2026-11-08)
+        local tc = T.color.text
+        T.inkCentre(self, self:closeKey(), kx, ky, keyW, kh, tc.r, tc.g, tc.b, 1, T.fontTile)
         T.caps(self, closeText, kx + keyW + 8, cy + math.floor((ch - capH) / 2),
             closeOver and T.color.accent or T.color.text)
 
@@ -1157,7 +1159,7 @@ function KnoxScreen:drawHints(right, midY)
     local kh = T.fontH(T.fontTile) + 4
     local total = 0
     for i, h in ipairs(self.hints) do
-        h.w = T.measure(T.fontTile, h.key) + 10 + 6 + T.measure(T.fontText, h.label)
+        h.w = T.keyW(h.key) + 6 + T.measure(T.fontText, h.label)
         total = total + h.w + (i > 1 and gap or 0)
     end
     -- leave room for the quick slots on the left

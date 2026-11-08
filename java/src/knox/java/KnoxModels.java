@@ -120,7 +120,9 @@ public class KnoxModels {
     /** Version of the Java part, for the Lua side to check it is loaded. */
     @LuaMethod(name = "knoxJavaVersion", global = true)
     public static String knoxJavaVersion() {
-        return "147";   // 147: a new jar hash on purpose. A Discord player had a stored ZombieBuddy denial of the v146 jar: its window never came back, and reinstalling the game or the mods does not clear it (the author 2026-11-06)
+        return "149";   // 149: knoxKeyName - key hints always in Latin letters, whatever layout the game started with (the author 2026-11-08)
+                        // 148: Viewpoint 0.1.7-rc3's use key (G) goes through Knox's crosshair panel; OldPoint's rotation key asked in CameraController now (the author 2026-11-08)
+                        // 147: a new jar hash on purpose. A Discord player had a stored ZombieBuddy denial of the v146 jar: its window never came back, and reinstalling the game or the mods does not clear it (the author 2026-11-06)
                         // 146: knoxOpenUrl also opens Knox's Discord invite (the news plate's second button, the author 2026-11-05)
                         // 145: a new jar hash on purpose. Update 13's signed jar was force-denied by ZombieBuddy; whoever had "Save decisions to disk" on keeps a stored denial of that hash, silently, with no row in its window (linlin, 2026-11-05)
                         // 144: the bar's frame no longer prints its build times (the author's decision before a release, 2026-11-04)

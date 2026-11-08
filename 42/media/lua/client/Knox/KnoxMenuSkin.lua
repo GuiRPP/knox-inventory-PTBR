@@ -834,6 +834,7 @@ local function look()
 end
 
 Events.OnPreUIDraw.Add(look)
+T.offInGame(Events.OnPreUIDraw, look, "newgame")   -- (the options over a paused game)
 
 -- The loading screen (the Java part's KnoxLoading) writes with atlases that
 -- load in the background: asked for while the menu is up, so that they are

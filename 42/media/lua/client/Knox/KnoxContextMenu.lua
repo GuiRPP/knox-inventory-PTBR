@@ -168,7 +168,31 @@ if ISWorldObjectContextMenu and ISWorldObjectContextMenu.createMenu and not ISWo
             end)
             K.world = {playerNum = player, square = sq, ground = ground, ms = getTimestampMs(), pending = true}
         end
+        -- (a thing whose picture has no name - a body: the game's menu breaks on it while the
+        -- character carries something to clear ashes with - its ashes check reads the name.
+        -- Viewpoint asks the menu of a body looked at: an error each time it was searched; the
+        -- author 2026-11-08. Its square's floor in its place for the call - the menu of its
+        -- square, as a right click there makes; the list given back as it was)
+        local swapped = nil
+        if type(worldobjects) == "table" then
+            pcall(function()
+                for i, o in ipairs(worldobjects) do
+                    local spr = o and o.getSprite and o:getSprite()
+                    if spr and not spr:getName() and not o:getSpriteName() then
+                        local floor = o:getSquare() and o:getSquare():getFloor()
+                        if floor then
+                            swapped = swapped or {}
+                            swapped[i] = o
+                            worldobjects[i] = floor
+                        end
+                    end
+                end
+            end)
+        end
         local a, b, c = createMenu(player, worldobjects, x, y, test, ...)
+        if swapped then
+            for i, o in pairs(swapped) do worldobjects[i] = o end
+        end
         -- (not taken by the time it is built: no world menu was made - no other
         -- menu opened soon after may take it)
         if K.world then K.world.pending = false end
@@ -344,6 +368,10 @@ local ICON_TEXT = {
     IGUI_EnterVehicle = "door",
     -- (the author, 2026-10-29: the car's "Mechanics" had none)
     ContextMenu_VehicleMechanics = "repair",
+    -- (the author, 2026-11-08: a rain collector's lid, a water cooler's bottle and a brazier's
+    -- fire had none in Viewpoint's crosshair panel)
+    ContextMenu_OpenLid = "open", ContextMenu_CloseLid = "open", ContextMenu_Take_Bottle = "grab",
+    ContextMenu_Light_fire = "burn",
 }
 local ICON_FN = {
     onEatItems = "eat", onDrinkFluid = "drink", onDrinkForThirst = "drink", onLiteratureItems = "read", onMediaText = "read",

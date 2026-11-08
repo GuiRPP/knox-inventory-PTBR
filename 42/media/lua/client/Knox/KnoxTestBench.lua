@@ -1556,209 +1556,34 @@ local function checkBar()
     return s ~= nil, getText("IGUI_KnoxTB_Res_Bar", name, tostring(s and s.objects and #s.objects or 0), kept)
 end
 
-B.POINTS = {
-    -- the winter bar in the main menu: the last ones leaving, stage 1 - the room as
-    -- the mockup has it, with the author's changes (the author, 2026-10-31)
-    {id = "w_bar4_room", menu = true, check = checkBar},
-    {id = "w_bar4_counter", menu = true},
-    {id = "w_bar4_fire", menu = true},
-    {id = "w_bar4_window", menu = true},
-    {id = "w_bar4_door", menu = true},
-    {id = "w_bar4_furniture", menu = true},
-    {id = "w_bar4_floor", menu = true},
-    {id = "w_bar4_nomods", menu = true, check = checkBar},
-    {id = "w_bar5_light", menu = true, check = checkBar},
-    {id = "w_bar5_air", menu = true},
-    {id = "w_bar5_quality", menu = true},
-    {id = "w_bar5_window", menu = true},
-    {id = "w_bar5_save", menu = true},
-    {id = "w_bar6_heroes", menu = true},
-    {id = "w_bar6_look", menu = true},
-    {id = "w_bar6_ember", menu = true},
-    {id = "w_bar6_leave", menu = true},
-    {id = "w_bar6_zombies", menu = true},
-    {id = "w_bar6_new", menu = true},
-    {id = "w_bar6_dark", menu = true},
-    {id = "w_bar7_door", menu = true},
-    {id = "w_bar7_snow", menu = true},
-    {id = "w_bar7_smoke", menu = true},
-    {id = "w_bar7_breath", menu = true},
-    {id = "w_bar7_paper", menu = true},
-    {id = "w_bar7_long", menu = true},
-    {id = "w_bar7_still", menu = true},
-    {id = "w_bar7_perf", menu = true},
-    {id = "w_bar8_wind", menu = true},
-    {id = "w_bar8_door", menu = true},
-    {id = "w_bar8_quiet", menu = true},
-    {id = "w_bar8_radio", menu = true},
-    {id = "w_bar8_tab", menu = true},
-    {id = "w_bar8_game", menu = true},
-    {id = "w_bar9_point", menu = true},
-    {id = "w_bar9_bag", menu = true},
-    {id = "w_bar10_photos", menu = true},
-    {id = "w_bar10_zombies", menu = true},
-    {id = "w_bar10_door", menu = true},
-    {id = "w_bar11_radio", menu = true},
-    {id = "w_bar12_ember", menu = true},
-    {id = "w_bar12_hand", menu = true},
-    {id = "w_bar12_needle", menu = true},
-    {id = "w_bar12_hit", menu = true},
-    {id = "w_bar2_perf", menu = true},
-    {id = "w_bar_open", menu = true, check = checkBar},
-    {id = "w_bar_light", menu = true},
-    {id = "w_bar_tab", menu = true, check = checkBar},
-    {id = "w_bar_keep", menu = true, check = checkBar},
-    {id = "w_bar_screens", menu = true},
-    {id = "w_bar_mods", menu = true},
-    {id = "w_bar_click", menu = true},
-    {id = "w_bar_alttab", menu = true},
-    {id = "w_bar_noanim", menu = true},
-    {id = "w_bar_back", menu = true},
-    {id = "w_bar_game", menu = true},
-    {id = "w_bar_camp", menu = true},
-    -- a thing's state as its category's colour (condition_v3, the author, 2026-10-31)
-    {id = "r_short", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "r_hold", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "r_mouse"},
-    {id = "r_head", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "r_swap"},
-    {id = "r_load"},
-    {id = "r_unload"},
-    {id = "r_move"},
-    {id = "r_eject"},
-    {id = "r_jam", actions = {{"RJam", function(p) B.jamR(p) end}}},
-    {id = "r_rifle", actions = {{"RRifle", function(p) B.giveRRifle(p) end}}},
-    {id = "r_shotgun", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
-    {id = "r_revolver", actions = {{"RRevolver", function(p) B.giveRRevolver(p) end}}},
-    {id = "r_bare", actions = {{"RBare", function(p) B.giveRBare(p) end}}},
-    {id = "r_none"},
-    {id = "r_scroll", actions = {{"RMany", function(p) B.giveRMany(p) end}}},
-    {id = "r_two", actions = {{"RTwo", function(p) B.giveRTwo(p) end}}},
-    {id = "r_size"},
-    {id = "r_again", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
-    {id = "r_again_close", actions = {{"RShotgun", function(p) B.giveRShotgun(p) end}}},
-    {id = "r_swap_again", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "r_vp"},
-    {id = "r_alt"},
-    {id = "r_off"},
-    {id = "h_numbers", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "h_tooltip"},
-    {id = "h_menu"},
-    {id = "h_shift"},
-    {id = "h_stack", actions = {{"RMany", function(p) B.giveRMany(p) end}}},
-    {id = "h_known", actions = {{"RPistol", function(p) B.giveRPistol(p) end}}},
-    {id = "h_save"},
-    {id = "h_found", actions = {{"RFound", function(p) B.giveHiddenFound(p) end}}},
-    {id = "h_cancel", actions = {{"RFound", function(p) B.giveHiddenFound(p) end}}},
-    {id = "h_kept"},
-    {id = "h_pad"},
-    {id = "d_cond", actions = {{"Worn", function(p) giveWorn(p) end}}},
-    {id = "d_cond_stack", actions = {{"WornStacks", function(p) B.giveWornStacks(p) end}}},
-    {id = "d_cond_floor", actions = {{"WornFloor", function(p) B.giveWornFloor(p) end}}},
-    {id = "d_cond_switch", actions = {{"Worn", function(p) giveWorn(p) end}}},
-    {id = "d_cond_hotbar", actions = {{"Worn", function(p) giveWorn(p) end}}},
-    {id = "d_cond_slots"},
-    {id = "d_cond_menu"},
-    -- the inventory's FPS: measuring, by itself since stage 0 (the author, 2026-10-28)
-    {id = "perf_inv", actions = {{"AutoPerf", function(p) B.autoPerf(p) end},
-        {"AutoPerfDetail", function(p) B.autoPerf(p, true) end},
-        {"Mark", function() mark("perf_inv") end}, {"PerfDetail", function() B.perfDetail() end},
-        {"Ammo500", function(p) B.ammo(p) end}, {"Dump", function(p) B.dump(p) end},
-        {"Wardrobe", function(p) B.wardrobe(p) end}}, check = checkPerfInv},
-    -- the author's own finds, 2026-10-29
-    {id = "a_pour"},
-    {id = "a_battery", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
-    {id = "a_torch", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
-    {id = "a_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "a_trash"},
-    {id = "a_hands", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    -- the author's wishes from the bench, 2026-10-29 (the crosshair panel)
-    {id = "b_vp_live"},
-    {id = "b_vp_bag", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_remember", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_keys"},
-    {id = "b_vp_locked"},
-    {id = "b_battery", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
-    -- magazines, rounds and guns: what fits lit up, the panel (the author, 2026-10-30)
-    {id = "c_mag", actions = {{"Guns", function(p) giveGuns(p) end}}},
-    {id = "c_gun"},
-    {id = "c_shotgun"},
-    {id = "c_fit"},
-    {id = "c_slots"},
-    {id = "c_battery_lit", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
-    {id = "c_tip", actions = {{"Guns", function(p) giveGuns(p) end}}},
-    {id = "c_load_bar", actions = {{"Guns", function(p) giveGuns(p) end}}},
-    {id = "c_insert_bar"},
-    {id = "c_look"},
-    {id = "c_hotbar", actions = {{"Guns", function(p) giveGuns(p) end}}},
-    {id = "c_tip_fade"},
-    {id = "c_hotbar_menu"},
-    {id = "perf_load", actions = {{"Guns", function(p) giveGuns(p) end}, {"Ammo500", function(p) B.ammo(p) end},
-        {"PerfDetail", function() B.perfDetail() end}, {"Mark", function() mark("perf_load") end}}},
-    {id = "b_slot_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_gen"},
-    {id = "b_vp_icons", actions = {{"IconLog", function(p)
-        if not KnoxCrosshair or not KnoxCrosshair.logNoIcons then return end
-        KnoxCrosshair.logNoIcons(not KnoxCrosshair.noIconLog)
-        halo(p, KnoxCrosshair.noIconLog and "IGUI_KnoxTB_IconLogOn" or "IGUI_KnoxTB_IconLogOff")
-    end}}},
-    -- the crosshair panel's actions in the right-click menu's groups (the author, 2026-10-29)
-    {id = "b_vp_groups", actions = {{"DirtyClothes", function(p)
-        local worn = p:getWornItems()
-        for i = 0, worn:size() - 1 do
-            local it = worn:get(i):getItem()
-            if instanceof(it, "Clothing") then
-                it:setDirtiness(60)
-                it:setBloodLevel(40)
-            end
-        end
-        p:resetModelNextFrame()
-        halo(p, "IGUI_KnoxTB_A_DirtyClothes")
-    end}}},
-    -- the author's bench, 2026-10-29 (evening): a locked door, the car, "Disassemble", the car's radio
-    {id = "b_vp_door"},
-    {id = "b_vp_car"},
-    {id = "b_vp_scrap"},
-    {id = "b_car_radio_cursor"},
-    -- (the author's radio and TV, 2026-10-29: "Device Options" the main one, "Disassemble" centred)
-    {id = "b_vp_device"},
-    -- (the author, 2026-10-29: F held at a fence climbed nothing while the panel was up)
-    {id = "b_vp_fence"},
-    -- stage 2 of the Steam reports, 2026-10-28
-    {id = "s2_sandbox", menu = true},
-    {id = "s2_colors", menu = true, check = checkColors},
-    {id = "s2_eat_move", actions = {{"Food", giveFood}, {"Watch", function() B.watchQueue() end}}},
-    {id = "s2_stack", actions = {{"Ammo500", function(p) B.ammo(p) end}, {"Hitch", function() B.hitch() end},
-        {"Mark", function() mark("s2_stack") end}}, check = checkHitch},
-    {id = "s2_hiss", menu = true, check = checkHiss},
-    {id = "s2_traits", menu = true},
-    -- stage 1 of the Steam reports, 2026-10-28
-    {id = "s1_editor", menu = true, actions = {{"Editor", openEditorCounted}}, check = checkEditorErrors},
-    {id = "s1_editor_menu", menu = true},
-    {id = "s1_disassemble"},
-    {id = "s1_item_tips"},
-    {id = "s1_far", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "s1_near", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    -- the reason plate by the held thing (option A, "Чертёж": the author 2026-10-28)
-    {id = "s1_reason", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "s1_bench_menu", menu = true},
-    -- the trunk's button on the pickup's body (linlin; the plate wider - the author, 2026-10-28)
-    {id = "s1_trunk", actions = {{"Van", function(p) B.car(p, "Base.Van") end}, {"Pickup", function(p) B.car(p, "Base.PickUpTruck") end},
-        {"Car", function(p) B.car(p) end}}},
-}
-
--- the health tab: hidden until 2.0, on the bench only with it (dev.health=1)
-if T.modules and T.modules.health then
-    for _, p in ipairs({
-        {id = "health_tab", check = checkHealthTab},
-        {id = "health_wounds", actions = woundActions(), check = checkHealthWounds},
-        {id = "health_bones", actions = boneActions(), check = checkFractures},
-        {id = "health_treat", actions = {{"Kit", function(p) B.kit(p) end}}, check = checkHealthTab},
-        {id = "health_menu", check = checkHealthTab},
-        {id = "health_heal", actions = {{"Heal", function(p) B.heal(p) end}}, check = checkHealthTab},
-        {id = "health_vanilla"},
-    }) do table.insert(B.POINTS, p) end
+--- Things going back to their place (KnoxHome): what waits to go back, what places wait
+--- in the test backpack.
+local function checkHome(player)
+    local L = B.layout(player)
+    if not L then return noBag() end
+    local held, homes = 0, 0
+    for _, e in ipairs(L.placed) do
+        if e.held then held = held + 1 end
+    end
+    for _ in pairs(KnoxHome and KnoxHome.homes or {}) do homes = homes + 1 end
+    return true, getText("IGUI_KnoxTB_Res_Home", homes, held, tostring(T.switch("home")))
 end
+
+-- (all the earlier points taken off by the author, 2026-11-07: "it is all cluttered";
+-- their marks are kept in Zomboid/Lua/knox_testbench_beta16.txt)
+B.POINTS = {
+    -- things go back to their place (the author, 2026-11-07; the mockup home_place)
+    {id = "home_hand", actions = {{"Prepare", function(p, n) B.prepare(p, n) end}}, check = checkHome},
+    {id = "home_block", check = checkHome},
+    {id = "home_drag", check = checkHome},
+    {id = "home_eat", actions = {{"Prepare", function(p, n) B.prepare(p, n) end}}, check = checkHome},
+    {id = "home_wear", check = checkHome},
+    {id = "home_belt", check = checkHome},
+    {id = "home_mine", check = checkHome},
+    {id = "home_nobag", check = checkHome},
+    {id = "home_save", check = checkHome},
+    {id = "home_off", actions = {{"Settings", function() openSettings() end}}, check = checkHome},
+}
 
 -- The report ----------------------------------------------------------------------
 

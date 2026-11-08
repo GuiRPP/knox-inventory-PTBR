@@ -1994,13 +1994,15 @@ function M:diagFrame()
     end
 end
 
-Events.OnPostUIDraw.Add(function()
+local function diagFrame()
     local self = KnoxMenuScene.instance
     if DIAG and self and self.diagShotName then
         knoxMenuShot(self.diagShotName .. "_end.png")
         self.diagShotName = nil
     end
-end)
+end
+Events.OnPostUIDraw.Add(diagFrame)
+T.offInGame(Events.OnPostUIDraw, diagFrame)
 
 -- Frame -----------------------------------------------------------------------
 
@@ -2248,10 +2250,12 @@ function M:updateSwitch(dt)
 end
 
 -- (a frame begins with neither of the two scenes drawn)
-Events.OnPostUIDraw.Add(function()
+local function swipeFrame()
     local sw = KnoxMenuScene.swipe
     if sw then sw.drew = nil end
-end)
+end
+Events.OnPostUIDraw.Add(swipeFrame)
+T.offInGame(Events.OnPostUIDraw, swipeFrame)
 
 --- Last of the scene's drawing, the menu's items still to come over it. Each of the two is kept as
 --- it's drawn, the second puts both up. Whichever: both are back-most, and the game swaps such
@@ -3472,12 +3476,10 @@ local function extraOf(player)
 end
 
 local snapshotTold = false
-local lastSnapMs = 0
 local function snapshotOf(player)
     if not T.active or not knoxMenuSnapshot or not player then return end
     -- (a game with others: the camp shows no such save - nothing to write, every minute)
     if isClient() then return end
-    lastSnapMs = getTimestampMs()
     local ok, extra = pcall(extraOf, player)
     local written = knoxMenuSnapshot(player, ok and extra or "")
     -- and what the hero carries: the bag beside them at the fire (KnoxMenuBag)
@@ -3493,42 +3495,31 @@ local function snapshot()
     snapshotOf(getSpecificPlayer(0))
 end
 
+-- When it is written (a player and the author, 2026-11-06: not "all the time"; it was once a
+-- minute as well, and that is gone): leaving the save (OnSave fires on the way out and on quitting
+-- to the desktop), death - and whenever the clothes change, which is not for the save left but for
+-- the risen hero: a dead player's clothes have gone to the corpse, so the look at the fire is the
+-- last one written alive (knoxMenuSnapshot). Into the game too: a new character gets its clothes
+-- and starting bag around the start (a player's report, 2026-10-16).
 Events.OnGameStart.Add(snapshot)
--- and once more a few seconds into the game: a new character gets its clothes
--- and starting bag around the start, and one taken out to the menu at once had
--- only the snapshot of that first moment (a player's report, 2026-10-16)
-local againAt = nil
-Events.OnGameStart.Add(function() againAt = getTimestampMs() + 3000 end)
-Events.OnTick.Add(function()
-    if againAt and getTimestampMs() >= againAt then
-        againAt = nil
-        local player = getSpecificPlayer(0)
-        if player and not player:isDead() then snapshotOf(player) end
-    end
-end)
--- Now and then as the game goes on - but not more than once a minute of real
--- time: fast forward or sleep pass ten game minutes in a fraction of a second,
--- and each snapshot lays out every bag of the hero and writes two files (a
--- performance pass, 2026-10-16). Saving, clothes and death write at once.
-local SNAP_EVERY_MS = 60000
-Events.EveryTenMinutes.Add(function()
-    if getTimestampMs() - lastSnapMs >= SNAP_EVERY_MS then snapshot() end
-end)
 Events.OnSave.Add(snapshot)
--- Clothes put on or taken off: the look is written again a moment later (once
--- for a burst of changes), so the hero at the fire wears what the player left
--- them in even when the game was quit between two of the snapshots above.
-local lookDirtyAt = nil
+-- (the one a moment later is on the game's tick only while it waits; once for a burst of changes)
+local writeAt = nil
+local function writeTick()
+    if getTimestampMs() < writeAt then return end
+    writeAt = nil
+    Events.OnTick.Remove(writeTick)
+    local player = getSpecificPlayer(0)
+    if player and not player:isDead() then snapshotOf(player) end
+end
+local function writeIn(ms)
+    if not writeAt then Events.OnTick.Add(writeTick) end
+    writeAt = math.max(writeAt or 0, getTimestampMs() + ms)
+end
+Events.OnGameStart.Add(function() writeIn(3000) end)
 if Events.OnClothingUpdated then
     Events.OnClothingUpdated.Add(function(player)
-        if player and player == getSpecificPlayer(0) then lookDirtyAt = getTimestampMs() + 1500 end
-    end)
-    Events.OnTick.Add(function()
-        if lookDirtyAt and getTimestampMs() >= lookDirtyAt then
-            lookDirtyAt = nil
-            local player = getSpecificPlayer(0)
-            if player and not player:isDead() then snapshotOf(player) end
-        end
+        if player and player == getSpecificPlayer(0) then writeIn(1500) end
     end)
 end
 Events.OnPlayerDeath.Add(function(player)

@@ -17,15 +17,24 @@
 
 param([Parameter(Mandatory = $true)][string]$Video, [double]$Start = 17, [double]$Length = 3.5,
       [int]$Size = 512, [int]$Fps = 8, [string]$Crop = "1110:759:1020:250", [int]$Colors = 112, [string]$Dither = "none",
-      [switch]$Winter, [int]$SceneY = 0)   # SceneY: the camp's picture that many px lower (of 1024), dark above it
+      [switch]$Winter, [int]$SceneY = 0,
+      [string]$SandFrames = "", [int]$SkinFade = 5, [string]$OutName = "")   # SceneY: the camp's picture that many px lower (of 1024), dark above it
 
 $ErrorActionPreference = "Stop"
 $art = Join-Path $PSScriptRoot "art"
 $args2 = @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "make_poster2.ps1"), "-Overlay", "-Fps", $Fps, "-Length", $Length)
 if ($Winter) { $args2 += "-Winter" }
 & powershell @args2 | Out-Null
+# -SandFrames "5-21" (with -Winter; the author, 2026-11-05: the sand skin while the string of
+# lights burns, the ice skin while it is off): the frames between go sand, softly over -SkinFade
+if ($SandFrames) {
+    & powershell @($args2 + "-SandSkin") | Out-Null
+    $from, $to = $SandFrames -split "-"
+    & python (Join-Path $PSScriptRoot "mix_skin_frames.py") $art $from $to $SkinFade
+    if ($LASTEXITCODE -ne 0) { throw "mix_skin_frames.py failed" }
+}
 $overlay = Join-Path $art "gif_frames\ov_%03d.png"   # (one a frame: the grid filling up)
-$out = Join-Path $art $(if ($Winter) { "preview_workshop_winter.gif" } else { "preview_workshop.gif" })
+$out = Join-Path $art $(if ($OutName) { $OutName } elseif ($Winter) { "preview_workshop_winter.gif" } else { "preview_workshop.gif" })
 $dark = $(if ($Winter) { "0x090c0f" } else { "0x0c0e0e" })   # the skin's screen
 
 # the camp 1024 x 700 at the top of a 1024 square, the poster over it, then the

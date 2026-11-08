@@ -199,7 +199,7 @@ ActiveMods = {getById = function() return {copyFrom = noop} end}
 
 -- the theme
 local function colorAny() return setmetatable({}, {__index = function() return {r = 1, g = 1, b = 1} end}) end
-KnoxTheme = {color = colorAny(), pad = 6, cell = 40, active = true,
+KnoxTheme = {color = colorAny(), pad = 6, cell = 40, active = true, offInGame = function() end,
     on = function(n) return n == "menu" end, animOn = function() return ANIM_ON end, switch = function() return true end,
     ensure = noop, mod = function(a, b) return a - math.floor(a / b) * b end,
     inRect = function(x, y, r) return x >= r[1] and x < r[1] + r[3] and y >= r[2] and y < r[2] + r[4] end,

@@ -50,7 +50,7 @@ local PAGE_ITEMS = {
             {"sec", "Sec_look_screen"}, {"slider", "look.all"}, {"slider", "look.bg"}, {"slider", "look.grid"},
             {"slider", "look.line"}, {"slider", "look.slot"}, {"slider", "look.model"}, {"switch", "anim"}},
     game = {{"sec", "Sec_game_search"}, {"switch", "search"}, {"slider", "search.time"}, {"switch", "scatter"},
-            {"choice", "loot.scope"}, {"switch", "vp.panel"}, {"sec", "Sec_game_bags"}, {"slider", "grid.scale"}},
+            {"choice", "loot.scope"}, {"switch", "vp.panel"}, {"sec", "Sec_game_bags"}, {"switch", "home"}, {"slider", "grid.scale"}},
     order = {{"sec", "Order_Title"}, {"choice", "order.rule"}, {"choice", "order.auto"}, {"sec", "Order_Cats"},
              {"cathelp"}, {"cats"}},
     sound = {{"sec", "Sec_sound_ui"}, {"slider", "search.sound"}, {"slider", "ui.sound"},
@@ -1202,3 +1202,4 @@ local function look()
 end
 
 Events.OnPreUIDraw.Add(look)
+T.offInGame(Events.OnPreUIDraw, look)

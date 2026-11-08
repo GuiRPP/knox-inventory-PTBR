@@ -804,7 +804,7 @@ function P:onMouseWheel(del) return true end
 -- (with nothing asked for, open or closing, and no thing hovered nor a tooltip
 -- up - most frames of a game - nothing is done: Viewpoint players count every
 -- frame, 2026-10-20)
-Events.OnPreUIDraw.Add(function()
+local function closedFrame()
     if KnoxScreen and KnoxScreen.instance then return end
     if KnoxNewsLive and KnoxNewsLive.live then return end   -- (the live grid of a news post keeps them itself)
     -- (a magazine's or gun's panel from the hotbar: its bar of rounds going in follows the action -
@@ -814,6 +814,8 @@ Events.OnPreUIDraw.Add(function()
     if T.on("hotbar") and (P.request or P.instance or #P.dying > 0) then P.sync(nil) end
     local K = KnoxTooltip
     if T.on("tooltips") and (K.wanted or K.lastHover or K.fold or (K.tip and K.tip.knoxShown)) then K.apply() end
-end)
+end
+Events.OnPreUIDraw.Add(closedFrame)
+T.offInGame(Events.OnPreUIDraw, closedFrame, "inventory", "hotbar", "tooltips", "rmenu")
 
 return KnoxSlotPicker

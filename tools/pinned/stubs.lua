@@ -41,7 +41,7 @@ ISPanel.__index = ISPanel
 function ISPanel:derive(name) local o = setmetatable({Type = name}, self) self.__index = self return o end
 
 -- the theme
-KnoxTheme = {cell = 48, javaFonts = true, MOD_ID = "KnoxInventory", settings = {},
+KnoxTheme = {cell = 48, javaFonts = true, MOD_ID = "KnoxInventory", settings = {}, offInGame = function() end,
              fontHeader = {size = 20}, fontText = {size = 16}, fontTile = {size = 14}, fontTab = {size = 15}, fontCaps = {size = 14}}
 local T = KnoxTheme
 local function rgb(v) return {r = v, g = v, b = v} end

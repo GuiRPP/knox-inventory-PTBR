@@ -1146,6 +1146,11 @@ end
 
 Events.OnPreUIDraw.Add(showOrHide)
 Events.OnPreUIDraw.Add(openNewOnce)
+T.offInGame(Events.OnPreUIDraw, showOrHide)
+T.offInGame(Events.OnPreUIDraw, openNewOnce)
+Events.OnGameStart.Add(function()
+    if C.instance then C.instance:setVisible(false) end   -- (nothing hides them in a game now)
+end)
 Events.OnMainMenuEnter.Add(C.create)
 Events.OnGameStart.Add(C.destroy)
 Events.OnResolutionChange.Add(function()

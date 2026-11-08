@@ -373,7 +373,7 @@ local function hintsWide()
     if Z.wide then return Z.wide end
     local s = strings()
     local function pair(key, label)
-        return T.measure(T.fontTile, key) + 10 + 6 + T.measure(T.fontText, label)
+        return T.keyW(key) + 6 + T.measure(T.fontText, label)
     end
     local lmb = 0
     for _, l in ipairs({s.swap, s.insert, s.load, s.use}) do lmb = math.max(lmb, pair(s.lmb, l)) end

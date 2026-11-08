@@ -97,6 +97,25 @@ function T.on(name)
     return T.active and T.modules[name] == true
 end
 
+-- A handler of every frame with nothing to do in a game: taken off as one starts, unless one
+-- of the named modules ("game": any in a game) is on. Lua is loaded anew on the way back to the menu (IngameState.exit),
+-- so there it is back. (A player with the menus only saw Knox at half the game's calls in a
+-- profiler - near-empty handlers, but none of them had any reason to run: 2026-11-06.)
+local offInGame = {}
+function T.offInGame(event, fn, ...)
+    table.insert(offInGame, {event = event, fn = fn, keep = {...}})
+end
+Events.OnGameStart.Add(function()
+    local any = false
+    for _, name in ipairs(T.MODULE_GROUPS[1].list) do any = any or T.on(name) end
+    for _, o in ipairs(offInGame) do
+        local keep = false
+        for _, name in ipairs(o.keep) do keep = keep or T.on(name) or (name == "game" and any) end
+        if not keep then o.event.Remove(o.fn) end
+    end
+    offInGame = {}
+end)
+
 --- Is the switch as the player left it (which may differ from what runs until the Lua reloads)?
 function T.moduleSaved(name)
     return T.settings["module." .. name] ~= "0"
@@ -214,6 +233,10 @@ T.SWITCHES = {
     -- scatter  things found in furniture, cars and bodies lie at random places, not
     --          packed in rows (KnoxGrid.build; the author, 2026-10-19)
     {key = "scatter", default = true, new = true, page = "game"},
+    -- home  a thing the game takes out of a bag (into a hand, to eat, wear, hang on the belt)
+    --       goes back to its place when let go; while in a hand or in use its place waits
+    --       for it, a grey silhouette in it (KnoxHome; the author, 2026-11-07)
+    {key = "home", default = true, new = true, page = "game"},
     -- musicShare  one's own music in the car heard by the players near it, in a game
     --             with others (KnoxMusicNet: only its hash, size and kind go out)
     -- musicHear   the others' own music heard here (and fetched when not here)
@@ -1376,12 +1399,28 @@ function T.buttonW(text, font)
     return T.measure(font or T.fontCaps, T.upper(text)) + T.pad * 2
 end
 
+--- How wide a key's plate is: one letter or digit - all of one width, the widest letter's
+--- (M, W): G stood wider than F (the author 2026-11-08: "G should not be wider than F";
+--- Tab, Ctrl, Shift keep their own). Worked out once per font.
+local keyOneFont, keyOneW = nil, 0
+function T.keyW(key, font)
+    font = font or T.fontTile
+    if key ~= nil and string.len(key) == 1 then
+        if keyOneFont ~= font then
+            keyOneFont = font
+            keyOneW = math.max(T.measure(font, "M"), T.measure(font, "W")) + 10
+        end
+        return keyOneW
+    end
+    return T.measure(font, key or "") + 10
+end
+
 --- A key in a small frame ("[R]") followed by its label, for hint rows;
 --- returns the x after it.
 -- (`a`: how much it shows - the crosshair panel's hints fade as they change, KnoxCrosshair)
 function T.keyHint(ui, x, y, key, label, h, a)
     local font = T.fontTile
-    local kw = T.measure(font, key) + 10
+    local kw = T.keyW(key, font)
     local kh = h or (T.fontH(font) + 4)
     hintPlate[1], hintPlate[2], hintPlate[3], hintPlate[4] = x, y, kw, kh
     hintPlateOpts.fill, hintPlateOpts.edge, hintPlateOpts.font, hintPlateOpts.a = T.color.header, T.color.tileEdge, font, a

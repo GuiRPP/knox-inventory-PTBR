@@ -11,7 +11,7 @@
 --
 -- Here (decided by the author, 2026-10-20):
 --   * what belongs to the world goes through the server: a thing's place in its
---     grid (knox, knoxP), its stack (knoxS), a bag's layout (knoxT). The client
+--     grid (knox, knoxP, knoxH), its stack (knoxS), a bag's layout (knoxT). The client
 --     writes at once (the grid answers at once), then tells the server, which
 --     finds the thing itself, writes it and sends it to the players near. The
 --     grid's room is the client's to check, as alone; the server only keeps.
@@ -100,7 +100,8 @@ local function layouts(v)
     return out
 end
 
-N.FIELDS = {knox = place, knoxP = place, knoxS = stackId, knoxT = layouts}
+N.FIELDS = {knox = place, knoxP = place, knoxS = stackId, knoxT = layouts,
+    knoxH = place}   -- (the place in a bag a thing the game took out goes back to: KnoxHome, 2026-11-07)
 
 --- A thing's field as it goes over the network: a copy; "-" for none.
 local function wire(key, v)
@@ -733,17 +734,20 @@ end
 if Events then
     if Events.OnClientCommand then Events.OnClientCommand.Add(N.onClientCommand) end
     if Events.OnServerCommand then Events.OnServerCommand.Add(N.onServerCommand) end
-    if Events.OnTick then
-        Events.OnTick.Add(function()
-            if not N.mp() then return end
-            hello()
-            N.flush()
-            N.flushMe()
-        end)
+    local function tick()
+        if not N.mp() then return end
+        hello()
+        N.flush()
+        N.flushMe()
     end
+    if Events.OnTick then Events.OnTick.Add(tick) end
     if Events.OnGameStart then
         Events.OnGameStart.Add(function()
-            if N.mp() then startOver() end
+            if N.mp() then
+                startOver()
+            elseif not N.server() and Events.OnTick then
+                Events.OnTick.Remove(tick)   -- (a game alone: nothing to send, ever - 2026-11-06)
+            end
         end)
     end
     if Events.OnCreatePlayer then

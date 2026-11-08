@@ -413,4 +413,36 @@ do
     T.applySkin()
 end
 
+-- frame handlers with nothing to do in a game: off as one starts, by the modules on
+-- (a profiler report, 2026-11-06)
+do
+    local T = KnoxTheme
+    local active, modules = T.active, T.modules
+    local gone = {}
+    local event = {Remove = function(f) gone[f] = true end}
+    local function start()
+        for _, f in ipairs(Events.OnGameStart.list) do f() end
+    end
+    local menuOnly, kept, anyGame, other = function() end, function() end, function() end, function() end
+    T.active = true
+    T.modules = {newgame = true}
+    T.offInGame(event, menuOnly)
+    T.offInGame(event, kept, "newgame")
+    T.offInGame(event, anyGame, "game")
+    T.offInGame(event, other, "dashboard", "hotbar")
+    start()
+    check("in a game: a menu's handler off", gone[menuOnly] == true)
+    check("in a game: kept by its module", gone[kept] == nil)
+    check("in a game: no game module, off", gone[anyGame] == true)
+    check("in a game: none of its modules, off", gone[other] == true)
+    T.modules = {hotbar = true}
+    local anyGame2, other2 = function() end, function() end
+    T.offInGame(event, anyGame2, "game")
+    T.offInGame(event, other2, "dashboard", "hotbar")
+    start()
+    check("in a game: a game module on, kept", gone[anyGame2] == nil)
+    check("in a game: the second module named keeps it", gone[other2] == nil)
+    T.active, T.modules = active, modules
+end
+
 print(string.format("settings: %d pass, %d FAIL", pass, fail))

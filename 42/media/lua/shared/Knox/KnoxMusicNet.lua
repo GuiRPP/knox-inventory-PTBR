@@ -903,12 +903,19 @@ end
 if Events then
     if Events.OnClientCommand then Events.OnClientCommand.Add(MN.onClientCommand) end
     if Events.OnServerCommand then Events.OnServerCommand.Add(MN.onServerCommand) end
-    if Events.OnTick then
-        Events.OnTick.Add(function()
-            if MN.server() then MN.serverTick() else MN.clientTick() end
+    local function tick()
+        if MN.server() then MN.serverTick() else MN.clientTick() end
+    end
+    if Events.OnTick then Events.OnTick.Add(tick) end
+    if Events.OnGameStart then
+        Events.OnGameStart.Add(function()
+            if MN.client() then
+                startOver()
+            elseif not MN.server() and Events.OnTick then
+                Events.OnTick.Remove(tick)   -- (a game alone: no one to play to - 2026-11-06)
+            end
         end)
     end
-    if Events.OnGameStart then Events.OnGameStart.Add(function() if MN.client() then startOver() end end) end
 end
 
 -- (Lua loaded anew: the others' tracks the old Lua left in the Java part have no one to step them)

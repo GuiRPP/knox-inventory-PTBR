@@ -318,6 +318,57 @@ function KnoxGridView:drawSilhouette(en, a)
     end
 end
 
+-- A place waiting for its thing (KnoxHome: taken into a hand, being eaten, ...), as the
+-- approved mockup .claude/mockups/home_place.html (the author, 2026-11-07: option C's dashed
+-- frame with option A's silhouette): a grey plate, a dashed edge, the thing's icon in grey.
+local HELD_PLATE = {r = 0x2a / 255, g = 0x2d / 255, b = 0x2c / 255}
+local HELD_DASH = {r = 0x6e / 255, g = 0x73 / 255, b = 0x70 / 255}
+
+--- One side's dashes, `len` px from `at`, `th` thick: each side on its own, starting and
+--- ending with a dash so that every corner is closed; what is left over goes to the middle
+--- dashes (the critic, 2026-11-07). Dash 4, gap 3 at a cell of 48. (no table: drawn every frame)
+local function dashSide(self, at, fixed, len, horizontal, dash, gap, th, c, a)
+    local n = math.max(1, math.floor((len + gap) / (dash + gap) + 0.5))
+    local ink = len - gap * (n - 1)
+    local base = math.floor(ink / n)
+    local extra = ink - base * n
+    local from = math.floor((n - extra) / 2)
+    local p = at
+    for i = 0, n - 1 do
+        local d = base + ((i >= from and i < from + extra) and 1 or 0)
+        if horizontal then
+            self:drawRect(p, fixed, d, th, a, c.r, c.g, c.b)
+        else
+            self:drawRect(fixed, p, th, d, a, c.r, c.g, c.b)
+        end
+        p = p + d + gap
+    end
+end
+
+function KnoxGridView:drawHeld(e)
+    local x, y, pw, ph = self:tileRect(e)
+    if not x then return end
+    -- the thing's own picture, as its tile draws it, under a veil of the plate's grey over the
+    -- whole place: the plate ends as the mockup's (0.55), the picture faded and greyed with it.
+    -- (the grey picture Knox makes - T.greyIcon - came out jagged, a stray dotted square round
+    -- it: the author's bench, 2026-11-07; a veil over the picture alone hid the grid line under it)
+    T.rect(self, x, y, pw, ph, HELD_PLATE, 0.2)
+    local tex = e.item:getTex()
+    if tex then
+        local side = math.floor(math.min(pw, ph) * 0.85)
+        self:drawTextureScaledAspect(tex, x + math.floor((pw - side) / 2), y + math.floor((ph - side) / 2), side, side, 0.5, 1, 1, 1)
+    end
+    T.rect(self, x, y, pw, ph, HELD_PLATE, 0.45)
+    local k = T.cell / 48
+    -- (2 px at 1080p: 1 px was lost - the author's bench, 2026-11-07)
+    local th = math.max(1, math.floor(2 * k + 0.5))
+    local dash, gap = math.max(2, math.floor(4 * k + 0.5)), math.max(2, math.floor(3 * k + 0.5))
+    dashSide(self, x, y, pw, true, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, x, y + ph - th, pw, true, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, y, x, ph, false, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, y, x + pw - th, ph, false, dash, gap, th, HELD_DASH, 0.9)
+end
+
 function KnoxGridView:cellUnderMouse()
     local cx, cy = self:cellAtPx(self:getMouseX(), self:getMouseY())
     -- (in a gap between a bag's compartments: no cell - one far outside the grid)
@@ -1123,7 +1174,9 @@ end
 --- Java part draws it with the others: `quietOk`) or "raised" (lifted: drawn after
 --- the others, or the tile above would cover its top).
 local function drawEntry(self, e, quietOk)
-    if e.reserved then
+    if e.held then
+        self:drawHeld(e)
+    elseif e.reserved then
         -- cells an item is coming to: only a breathing frame, no item yet
         local rx, ry, rw, rh = self:tileRect(e)
         if rx then

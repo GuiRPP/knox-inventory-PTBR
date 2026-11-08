@@ -390,7 +390,7 @@ local searchSaid = nil
 Knox.viewpointLookAfter = false   -- the screen came from Viewpoint's loot key: closed, back to looking
 -- (only with Viewpoint: without it nothing of this runs a frame - it was asked every frame anyway)
 if KnoxCompat.vpHas("cursor") or KnoxCompat.vpHas("rows") then
-    Events.OnPreUIDraw.Add(function()
+    local function viewpointFrame()
         if not getSpecificPlayer(0) then return end
         -- (told to Java when it changes, not every frame)
         if knoxViewpointSearch then
@@ -408,7 +408,9 @@ if KnoxCompat.vpHas("cursor") or KnoxCompat.vpHas("rows") then
             if not want then Knox.viewpointLookAfter = false end
         end
         if want and knoxViewpointKeep then knoxViewpointKeep() end
-    end)
+    end
+    Events.OnPreUIDraw.Add(viewpointFrame)
+    KnoxTheme.offInGame(Events.OnPreUIDraw, viewpointFrame, "game")
 end
 
 -- Viewpoint's loot key opens the game's loot window on the container looked at
@@ -675,3 +677,7 @@ Events.OnContainerUpdate.Add(onContainerUpdate)
 Events.OnPlayerDeath.Add(onPlayerDeath)
 Events.OnResolutionChange.Add(onResolutionChange)
 Events.OnTick.Add(onTick)
+-- (the game's windows to keep hidden, the screen to close: only with the inventory)
+KnoxTheme.offInGame(Events.OnTick, onTick, "inventory")
+-- (the frame count is for what is on the way into a grid, the windows of any module's)
+KnoxTheme.offInGame(Events.OnPreUIDraw, KnoxGrid.onFrame, "game")

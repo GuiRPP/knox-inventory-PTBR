@@ -17,12 +17,14 @@
 #   -Winter: the preview of the winter update (the author, 2026-11-04): the ice skin
 #   (KnoxTheme T.SKINS "ice") in place of the sand, no tags over the panel - a plate
 #   "WINTER IS COMING - UPDATE AVAILABLE" in their place (UPDATE SOON till update 11 came out, 2026-11-05), a light sweeping over it once a loop
-param([switch]$Overlay, [int]$Fps = 8, [double]$Length = 3.5, [switch]$Winter)
+#   -SandSkin (with -Winter): the same winter layout in the sand skin, into gif_frames_sand
+#   (make_poster_gif.ps1 -SandFrames; the author, 2026-11-05)
+param([switch]$Overlay, [int]$Fps = 8, [double]$Length = 3.5, [switch]$Winter, [switch]$SandSkin)
 
 . (Join-Path $PSScriptRoot "news_ui.ps1")
 $art = Join-Path $PSScriptRoot "art"
 $K.ammo = Hex "#3a321c"   # (T.category.ammo, news_ui has no ammo)
-if ($Winter) {
+if ($Winter -and -not $SandSkin) {
     # the ice skin as KnoxTheme paints it: the main colour and the dark tones; the categories stay
     $ice = @{ accent = "#8ec5e0"; window = "#101317"; header = "#171c21"; border = "#262e36"; cell = "#0b0f12"
               line = "#20272e"; tileEdge = "#37414a"; tileFrame = "#535e69"; tileHover = "#8794a1"
@@ -276,7 +278,7 @@ if ($Winter -and -not $Overlay) { DrawWinterAt $g -1 }
 $g.Dispose()
 if ($Overlay) {
     # one overlay a frame: the poster with the grid as it is at that moment
-    $dir = Join-Path $art "gif_frames"
+    $dir = Join-Path $art $(if ($SandSkin) { "gif_frames_sand" } else { "gif_frames" })
     if (Test-Path $dir) { Get-ChildItem $dir -Filter "ov_*.png" | Remove-Item -Force }
     New-Item -ItemType Directory -Force $dir | Out-Null
     $n = [int][math]::Round($Length * $Fps)
@@ -288,7 +290,9 @@ if ($Overlay) {
         $fg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
         $fg.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
         if ($Winter) { DrawWinterAt $fg $f }   # (first: a thing carried in goes over the plate)
-        DrawGridAt $fg ($f / $Fps) $Length
+        # (the bag's timing is for 3.5 s: a shorter loop runs it faster, or its things fade out as they land)
+        $gridK = [math]::Max([double]1, 3.5 / $Length)
+        DrawGridAt $fg ($f / $Fps * $gridK) ($Length * $gridK)
         $fg.Dispose()
         $fb.Save((Join-Path $dir ("ov_{0:D3}.png" -f $f)), [System.Drawing.Imaging.ImageFormat]::Png)
         $fb.Dispose()

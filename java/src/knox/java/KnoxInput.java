@@ -42,6 +42,61 @@ public class KnoxInput {
         KnoxCursor.hide(open);
     }
 
+    // A key's name for Knox's hints, always in Latin letters (the author 2026-11-08: started
+    // with the Russian layout the hints read a Cyrillic letter for F until the game restarts). The game
+    // names keys once, at its start, by the layout on then (Keyboard.initKeyNames ->
+    // glfwGetKeyName). A name with letters past Latin-1 is taken from the key's field in
+    // Keyboard instead (KEY_F -> "F"), as Viewpoint's KeyChord.latinName does; a Latin
+    // layout's own names (AZERTY, QWERTZ) are kept.
+    private static Map<Integer, String> latinKeys;
+
+    private static String latinKey(int key) {
+        if (latinKeys == null) {
+            Map<Integer, String> m = new HashMap<>();
+            Map<String, String> signs = new HashMap<>();
+            String[][] pairs = {{"SEMICOLON", ";"}, {"APOSTROPHE", "'"}, {"COMMA", ","}, {"PERIOD", "."},
+                    {"SLASH", "/"}, {"BACKSLASH", "\\"}, {"LBRACKET", "["}, {"RBRACKET", "]"},
+                    {"MINUS", "-"}, {"EQUALS", "="}, {"GRAVE", "`"}};
+            for (String[] p : pairs) signs.put(p[0], p[1]);
+            try {
+                for (java.lang.reflect.Field f : org.lwjglx.input.Keyboard.class.getFields()) {
+                    int mod = f.getModifiers();
+                    if (!java.lang.reflect.Modifier.isStatic(mod) || f.getType() != int.class || !f.getName().startsWith("KEY_")) continue;
+                    String n = f.getName().substring(4);
+                    m.putIfAbsent(f.getInt(null), signs.getOrDefault(n, n));
+                }
+            } catch (Throwable t) {
+                // (left as far as it got)
+            }
+            latinKeys = m;
+        }
+        return latinKeys.get(key);
+    }
+
+    /** The name to show for a key: the game's, or its Latin one when the game's is not Latin. */
+    @LuaMethod(name = "knoxKeyName", global = true)
+    public static String knoxKeyName(int key) {
+        String n = null;
+        try {
+            n = org.lwjglx.input.Keyboard.getKeyName(key);
+        } catch (Throwable t) {
+            // (out of the table)
+        }
+        return latin(key, n);
+    }
+
+    /** The game's name of a key made Latin (Viewpoint's panel keys go through it too). */
+    public static String latin(int key, String n) {
+        if (n == null || n.isEmpty()) return latinKey(key);
+        for (int i = 0; i < n.length(); i++) {
+            if (n.charAt(i) > 0xFF) {
+                String l = latinKey(key);
+                return l != null ? l : n;
+            }
+        }
+        return n;
+    }
+
     @Patch(className = "zombie.ui.UIManager", methodName = "isMouseOverInventory")
     public static class OverInventory {
         @Patch.OnExit

@@ -19,20 +19,16 @@ try {
 # must have a Remove of the same name in that file; an anonymous one indented must
 # be at file level - the known ones, each looked at (2026-10-24), are listed here.
 $fileLevel = @(
-    'KnoxMain.lua: Events.OnPreUIDraw.Add(function()',          # inside "if Viewpoint is there" at file level
-    'KnoxFootprint.lua: Events.OnTick.Add(function()',          # inside "if not the server" at file level
+    'KnoxMain.lua: Events.OnPreUIDraw.Add(viewpointFrame)',     # inside "if Viewpoint is there" at file level
     'KnoxGenerator.lua: if Events.OnClientCommand then Events.OnClientCommand.Add(G.onClientCommand) end',
     'KnoxGenerator.lua: if Events.OnServerCommand then Events.OnServerCommand.Add(G.onServerCommand) end',
     'KnoxRMenu.lua: Events.OnPressReloadButton.Add(function(player, gun)', # inside "if not wrapped yet" at file level
     'KnoxMenuScene.lua: Events.OnClothingUpdated.Add(function(player)', # inside "if Events.OnClothingUpdated" at file level
-    'KnoxMenuScene.lua: Events.OnTick.Add(function()',          # the same
     'KnoxMusicNet.lua: if Events.OnClientCommand then Events.OnClientCommand.Add(MN.onClientCommand) end',
     'KnoxMusicNet.lua: if Events.OnServerCommand then Events.OnServerCommand.Add(MN.onServerCommand) end',
-    'KnoxMusicNet.lua: Events.OnTick.Add(function()',
-    'KnoxMusicNet.lua: if Events.OnGameStart then Events.OnGameStart.Add(function() if MN.client() then startOver() end end) end',
+    'KnoxMusicNet.lua: Events.OnGameStart.Add(function()',
     'KnoxNet.lua: if Events.OnClientCommand then Events.OnClientCommand.Add(N.onClientCommand) end',
     'KnoxNet.lua: if Events.OnServerCommand then Events.OnServerCommand.Add(N.onServerCommand) end',
-    'KnoxNet.lua: Events.OnTick.Add(function()',
     'KnoxNet.lua: Events.OnGameStart.Add(function()',
     'KnoxNet.lua: Events.OnCreatePlayer.Add(function(playerNum)'
 )

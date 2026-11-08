@@ -406,7 +406,7 @@ local function enter(host)
     W.rLayer = layer(RL:new())
     M.layer, M.inNews = W.rLayer, true
     W.key = (KeybindId and getCore():getKey(KeybindId.RELOAD_WEAPON)) or Keyboard.KEY_R
-    W.keyName = Keyboard.getKeyName(W.key) or "R"
+    W.keyName = (knoxKeyName and knoxKeyName(W.key) or Keyboard.getKeyName(W.key)) or "R"
     W.keyText = getText("IGUI_Knox_NewsRHold")
     W.view = V:new(0, 0)
     W.view:initialise()
@@ -545,7 +545,7 @@ local function step(now)
     tops()
 end
 
-Events.OnPreUIDraw.Add(function()
+local function liveFrame()
     if W.want and not W.live and not W.broken then
         local host = W.want
         W.want = nil
@@ -558,7 +558,9 @@ Events.OnPreUIDraw.Add(function()
     local ok, err = pcall(step, getTimestampMs())
     if not ok then W.problem = W.problem or err end
     if W.problem then W.fail(W.problem) end
-end)
+end
+Events.OnPreUIDraw.Add(liveFrame)
+T.offInGame(Events.OnPreUIDraw, liveFrame, "inventory")   -- (the news in the Knox screen)
 
 Events.OnGameStart.Add(function() W.leave() end)
 
@@ -607,7 +609,7 @@ function W.drawRBlock(host, centre, y, view, c)
         W.want = host
         return h
     end
-    local w = T.measure(T.fontTile, W.keyName) + 10 + 6 + T.measure(T.fontText, W.keyText) + pad * 4
+    local w = T.keyW(W.keyName) + 6 + T.measure(T.fontText, W.keyText) + pad * 4
     local x = centre - math.floor(w / 2)
     T.rect(host, x, y, w, h, T.color.window, 0.7)
     T.tileFrame(host, x, y, w, h, c)

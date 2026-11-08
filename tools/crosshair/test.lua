@@ -166,6 +166,33 @@ run("actions", function()
     check("the choice stays on it", P.pick[P.sel] and P.pick[P.sel].name == "Close Window", P.pick[P.sel] and P.pick[P.sel].name)
 end)
 
+-- an open window: the take key tapped closes it, held climbs through (the author 2026-11-08)
+run("window held climbs", function()
+    local W0, VI0 = ISWorldObjectContextMenu, ViewpointInteract
+    local W = {onOpenCloseWindow = function() end, onClimbThroughWindow = function() end, onSmashWindow = function() end}
+    ISWorldObjectContextMenu = W
+    ViewpointInteract = {actions = {{fn = W.onSmashWindow}, {fn = W.onOpenCloseWindow}, {fn = W.onClimbThroughWindow}}}
+    VP.obj, VP.loot, VP.containers = {}, false, jlist({})
+    VP.actions = {{label = "Smash Window", on = true}, {label = "Close Window", on = true}, {label = "Climb through", on = true}}
+    VP.version = (VP.version or 0) + 1
+    frames(30)
+    chooseRow(function(r) return r.name == "Close Window" end)
+    local n0 = #VP.ran
+    VP.pressed, VP.held = 1, true
+    frames(3)   -- 48 ms
+    check("nothing run while held", #VP.ran == n0, #VP.ran - n0)
+    VP.held = false
+    frames(2)
+    check("tap: closed", #VP.ran == n0 + 1 and VP.ran[#VP.ran] == 1, VP.ran[#VP.ran])
+    VP.pressed, VP.held = 1, true
+    frames(14)   -- 224 ms > 180
+    check("held: climbed", #VP.ran == n0 + 2 and VP.ran[#VP.ran] == 2, VP.ran[#VP.ran])
+    VP.held = false
+    frames(2)
+    check("let go: nothing more", #VP.ran == n0 + 2, #VP.ran - n0)
+    ISWorldObjectContextMenu, ViewpointInteract = W0, VI0
+end)
+
 -- a locked door: Viewpoint's "[Locked]" off the name, a lock and "LOCKED" at the right (2026-10-29)
 RATTLED = 0
 local door = {classes = {IsoDoor = true}, ToggleDoor = function() RATTLED = RATTLED + 1 end}
@@ -309,9 +336,10 @@ run("groups", function()
     chooseRow(function(r) return r == wash end)
     frames(2)
     check("hint: unfold", P.shownLabels[1] == "IGUI_Knox_VPUnfold", P.shownLabels[1])
+    local ran0 = #VP.ran
     VP.pressed = 1
     frames(30)
-    check("nothing run", #VP.ran == 1, #VP.ran)
+    check("nothing run", #VP.ran == ran0, #VP.ran - ran0)
     local kids, shown, strips = 0, 0, 0
     for _, r in ipairs(P.rows) do
         if r.parent == wash.key and r.kind == "act" then
@@ -719,6 +747,71 @@ run("the foot in two lines", function()
     frames(30)
     check("empty: one line", not P.footTwo)
     VP.placeKey, VP.actions = false, {}
+end)
+
+-- The use key (Viewpoint 0.1.7-rc3, the author's pick 2026-11-08, C): three lines - the
+-- thing's keys on the left (take, use, place), the container's on the right (take all, open).
+run("the use key", function()
+    local used = {}
+    ViewpointLoot = {use = function(_, it, w) table.insert(used, {it, w}) end, place = function() end}
+    local function slotOf(label)
+        for i = 1, P.hintCount do if P.shownLabels[i] == label then return P.shownSlots[i], i end end
+        return nil
+    end
+    local w, k = item("Water", 1.2), item("Knife", 0.7)
+    w.useWord = "ContextMenu_Drink"
+    VP.obj = {}
+    VP.shown, VP.kind, VP.loot, VP.locked = true, 3, true, false
+    VP.placeKey = true
+    VP.containers = jlist({container({w, k}, "crate")})
+    frames(30)
+    local twoH = P.L.H
+    VP.useKey = true
+    VP.obj = {}
+    frames(30)
+    check("three lines", P.footRows == 3 and P.footTwo == true, P.footRows)
+    check("taller by a line", P.L.H == twoH + P.Z.KH + P.Z.HINT_ROW, P.L.H - twoH)
+    check("within the plate's width", P.needW <= P.Z.MAXW, P.needW)
+    chooseRow(function(r) return r.name == "Water" end)
+    frames(30)
+    check("drink: the key is the panel's", VP.uses == true)
+    check("take upper left", slotOf("IGUI_Knox_VPTake") == 1)
+    check("take all upper right", slotOf("IGUI_Knox_VPTakeAll") == 2)
+    check("use middle left, its word", slotOf("IGUI_Knox_VPUseDrink") == 3)
+    check("open middle right", slotOf("IGUI_Knox_VPOpen") == 4)
+    check("place lower left", slotOf("IGUI_Knox_VPPlace") == 5)
+    VP.pressed = 4
+    frames(2)
+    check("G: the row chosen, with its word", #used == 1 and used[1][1] == w and used[1][2] == "ContextMenu_Drink", #used)
+    local h = P.L.H
+    chooseRow(function(r) return r.name == "Knife" end)
+    frames(30)
+    check("nothing to do: the key is the game's", VP.uses == false and slotOf("IGUI_Knox_VPUseDrink") == nil)
+    check("place still lower left", slotOf("IGUI_Knox_VPPlace") == 5)
+    check("the same height", P.L.H == h, P.L.H - h)   -- (a thing chosen again: the same growth)
+    VP.pressed = 4
+    frames(2)
+    check("G on nothing: nothing used", #used == 1, #used)
+    -- a thing in a bag unfolded in the container: both keys too (the author 2026-11-08)
+    local soup = item("Soup", 0.8)
+    soup.useWord = "ContextMenu_Eat"
+    local pk = bag("Backpack", {soup})
+    VP.obj = {}
+    VP.containers = jlist({container({w, pk}, "crate")})
+    frames(30)
+    chooseRow(function(r) return r.bag ~= nil end)
+    VP.pressed, VP.held = 1, true
+    frames(3)
+    VP.held = false
+    frames(20)
+    chooseRow(function(r) return r.depth == 1 and r.name == "Soup" end)
+    frames(30)
+    check("in a bag: use", VP.uses == true and slotOf("IGUI_Knox_VPUseEat") == 3)
+    check("in a bag: place", VP.places == true and slotOf("IGUI_Knox_VPPlace") == 5)
+    VP.pressed = 4
+    frames(2)
+    check("in a bag: G eats it", #used == 2 and used[2][1] == soup and used[2][2] == "ContextMenu_Eat", #used)
+    VP.placeKey, VP.useKey, ViewpointLoot = false, false, nil
 end)
 
 -- Viewpoint 0.1.6 has no place key: asking it throws in its Java, and the game logs that past

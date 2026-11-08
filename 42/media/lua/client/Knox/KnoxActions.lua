@@ -509,7 +509,10 @@ function A.grab(player, items, walk)
     local views = ownViews(player)
     local taken, failed = 0, 0
     for _, item in ipairs(seen) do
-        if moveInto(views, tileOf(item), player, nil, true) then taken = taken + 1 else failed = failed + 1 end
+        -- (a key onto a key ring the character carries, as Shift+click puts it - a body
+        -- searched from Viewpoint's panel put it into the backpack; the author 2026-11-08)
+        local e = tileOf(item)
+        if toKeyRing(e, nil, player) or moveInto(views, e, player, nil, true) then taken = taken + 1 else failed = failed + 1 end
     end
     if failed > 0 then say(player, "IGUI_Knox_NoRoom") end
     for _, v in ipairs(A.allViews()) do v:markDirty() end

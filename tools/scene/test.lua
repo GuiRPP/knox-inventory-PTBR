@@ -621,4 +621,42 @@ frame(2)
 ok("no animations, H again: back at once", s.menuK == 1 and s.uiOff == false, s.menuK)
 ANIM_ON = true
 
+-- when the hero is written (the author, 2026-11-06: not once a minute): into the game and a moment
+-- later, the clothes, the save, death; nothing on the game's tick while none is waiting
+do
+    local written = 0
+    if KnoxMenuBag then KnoxMenuBag.write = function() end end
+    knoxMenuSnapshot = function() written = written + 1; return true end
+    local hero = {isDead = function() return false end, getX = function() return 0 end, getY = function() return 0 end}
+    getSpecificPlayer = function() return hero end
+    NOW = NOW + 10000   -- (a wait left by the games started above)
+    fire("OnTick")
+    written = 0
+    local ticks = #Events.OnTick.list
+    fire("OnGameStart")
+    ok("hero: written into the game", written == 1, written)
+    ok("hero: the tick waits for the second", #Events.OnTick.list == ticks + 1, #Events.OnTick.list)
+    NOW = NOW + 2900
+    fire("OnTick")
+    ok("hero: not before its time", written == 1, written)
+    fire("OnClothingUpdated", hero)
+    NOW = NOW + 200
+    fire("OnTick")
+    ok("hero: clothes in the wait keep the later time", written == 1, written)
+    ok("hero: one wait for the two", #Events.OnTick.list == ticks + 1, #Events.OnTick.list)
+    NOW = NOW + 1400
+    fire("OnTick")
+    ok("hero: written once for the burst", written == 2, written)
+    ok("hero: nothing on the tick after", #Events.OnTick.list == ticks, #Events.OnTick.list)
+    NOW = NOW + 3600000
+    fire("EveryTenMinutes")
+    fire("OnTick")
+    ok("hero: time alone writes nothing", written == 2, written)
+    fire("OnSave")
+    ok("hero: written leaving the save", written == 3, written)
+    fire("OnPlayerDeath", hero)
+    ok("hero: written at death", written == 4, written)
+    getSpecificPlayer = function() return nil end
+end
+
 say("scene: " .. pass .. " pass, " .. fail .. " fail")

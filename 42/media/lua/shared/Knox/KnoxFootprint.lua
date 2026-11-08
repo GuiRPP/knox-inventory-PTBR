@@ -413,10 +413,13 @@ local function saveLearned()
     unsaved = {}
 end
 
+local saveTick = nil   -- (on the game's tick only while something waits: 2026-11-06)
+
 local function remember(fullType, text)
     learned[fullType] = text
     asking[fullType] = nil
     table.insert(unsaved, fullType .. "=" .. text)
+    if saveTick and #unsaved == 1 then Events.OnTick.Add(saveTick) end
 end
 
 --- The model script behind a model's name as items give it (with or without the module).
@@ -848,13 +851,14 @@ if getFileReader and not (isServer and isServer()) then
     loadOverrides()
     loadLearned()
     local lastSave = 0
-    Events.OnTick.Add(function()
-        if #unsaved == 0 then return end
+    saveTick = function()
         local now = getTimestampMs()
         if now - lastSave < 2000 then return end
         lastSave = now
         saveLearned()
-    end)
+        if #unsaved == 0 then Events.OnTick.Remove(saveTick) end
+    end
+    if #unsaved > 0 then Events.OnTick.Add(saveTick) end
 end
 
 return KnoxFootprint
