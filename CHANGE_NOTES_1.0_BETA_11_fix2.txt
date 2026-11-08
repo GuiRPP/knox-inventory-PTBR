@@ -1,0 +1,10 @@
+[h1]Knox Inventory: one version now[/h1]
+The old 0.9.8.7 is gone from this item. Knox Inventory 1.0 BETA is now the one and only version of the mod, and in the mod list it is simply called "Knox Inventory".
+
+[list]
+[*]Were you on the beta? Nothing to do: your saves keep Knox as before.
+[*]Were you on 0.9.8.7? Your saves open as usual, Knox just needs turning on again: Load, pick the save, Mods, enable Knox Inventory. Knox doesn't touch the map, so nothing in your world changes.
+[*]ZombieBuddy is still required.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].
