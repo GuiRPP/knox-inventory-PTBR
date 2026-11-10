@@ -1,0 +1,19 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Things go back to their place. Take a flashlight out of your backpack into your hand, eat half a can, put on a belt item - when you're done, it returns to the very cell it came from. While it's away, a grey silhouette keeps its spot. You can still drag something onto that silhouette: the thing then comes back as close to it as it can. Don't want it? Switch off "Put things back" in Knox's settings.
+[*]A battery taken out of a flashlight joins the stack of batteries in the same bag instead of lying apart.
+[*]A key you take with Knox (from a body searched in Viewpoint's panel, from the ground) goes onto your key ring, if you carry one.
+[*]Viewpoint 0.1.7-rc3: its new use key (G) works through Knox's crosshair panel - drink, eat, wear, bandage or take in hand the thing chosen there, also inside an opened bag. The line tells you which.
+[*]At an open window, tap the take key to close it, hold it to climb through, as without the panel.
+[*]Key hints are always in Latin letters, even if the game started with another keyboard layout. Single-letter keys are all one width now.
+[*]Icons for "Close Lid", "Take Bottle" and "Light Fire" in the crosshair panel.
+[*]Fixed an error each time a body was searched from Viewpoint's panel while carrying a shovel.
+[*]OldPoint: the middle mouse button in Knox windows no longer turns the camera again.
+[*]Knox does less work every frame in modules you've switched off.
+[*]Set sizes for a few more items: the heavy chain with a hook, the stock certificate, the old tin opener, the broken wooden stick.
+[*]ZombieBuddy will ask about KnoxInventoryJava.jar once more: allow it.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

@@ -3,6 +3,7 @@ package knox.java;
 import java.util.function.Consumer;
 
 import me.zed_0xff.zombie_buddy.Patch;
+import me.zed_0xff.zombie_buddy.Watermark;
 import se.krka.kahlua.integration.annotations.LuaMethod;
 import zombie.core.textures.Texture;
 import zombie.core.textures.TextureDraw;
@@ -29,6 +30,12 @@ public class KnoxUiFade {
     public static float alpha = 1f;
     public static boolean skip;
     public static long setAt;
+    // One window's own alpha while it draws (the hotbar's, the author 2026-11-10: "a setting for
+    // the hotbar's transparency"): Lua sets it around that window's render and puts it back to 1.
+    // Scaled here, at the sprite, it takes everything the window draws at once - its tiles, the
+    // items' icons, the text, its ready lists played back (they keep the alpha unscaled).
+    public static float part = 1f;
+    private static final float WATERMARK_ALPHA = 0.4f;   // (ZombieBuddy's own)
 
     /** The menu's alpha now (1: as it is). */
     @LuaMethod(name = "knoxMenuUiAlpha", global = true)
@@ -43,9 +50,30 @@ public class KnoxUiFade {
         skip = on;
     }
 
+    /**
+     * ZombieBuddy's line and icon at the top of the menu hidden with it, by H (the author,
+     * 2026-11-01). Its own alpha: they are drawn at the end of the frame, past the UI's
+     * elements. Another version of ZombieBuddy without the call: they stay.
+     */
+    @LuaMethod(name = "knoxMenuWatermark", global = true)
+    public static void knoxMenuWatermark(boolean hidden) {
+        try {
+            Watermark.setAlpha(hidden ? 0f : WATERMARK_ALPHA);
+        } catch (LinkageError e) {
+            // (as it was)
+        }
+    }
+
     public static void off() {
         alpha = 1f;
         skip = false;
+        part = 1f;
+    }
+
+    /** The alpha of the window drawing now (1: as it is; set back to 1 after its render). */
+    @LuaMethod(name = "knoxUiPartAlpha", global = true)
+    public static void knoxUiPartAlpha(double a) {
+        part = (float) Math.max(0.0, Math.min(1.0, a));
     }
 
     /** The alpha to draw with: `a` scaled while the menu fades. */
@@ -73,6 +101,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(9) Consumer<TextureDraw> c) {
             if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
+            if (KnoxUiFade.part < 1f) a *= KnoxUiFade.part;
         }
     }
 
@@ -86,6 +115,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(9) Consumer<TextureDraw> c) {
             if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
+            if (KnoxUiFade.part < 1f) a *= KnoxUiFade.part;
         }
     }
 
@@ -101,6 +131,7 @@ public class KnoxUiFade {
                                  @Patch.Argument(15) float u4, @Patch.Argument(16) float v4) {
             if (KnoxDrawList.counting) KnoxDrawList.sprites++;
             if (KnoxUiFade.alpha < 1f && !KnoxUiFade.skip) a = KnoxUiFade.scaled(a);
+            if (KnoxUiFade.part < 1f) a *= KnoxUiFade.part;
         }
     }
 }

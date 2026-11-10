@@ -1,0 +1,6 @@
+[h1]Knox Inventory 1.0 BETA - update 15: Hotfix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Fixed the mod staying off with no error and no Allow checkbox after update 13. If you had "Save decisions to disk" ticked in ZombieBuddy's window, it remembered the signature error as your own "No". The Java part is new now, so ZombieBuddy will ask about KnoxInventoryJava.jar once more: tick Yes.
+[/list]

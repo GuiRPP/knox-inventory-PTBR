@@ -168,7 +168,31 @@ if ISWorldObjectContextMenu and ISWorldObjectContextMenu.createMenu and not ISWo
             end)
             K.world = {playerNum = player, square = sq, ground = ground, ms = getTimestampMs(), pending = true}
         end
+        -- (a thing whose picture has no name - a body: the game's menu breaks on it while the
+        -- character carries something to clear ashes with - its ashes check reads the name.
+        -- Viewpoint asks the menu of a body looked at: an error each time it was searched; the
+        -- author 2026-11-08. Its square's floor in its place for the call - the menu of its
+        -- square, as a right click there makes; the list given back as it was)
+        local swapped = nil
+        if type(worldobjects) == "table" then
+            pcall(function()
+                for i, o in ipairs(worldobjects) do
+                    local spr = o and o.getSprite and o:getSprite()
+                    if spr and not spr:getName() and not o:getSpriteName() then
+                        local floor = o:getSquare() and o:getSquare():getFloor()
+                        if floor then
+                            swapped = swapped or {}
+                            swapped[i] = o
+                            worldobjects[i] = floor
+                        end
+                    end
+                end
+            end)
+        end
         local a, b, c = createMenu(player, worldobjects, x, y, test, ...)
+        if swapped then
+            for i, o in pairs(swapped) do worldobjects[i] = o end
+        end
         -- (not taken by the time it is built: no world menu was made - no other
         -- menu opened soon after may take it)
         if K.world then K.world.pending = false end
@@ -186,6 +210,7 @@ end
 local GROUPS = {"use", "equip", "move", "craft", "other", "danger"}
 local GROUP_TITLE = {use = "IGUI_Knox_MenuUse", equip = "IGUI_Knox_MenuEquip", move = "IGUI_Knox_MenuMove",
                      craft = "IGUI_Knox_MenuCraft", other = "IGUI_Knox_MenuOther"}
+K.GROUP_TITLE = GROUP_TITLE   -- (the menu order editor names the groups as the menu does)
 
 local BY_FN = {
     use = {"onEatItems", "onDrinkFluid", "onDrinkForThirst", "onLiteratureItems", "onMediaText", "onCheckMap",
@@ -293,6 +318,7 @@ local ICON_TEXT = {
     ContextMenu_Splint = "splint", ContextMenu_Remove_Splint = "unsplint", ContextMenu_Clean_Burn = "burn",
     ContextMenu_PlantainCataplasm = "poultice", ContextMenu_ComfreyCataplasm = "poultice", ContextMenu_GarlicCataplasm = "poultice",
     ContextMenu_InsertBulletsInMagazine = "magazine", ContextMenu_InsertBullets = "magazine",
+    IGUI_Knox_RMenu_LoadMagazine = "magazine", IGUI_Knox_RMenu_LoadGun = "magazine",
     ContextMenu_UnloadRounds = "magazine", ContextMenu_EjectMagazine = "magazine", ContextMenu_InsertMagazine = "magazine",
     IGUI_DeviceOptions = "device", ContextMenu_Attach = "attach",
     ContextMenu_Grab = "grab", ContextMenu_Grab_one = "grab", ContextMenu_Grab_half = "grab", ContextMenu_Grab_all = "grab",
@@ -343,6 +369,10 @@ local ICON_TEXT = {
     IGUI_EnterVehicle = "door",
     -- (the author, 2026-10-29: the car's "Mechanics" had none)
     ContextMenu_VehicleMechanics = "repair",
+    -- (the author, 2026-11-08: a rain collector's lid, a water cooler's bottle and a brazier's
+    -- fire had none in Viewpoint's crosshair panel)
+    ContextMenu_OpenLid = "open", ContextMenu_CloseLid = "open", ContextMenu_Take_Bottle = "grab",
+    ContextMenu_Light_fire = "burn",
 }
 local ICON_FN = {
     onEatItems = "eat", onDrinkFluid = "drink", onDrinkForThirst = "drink", onLiteratureItems = "read", onMediaText = "read",
@@ -357,7 +387,7 @@ local ICON_FN = {
     onPlaceItemOnGround = "place", ["ISInventoryPage.transferAll"] = "all", ["ISInventoryPage.lootAll"] = "all",
     onDropItems = "drop", onDumpContents = "pour", ["ISFluidContainerMenu.emptyFluidContainer"] = "pour",
     ["ISFluidContainerMenu.showInfo"] = "fluid_info", ["ISFluidContainerMenu.transferFluids"] = "fluid_move",
-    onInspectClothing = "inspect", onRenameBag = "rename", onRenameFood = "rename", onRenameMap = "rename",
+    onInspectClothing = "sew", onRenameBag = "rename", onRenameFood = "rename", onRenameMap = "rename",
     onFavorite = "star", OnCraft = "craft", OnNewCraft = "craft", onResearchRecipe = "recipes",
     onAddItemInEvoRecipe = "cook", removePatch = "sew", removeAllPatches = "sew",
     ["ISHotbar.removeItem"] = "unequip", ["ISHotbar.attachItem"] = "attach",
@@ -848,6 +878,229 @@ end
 
 --- The rows of a menu, top down: {kind = "head" | "label" | "sep" | "opt", y, h, ...};
 --- `byIndex[i]` is the row of option i. Rebuilt whenever asked (a few dozen options).
+-- The order of an item menu's options (the author, 2026-11-10: "an editor to change the
+-- default order of the context menu's options right in the game"; KnoxMenuOrder). The
+-- menu is cut into sections - the top without a title, then the groups - and the author's
+-- order (media/knox/menu_order.txt in the mod, the same for every player) moves options
+-- between them and within them. An option is known by what it does, not by its words:
+-- the game's function behind it, or on top its role there (the item's main action, its
+-- recipes...), so one order fits every language and every item that has it.
+
+K.ORDER_FILE = "media/knox/menu_order.txt"
+K.order = {groups = nil, lists = {}}   -- groups: the middle groups' order; lists[section] = {id...}
+K.SECTIONS = {"top", "use", "equip", "move", "craft", "other", "danger"}   -- the game's own order
+
+local fnNames = nil
+local function fnName(f)
+    if not fnNames then
+        fnNames = {}
+        for _, pair in ipairs({{"", ISInventoryPaneContextMenu}, {"ISInventoryPage.", ISInventoryPage},
+                               {"ISFluidContainerMenu.", ISFluidContainerMenu}, {"ISHotbar.", ISHotbar},
+                               -- ("Place" of furniture: known by its function, not by its words in one language)
+                               {"ISMoveableContextMenu.", ISMoveableContextMenu}}) do
+            if pair[2] then
+                for k, v in pairs(pair[2]) do
+                    if type(v) == "function" and fnNames[v] == nil then fnNames[v] = pair[1] .. k end
+                end
+            end
+        end
+    end
+    return fnNames[f]
+end
+
+--- What an option is to the order: "fn:<the game's function>", "sub:<its sub menu's first
+--- function>", or its words for anything else (another mod's option).
+local function optionId(menu, o)
+    local f = o.onSelect and fnName(o.onSelect)
+    if f then return "fn:" .. f end
+    if o.subOption then
+        local sf = firstFn(menu, o)
+        local n = sf and fnName(sf)
+        if n then return "sub:" .. n end
+    end
+    return "text:" .. tostring(o.name)
+end
+
+--- The options of a menu as the layout sees them: the first after the "back" ones, the
+--- rest, "Inspect", "Take the generator".
+local function splitOptions(menu)
+    local kt = knownTables()
+    local first = 1
+    while menu.options[first] and menu.options[first].isDefaultOption do first = first + 1 end
+    local rest, inspect, take = {}, nil, nil
+    for i = first, #menu.options do
+        local o = menu.options[i]
+        if o.onSelect and kt.hidden[o.onSelect] then
+            -- (left out)
+        elseif o.name == kt.take and not take and not o.notAvailable then
+            take = i
+        elseif o.name == kt.inspect and not inspect then
+            inspect = i
+        else
+            table.insert(rest, i)
+        end
+    end
+    return first, rest, inspect, take
+end
+
+--- The sections in the author's order: the top, the groups as he set them, "danger" last.
+function K.sectionKeys()
+    local out = {"top"}
+    local seen = {top = true, danger = true}
+    for _, g in ipairs(K.order.groups or {}) do
+        if GROUP_TITLE[g] and not seen[g] then
+            seen[g] = true
+            table.insert(out, g)
+        end
+    end
+    for _, g in ipairs(GROUPS) do
+        if not seen[g] then
+            seen[g] = true
+            table.insert(out, g)
+        end
+    end
+    table.insert(out, "danger")
+    return out
+end
+
+--- An item menu cut into sections {{key, rows = {{i, id}...}}...}: "top" first, the
+--- groups, "danger" last; `useOrder` - in the author's order, else the game's own.
+local function sectionsOf(menu, head, first, rest, inspect, useOrder)
+    local kt = knownTables()
+    local top, taken = {}, {}
+    local function put(i, id)
+        table.insert(top, {i = i, id = id})
+        taken[i] = true
+    end
+    if inspect then put(inspect, "knox:inspect") end
+    local main = mainOf(menu, head, first)
+    if main and main ~= inspect then put(main, "role:main") end
+    -- "Attach to" (a quick slot) is on top for anything that has it, not only weapons
+    -- (the author, 2026-10-19: a canteen's was down in the group)
+    for _, i in ipairs(rest) do
+        local o = menu.options[i]
+        if not taken[i] and o.name == kt.attach and not o.notAvailable then put(i, "role:attach") end
+    end
+    for _, i in ipairs(rest) do
+        local o = menu.options[i]
+        if not taken[i] and ((o.onSelect and o.onSelect == kt.craft) or isInteract(menu, head, o)) then put(i, "role:craft") end
+    end
+    -- clothes' "Holes and patches" (the game's garment window) right after "Rip" (the author, 2026-11-10)
+    local garment = ISInventoryPaneContextMenu and ISInventoryPaneContextMenu.onInspectClothing
+    for _, i in ipairs(rest) do
+        local o = menu.options[i]
+        if not taken[i] and garment and o.onSelect == garment then put(i, "role:garment") end
+    end
+    local groups = {top = top}
+    for _, i in ipairs(rest) do
+        if not taken[i] then
+            local g = groupOf(menu, menu.options[i], 0)
+            groups[g] = groups[g] or {}
+            table.insert(groups[g], {i = i, id = optionId(menu, menu.options[i])})
+        end
+    end
+    if not useOrder then
+        local out = {}
+        for _, key in ipairs(K.SECTIONS) do table.insert(out, {key = key, rows = groups[key] or {}}) end
+        return out
+    end
+    -- the author's order: an option listed goes to its list's section, at its place there;
+    -- one not listed stays in its own section after the listed ones, in the game's order
+    local where = {}
+    for key, list in pairs(K.order.lists) do
+        for r, id in ipairs(list) do where[id] = {key = key, rank = r} end
+    end
+    local out, byKey = {}, {}
+    for _, key in ipairs(K.sectionKeys()) do
+        local sec = {key = key, rows = {}}
+        byKey[key] = sec
+        table.insert(out, sec)
+    end
+    local seq = 0
+    for _, key in ipairs(K.SECTIONS) do
+        for _, r in ipairs(groups[key] or {}) do
+            seq = seq + 1
+            local w = where[r.id]
+            local dest = (w and byKey[w.key]) or byKey[key]
+            table.insert(dest.rows, {i = r.i, id = r.id, rank = w and w.rank or 100000, seq = seq})
+        end
+    end
+    for _, sec in ipairs(out) do
+        table.sort(sec.rows, function(a, b)
+            if a.rank ~= b.rank then return a.rank < b.rank end
+            return a.seq < b.seq
+        end)
+    end
+    return out
+end
+
+--- Read the author's order (at the start, and after the editor writes it).
+function K.loadOrder()
+    K.order = {groups = nil, lists = {}}
+    if not getModFileReader then return end
+    local ok, r = pcall(getModFileReader, KnoxModId or "KnoxInventory", K.ORDER_FILE, false)
+    if not ok or not r then return end
+    local line = r:readLine()
+    while line do
+        local key, rest = string.match(line, "^%s*([%w_]+)%s*=%s*(.-)%s*$")
+        if key and rest then
+            local list = {}
+            for id in string.gmatch(rest, "[^|]+") do
+                id = string.match(id, "^%s*(.-)%s*$")
+                if id ~= "" then table.insert(list, id) end
+            end
+            if key == "groups" then K.order.groups = list else K.order.lists[key] = list end
+        end
+        line = r:readLine()
+    end
+    r:close()
+end
+
+--- Write the author's order into the mod (the editor, DEV mode only).
+function K.saveOrder()
+    local w = getModFileWriter and getModFileWriter(T.MOD_ID or KnoxModId or "KnoxInventory", K.ORDER_FILE, true, false)
+    if not w then return false end
+    w:write("# Knox Inventory: the order of item menu options, the same for every player (the menu order editor, DEV).\r\n")
+    w:write("# section = id | id | ...  (top, use, equip, move, craft, other, danger); groups = the groups' order.\r\n")
+    if K.order.groups and #K.order.groups > 0 then w:write("groups = " .. table.concat(K.order.groups, " | ") .. "\r\n") end
+    for _, key in ipairs(K.SECTIONS) do
+        local list = K.order.lists[key]
+        if list and #list > 0 then w:write(key .. " = " .. table.concat(list, " | ") .. "\r\n") end
+    end
+    w:close()
+    return true
+end
+
+--- For the editor: the menu's sections in the author's order and in the game's own, each row
+--- {id, name, icon} (options of one id together: recipes of every kind are one "Rip, ...").
+function K.orderSnapshot(menu)
+    local head = headOf(menu)
+    if not head then return nil end
+    local first, rest, inspect = splitOptions(menu)
+    local function rowsOf(sections)
+        local out = {}
+        for _, sec in ipairs(sections) do
+            local rows, byId = {}, {}
+            for _, r in ipairs(sec.rows) do
+                local o = menu.options[r.i]
+                local name = isInteract(menu, head, o) and getText("IGUI_Knox_MenuInteract") or tostring(o.name)
+                local row = byId[r.id]
+                if row then
+                    row.name = row.name .. ", " .. name
+                else
+                    row = {id = r.id, name = name, icon = iconOf(menu, o, 0)}
+                    byId[r.id] = row
+                    table.insert(rows, row)
+                end
+            end
+            table.insert(out, {key = sec.key, rows = rows})
+        end
+        return out
+    end
+    return {head = head, now = rowsOf(sectionsOf(menu, head, first, rest, inspect, true)),
+            game = rowsOf(sectionsOf(menu, head, first, rest, inspect, false))}
+end
+
 local function buildLayout(menu)
     ensure(menu)
     local L = {rows = {}, byIndex = {}, h = 0}
@@ -900,19 +1153,7 @@ local function buildLayout(menu)
     end
     -- what stays out of Knox's menus; "Inspect" (the 3D look) always first; "Take the
     -- generator", when it can be done, before everything (the author, 2026-10-22)
-    local rest, inspect, take = {}, nil, nil
-    for i = first, #menu.options do
-        local o = menu.options[i]
-        if o.onSelect and kt.hidden[o.onSelect] then
-            -- (left out)
-        elseif o.name == kt.take and not take and not o.notAvailable then
-            take = i
-        elseif o.name == kt.inspect and not inspect then
-            inspect = i
-        else
-            table.insert(rest, i)
-        end
-    end
+    local _, rest, inspect, take = splitOptions(menu)
     if take then addOption(take) end
     local labelH = T.fontH(T.fontTile) + math.floor(ih * 0.55)
     if wh and wh.kind ~= "title" then
@@ -966,49 +1207,22 @@ local function buildLayout(menu)
         L.grouped = false
         return finish(menu, L)
     end
-    -- an item's menu: on top what is used most, then the groups
-    local top, taken = {}, {}
-    if inspect then table.insert(top, inspect) end
-    local main = mainOf(menu, head, first)
-    if main and main ~= inspect then
-        table.insert(top, main)
-        taken[main] = true
-    end
-    -- "Attach to" (a quick slot) is on top for anything that has it, not only weapons
-    -- (the author, 2026-10-19: a canteen's was down in the group)
-    for _, i in ipairs(rest) do
-        local o = menu.options[i]
-        if not taken[i] and o.name == kt.attach and not o.notAvailable then
-            table.insert(top, i)
-            taken[i] = true
-        end
-    end
-    for _, i in ipairs(rest) do
-        local o = menu.options[i]
-        if not taken[i] and ((o.onSelect and o.onSelect == kt.craft) or isInteract(menu, head, o)) then
-            table.insert(top, i)
-            taken[i] = true
-        end
-    end
-    local groups, present = {}, 0
-    for _, i in ipairs(rest) do
-        if not taken[i] then
-            local g = groupOf(menu, menu.options[i], 0)
-            if not groups[g] then
-                groups[g] = {}
-                if g ~= "danger" then present = present + 1 end
-            end
-            table.insert(groups[g], i)
-        end
+    -- an item's menu: on top what is used most, then the groups - in the author's order
+    -- (the menu order editor, media/knox/menu_order.txt)
+    local sections = sectionsOf(menu, head, first, rest, inspect, true)
+    local top = sections[1].rows
+    local present = 0
+    for n = 2, #sections do
+        if #sections[n].rows > 0 and sections[n].key ~= "danger" then present = present + 1 end
     end
     L.grouped = true
-    for _, i in ipairs(top) do addOption(i) end
+    for _, r in ipairs(top) do addOption(r.i) end
     -- a group's title is a divider, not an option: small dim caps and a line,
     -- room above it, little below - it holds on to its options (the author, 2026-10-18)
     local labelled = present >= 2 or (#top > 0 and present >= 1)
-    for _, g in ipairs(GROUPS) do
-        local list = groups[g]
-        if list then
+    for n = 2, #sections do
+        local g, list = sections[n].key, sections[n].rows
+        if #list > 0 then
             local fold = g == "other" and labelled
             if g == "danger" then
                 if #L.rows > 0 then add({kind = "sep", h = math.floor(ih * 0.35)}) end
@@ -1016,7 +1230,7 @@ local function buildLayout(menu)
                 -- "Other" folded until the mouse comes on its title (the author, 2026-10-18)
                 add({kind = "label", h = labelH, text = getText(GROUP_TITLE[g]), toggle = fold})
             end
-            for _, i in ipairs(list) do addOption(i, g == "danger", fold) end
+            for _, r in ipairs(list) do addOption(r.i, g == "danger", fold) end
         end
     end
     return finish(menu, L)
@@ -1712,3 +1926,6 @@ function ISContextMenu:render()
     renderMenu(self, visH, plateA, rowsA)
     if visH then self:clearStencilRect() end
 end
+
+-- the author's order of item menus (KnoxMenuOrder writes it; read once at load)
+K.loadOrder()

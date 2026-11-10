@@ -1,0 +1,6 @@
+[h1]Knox Inventory 1.0 BETA - update 12: Black bars fixed[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Fixed the black bars over the inventory grid when scrolling: a long bag name no longer leaves a hole there, and it stays in its header. The same fix for long names in the Surroundings list.
+[/list]

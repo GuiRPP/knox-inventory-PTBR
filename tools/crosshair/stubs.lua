@@ -52,6 +52,13 @@ VP = {owned = false, shown = false, kind = 3, locked = false, loot = true, conta
       actions = {}, wheel = 0, pressed = 0, held = false, left = false, obj = nil, sq = nil}
 function knoxVpPanelOwn(on) VP.owned = on return on end
 function knoxVpPanelWants(on) VP.wants = on end
+function knoxVpPanelPlaces(on) VP.places = on end
+function knoxVpPanelPlaceKey() return VP.placeKey == true end
+function knoxVpPanelPlaceable(it) return it.noPlace ~= true end
+-- (Viewpoint 0.1.7-rc3's use key: what it does, the game's text key; it.useWord, nil for nothing)
+function knoxVpPanelUses(on) VP.uses = on end
+function knoxVpPanelUseKey() return VP.useKey == true end
+function knoxVpPanelUseWords(player, it) return it.useWord end
 function knoxVpPanelShown() return VP.shown end
 function knoxVpPanelKind() return VP.kind end
 function knoxVpPanelLocked() return VP.locked end
@@ -112,10 +119,15 @@ function T.inkBox(f, s) return 0, 2, T.measure(f, s), 12 end
 function T.marquee(ui) ui:setStencilRect() DRAWN.label = DRAWN.label + 1 ui:clearStencilRect() end
 function T.fontH() return 16 end
 function T.rollNumber(ui, st, s) assert(type(s) == "string") DRAWN.label = DRAWN.label + 1 end
+-- (as the real one: one letter's plate as wide as M's, the author 2026-11-08)
+function T.keyW(key, font)
+    if key ~= nil and string.len(key) == 1 then return T.measure(font, "M") + 10 end
+    return T.measure(font, key or "") + 10
+end
 function T.keyHint(ui, x, y, key, label)
     assert(type(key) == "string" and type(label) == "string", "a hint without its key or label")
     DRAWN.label = DRAWN.label + 2
-    return x + T.measure(nil, key) + 16 + T.measure(nil, label)
+    return x + T.keyW(key) + 6 + T.measure(nil, label)
 end
 
 UI = {}

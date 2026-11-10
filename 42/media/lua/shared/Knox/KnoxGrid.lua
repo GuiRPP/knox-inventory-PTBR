@@ -175,7 +175,12 @@ end
 --- Size of a container's grid. `limit` is set when its last row is not whole:
 --- only the first `limit` cells (row by row) are cells of the grid.
 --- @return number cols, number rows, number|nil limit
+-- (a container that says its own size: the live grid of a news post, KnoxNewsLive, the author 2026-11-05)
+KnoxGrid.fixedSize = {}
+
 function KnoxGrid.getSize(container, player)
+    local fixed = KnoxGrid.fixedSize[container]
+    if fixed then return fixed.cols, fixed.rows end
     local shape = KnoxGrid.shapeOf(container, player)
     if shape then return shape.cols, shape.rows end
     if player and container == player:getInventory() then
@@ -571,6 +576,19 @@ local function queueOf(player)
 end
 
 local function finish(item)
+    -- a move that ended without the thing where it was to go (cancelled, walked away): its
+    -- wanted place there is let go of. Left, it waited on the thing for good, and the thing
+    -- the game took out of its bag later lay down there as if the player had put it there -
+    -- not going back (the author's bench, 2026-11-07: the flashlight's silhouette in the pockets)
+    local rec = KnoxGrid.pending[item]
+    local t = rec and rec.target
+    if t and t.kind == "grid" and t.container and item:getContainer() ~= t.container then
+        local md = item:getModData()
+        if md.knoxP and md.knoxP.k == t.key then
+            md.knoxP = nil
+            told(item, "knoxP")
+        end
+    end
     KnoxGrid.pending[item] = nil
     KnoxGrid.pendingEpoch = KnoxGrid.pendingEpoch + 1
 end
@@ -729,7 +747,8 @@ local listN = 0
 -- brought up to date: made anew every frame, 260 bullets on their way cost 0.45-0.6 ms
 -- a frame, up to 4.5 ms - the author's detailed bench 2026-10-29)
 KnoxGrid.frame = 0   -- frames drawn
-if Events and Events.OnPreUIDraw then Events.OnPreUIDraw.Add(function() KnoxGrid.frame = KnoxGrid.frame + 1 end) end
+function KnoxGrid.onFrame() KnoxGrid.frame = KnoxGrid.frame + 1 end
+if Events and Events.OnPreUIDraw then Events.OnPreUIDraw.Add(KnoxGrid.onFrame) end
 local last = {frame = -1}
 
 local function lastHolds()
@@ -925,12 +944,95 @@ end
 
 KnoxGrid.useNow = {}   -- item -> progress 0..1, refreshed once a frame by the screen
 
+-- Rounds in or out one by one (the author, 2026-10-30: the magazine's bar stood
+-- still - the game ends these on their animation, maxTime -1, and the guess of
+-- half a second stopped at 95%): by the rounds in the thing itself - of those
+-- that will go in (room left, rounds carried) or come out - and between two
+-- rounds by the time a round took the last time: the bar runs the whole load,
+-- partial or full, in its time. Unloading, it goes down (the author, 2026-10-31).
+-- (the game's own job delta won't do: its R-reload asks a magazine for more
+-- rounds than go in, the bar never got to its end)
+local ROUNDS = {ISLoadBulletsInMagazine = "magazine", ISUnloadBulletsFromMagazine = "magazine",
+                ISReloadWeaponAction = "gun", ISUnloadBulletsFromFirearm = "gun"}
+local ROUNDS_OUT = {ISUnloadBulletsFromMagazine = true, ISUnloadBulletsFromFirearm = true}
+local ROUND_MS = {}        -- action type -> how long a round took the last time
+local ROUND_FIRST_MS = 700
+local useAction = nil      -- the action under way last frame (how long it took, when it ends)
+
+--- How many rounds the action moves (made once, when it has started).
+local function roundsOf(a, it, start)
+    if ROUNDS_OUT[a.Type] then return start end
+    local n = math.min(a.ammoCount or 0, it:getMaxAmmo() - start)
+    local ok, have = pcall(function()
+        return a.character:getInventory():getItemCountRecurse(a.ammoTypeOverride or it:getAmmoType():getItemKey())
+    end)
+    if ok and have then n = math.min(n, have) end
+    return n
+end
+
+--- Progress 0..1 of the action under way, for the items it works with.
+local function useDeltaOf(a)
+    if a.maxTime ~= -1 or not a.action then return deltaOf(a) end
+    local now = getTimestampMs()
+    if not a.knoxStartMs then a.knoxStartMs = now end
+    local field = ROUNDS[a.Type or ""]
+    local it = field and a[field]
+    if it then
+        local out = ROUNDS_OUT[a.Type] == true
+        local start = a.ammoCountStart   -- (set by the game's start())
+        if not start then return out and 1 or 0 end
+        if not a.knoxN then a.knoxN = roundsOf(a, it, start) end
+        local n = a.knoxN
+        if n <= 0 then return out and 0 or 1 end
+        local cur = it:getCurrentAmmoCount()
+        local d = math.max(0, math.min(1, (out and (start - cur) or (cur - start)) / n))
+        if d ~= a.knoxD then
+            if a.knoxD and d > a.knoxD then ROUND_MS[a.Type] = math.max(150, math.min(3000, now - a.knoxAtMs)) end
+            a.knoxD, a.knoxAtMs = d, now
+        end
+        local per = ROUND_MS[a.Type] or ROUND_FIRST_MS
+        local p = math.min(1, d + 0.95 / n * math.min(1, (now - a.knoxAtMs) / per))
+        return out and 1 - p or p
+    end
+    -- one animation (a magazine in or out, racking): by the time it took the last
+    -- time, slowing down past 80% instead of standing at the end
+    local x = (now - a.knoxStartMs) / animMs(a)
+    if x <= 0.8 then return math.max(0, x) end
+    return math.min(0.97, 0.8 + 0.2 * (1 - math.exp(-5 * (x - 0.8))))
+end
+KnoxGrid.useDelta = useDeltaOf
+
+-- (this runs every frame with the screen or a panel of rounds open: with no action, or rounds going
+-- in - nearly all of them - no new table: QA, 2026-11-04)
+local useNone = {}
+local useRounds, useRoundsItem = {}, nil
+
 function KnoxGrid.updateUse(player)
-    local map = {}
+    local map = useNone
     local q = queueOf(player)
     local a = q and q[1]
+    -- (an animation's action just over: how long such takes, for the next time)
+    if useAction and useAction ~= a then
+        local u = useAction
+        if u.maxTime == -1 and u.knoxStartMs and not u.knoxTimed and not ROUNDS[u.Type or ""] then
+            u.knoxTimed = true
+            ANIM_MS[u.Type or ""] = math.max(150, math.min(3000, getTimestampMs() - u.knoxStartMs))
+        end
+    end
+    useAction = a and a.action and a or nil
     if a and a.action then
-        local d = deltaOf(a)
+        local d = useDeltaOf(a)
+        -- (rounds in or out: the bar on the magazine or gun only - not on the
+        -- shells a shotgun takes, the author 2026-10-31)
+        local field = ROUNDS[a.Type or ""]
+        if field then
+            if useRoundsItem then useRounds[useRoundsItem] = nil end
+            useRoundsItem = a[field]
+            if useRoundsItem and not KnoxGrid.pending[useRoundsItem] then useRounds[useRoundsItem] = d end
+            KnoxGrid.useNow = useRounds
+            return
+        end
+        map = {}
         local function take(v)
             if type(v) ~= "userdata" then return end
             if instanceof(v, "InventoryItem") then
@@ -1017,7 +1119,21 @@ local function readPlace(item, key)
     if p and p.k == key then return p, true end
     p = md.knox
     if p and p.k == key then return p, false end
+    -- (the place it was taken from by the game - KnoxHome - and the game has put it back
+    -- itself: after eating or drinking part of it the game returns it to its bag by a move of
+    -- its own; the author's bench 2026-11-08: "it lands in a random cell")
+    p = md.knoxH
+    if p and p.k == key then return p, true, true end
     return nil
+end
+
+--- The player has put the thing somewhere himself: the place it was taken from by the
+--- game (knoxH, KnoxHome) is forgotten - it doesn't go back there.
+local function homeForgotten(item, md)
+    if md.knoxH then
+        md.knoxH = nil
+        told(item, "knoxH")
+    end
 end
 
 --- `auto`: the grid found the place itself (a build), not the player.
@@ -1027,9 +1143,11 @@ function KnoxGrid.writePlace(entity, key, x, y, r, auto)
         local md = item:getModData()
         md.knox = {k = key, x = x, y = y, r = r}
         told(item, "knox", auto)
+        if not auto then homeForgotten(item, md) end
         -- a wanted place in another container stays: the item may be on its way
-        -- there (taken off into the pockets first, then moved to a bag)
-        if md.knoxP and md.knoxP.k == key then
+        -- there (taken off into the pockets first, then moved to a bag) - unless the
+        -- player has just put it here himself
+        if md.knoxP and (md.knoxP.k == key or not auto) then
             md.knoxP = nil
             told(item, "knoxP", auto)
         end
@@ -1038,8 +1156,10 @@ end
 
 function KnoxGrid.writePending(entity, key, x, y, r)
     for i = 1, #entity.items do
-        entity.items[i]:getModData().knoxP = {k = key, x = x, y = y, r = r}
+        local md = entity.items[i]:getModData()
+        md.knoxP = {k = key, x = x, y = y, r = r}
         told(entity.items[i], "knoxP")
+        homeForgotten(entity.items[i], md)
     end
 end
 
@@ -1073,8 +1193,10 @@ function Layout:partAt(x, y)
     return self.shape.mask[y * self.cols + x]
 end
 
---- Free for a w x h block at x,y? `ignore` = entity allowed to overlap (itself).
-function Layout:fits(x, y, w, h, ignore)
+--- Free for a w x h block at x,y? `ignore` = entity allowed to overlap (itself);
+--- `overHeld`: a place held for its thing (KnoxHome's silhouette) counts as free - a drag may
+--- cover it (the author 2026-11-08), the thing then goes back as near to it as it can.
+function Layout:fits(x, y, w, h, ignore, overHeld)
     if x < 0 or y < 0 or x + w > self.cols or y + h > self.rows then return false end
     if self.limit then
         -- the grid's cells run row by row: the block is inside when the last of
@@ -1104,7 +1226,7 @@ function Layout:fits(x, y, w, h, ignore)
         for xx = x, x + w - 1 do
             local e = self.cells[yy * self.cols + xx + 1]
             -- compared by item: the grid may have been rebuilt since `ignore` was taken
-            if e and not (ignore and e.item == ignore.item) then return false end
+            if e and not (ignore and e.item == ignore.item) and not (overHeld and e.held) then return false end
         end
     end
     return true
@@ -1174,6 +1296,26 @@ function Layout:findRandom(entity)
     return s[1], s[2], s[3]
 end
 
+--- The free place for a tile nearest to x0,y0 (its home taken: KnoxHome, the author
+--- 2026-11-08 - "as close as can be to the silhouette it lost"), upright as it was first,
+--- in the grid proper. Returns x, y, r or nil.
+function Layout:nearest(entity, x0, y0, r0)
+    local rows = self.baseRows or self.rows
+    local bx, by, br, bd = nil, nil, nil, nil
+    for _, r in ipairs({r0, 1 - r0}) do
+        local w, h = KnoxGrid.dims(entity, r)
+        if r == r0 or w ~= h then
+            for y = 0, rows - h do
+                for x = 0, self.cols - w do
+                    local d = (x - x0) * (x - x0) + (y - y0) * (y - y0)
+                    if (not bd or d < bd) and self:fits(x, y, w, h) then bx, by, br, bd = x, y, r, d end
+                end
+            end
+        end
+    end
+    return bx, by, br
+end
+
 --- Take a tile off its cells again (undoing occupy).
 function Layout:vacate(entity)
     local w, h = KnoxGrid.dims(entity, entity.r)
@@ -1227,8 +1369,14 @@ end
 
 -- A magazine stacks only with magazines holding as many rounds: loaded and empty ones
 -- in one tile could be loaded only one at a time, from the first (Nik_135, 2026-10-17).
+-- A magazine not known keeps to itself: lying together or apart would tell how many it
+-- holds (the hidden rounds, the author, 2026-10-31). A gun is known (it never stacks
+-- unless the player says so in the item editor - that is kept).
 local function rounds(item)
     if (item:getMaxAmmo() or 0) <= 0 then return "" end
+    if KnoxMagKnown and KnoxMagKnown.hide and not instanceof(item, "HandWeapon") and not KnoxMagKnown.is(item) then
+        return "|u" .. tostring(item:getID())
+    end
     return "|r" .. tostring(item:getCurrentAmmoCount() or 0)
 end
 KnoxGrid.rounds = rounds
@@ -1452,12 +1600,19 @@ function KnoxGrid.build(container, player, dry, mayWait)
     entities, layout.tally, layout.loose, layout.away, layout.moved = collectEntities(container, player, moving)
     if pt then pt = Pf.part("part: grid build 2 things", pt, container:getItems():size()) end
     local homeless = {}
+    -- (the pockets: what the game has just taken out of a bag of the character into them -
+    -- to hold, wear, eat - is told to KnoxHome before its place in the bag is written over)
+    local noteHome = key == "p" and not dry and KnoxGrid.noteHome or nil
+    if noteHome and layout.away then
+        for _, it in ipairs(layout.away) do noteHome(it, player) end
+    end
 
     -- Saved places. A stack keeps the place of its first member that has one.
+    local homeBound = nil   -- {e, place}: back home by the game, its cells taken - placed near them below
     for _, e in ipairs(entities) do
-        local place, pending
+        local place, pending, home
         for _, it in ipairs(e.items) do
-            place, pending = readPlace(it, key)
+            place, pending, home = readPlace(it, key)
             if place then break end
         end
         local r = place and (place.r == 1 and 1 or 0) or 0
@@ -1465,14 +1620,83 @@ function KnoxGrid.build(container, player, dry, mayWait)
         if place and layout:fits(place.x, place.y, w, h) then
             layout:occupy(e, place.x, place.y, r)
             if pending and not dry then KnoxGrid.writePlace(e, key, place.x, place.y, r, true) end
+            if home and not dry then
+                for _, it in ipairs(e.items) do homeForgotten(it, it:getModData()) end
+            end
+        elseif home then
+            homeBound = homeBound or {}
+            table.insert(homeBound, {e = e, p = place})
         else
+            if noteHome and not place then
+                for _, it in ipairs(e.items) do noteHome(it, player) end
+            end
+            -- (DEV: a thing of the pockets come into a bag with no place for it here - KnoxHome.trace)
+            if not dry and key ~= "p" and KnoxHome and KnoxHome.trace then
+                local k0 = e.item:getModData().knox
+                if k0 and k0.k == "p" then KnoxHome.trace(e.item, "no place in " .. key) end
+            end
             table.insert(homeless, e)
+        end
+    end
+
+    -- Places held for their things (KnoxHome; the author, 2026-11-07, mockup home_place):
+    -- a thing the game took out of here to use - into a hand, to eat, to drink - keeps its
+    -- cells while it is away, its grey silhouette on them, and comes back to them.
+    -- (after the saved places: what lies there keeps its place; a held place nothing else
+    -- may take - it is "reserved" to all that counts or moves tiles)
+    local holds = player and KnoxGrid.heldIn and KnoxGrid.heldIn(layout, player)
+    if holds then
+        for _, hd in ipairs(holds) do
+            local e = {item = hd.item, items = {hd.item}, w = hd.w, h = hd.h, reserved = true, held = true}
+            local dw, dh = KnoxGrid.dims(e, hd.r)
+            if hd.y + dh <= layout.baseRows and layout:fits(hd.x, hd.y, dw, dh) then layout:occupy(e, hd.x, hd.y, hd.r) end
         end
     end
 
     for _, c in ipairs(coming) do
         local dw, dh = KnoxGrid.dims(c.e, c.t.r)
         if layout:fits(c.t.x, c.t.y, dw, dh) then layout:occupy(c.e, c.t.x, c.t.y, c.t.r) end
+    end
+
+    -- back home by the game with its cells taken (something was put on its silhouette): as
+    -- near to them as there is room (the author 2026-11-08)
+    if homeBound then
+        for _, hb in ipairs(homeBound) do
+            local x, y, r = layout:nearest(hb.e, hb.p.x, hb.p.y, hb.p.r == 1 and 1 or 0)
+            if x then
+                layout:occupy(hb.e, x, y, r)
+                if not dry then
+                    KnoxGrid.writePlace(hb.e, key, x, y, r, true)
+                    for _, it in ipairs(hb.e.items) do homeForgotten(it, it:getModData()) end
+                end
+            else
+                table.insert(homeless, hb.e)
+            end
+        end
+    end
+
+    -- new here without a place, on the character (a battery out of a flashlight, what the
+    -- game hands back): onto a stack of its kind that has room for it, not a tile of its own
+    -- (the author 2026-11-08)
+    if not dry and #homeless > 0 and player and inPlayers(container, player) then
+        local rest = {}
+        for _, e in ipairs(homeless) do
+            local onto = nil
+            if KnoxGrid.isStackable(e.item) then
+                for _, b in ipairs(layout.placed) do
+                    if not b.held and not b.overflow and KnoxGrid.canMerge(e, b) then onto = b break end
+                end
+            end
+            if onto then
+                local s = onto.item:getModData().knoxS
+                KnoxGrid.setStackId(e.items, s)
+                for _, it in ipairs(e.items) do table.insert(onto.items, it) end
+                KnoxGrid.writePlace(e, key, onto.x, onto.y, onto.r, true)
+            else
+                table.insert(rest, e)
+            end
+        end
+        homeless = rest
     end
 
     if pt then pt = Pf.part("part: grid build 3 saved places", pt, #entities) end

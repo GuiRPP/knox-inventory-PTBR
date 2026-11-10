@@ -1,0 +1,9 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+Only "Knox Inventory 1.0 BETA" changes. The released 0.9.8.7 stays as it was.
+
+[list]
+[*]Gunworks and Escape From Zomboid Firearms: guns that take rounds directly now show every round of their family in the Shift panel and load the one you click.
+[*]Menu on R: such a gun lists each kind of round you carry. Pick one and click to load it, or double right-click to unload the gun.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

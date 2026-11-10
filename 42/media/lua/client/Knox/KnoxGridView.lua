@@ -318,6 +318,57 @@ function KnoxGridView:drawSilhouette(en, a)
     end
 end
 
+-- A place waiting for its thing (KnoxHome: taken into a hand, being eaten, ...), as the
+-- approved mockup .claude/mockups/home_place.html (the author, 2026-11-07: option C's dashed
+-- frame with option A's silhouette): a grey plate, a dashed edge, the thing's icon in grey.
+local HELD_PLATE = {r = 0x2a / 255, g = 0x2d / 255, b = 0x2c / 255}
+local HELD_DASH = {r = 0x6e / 255, g = 0x73 / 255, b = 0x70 / 255}
+
+--- One side's dashes, `len` px from `at`, `th` thick: each side on its own, starting and
+--- ending with a dash so that every corner is closed; what is left over goes to the middle
+--- dashes (the critic, 2026-11-07). Dash 4, gap 3 at a cell of 48. (no table: drawn every frame)
+local function dashSide(self, at, fixed, len, horizontal, dash, gap, th, c, a)
+    local n = math.max(1, math.floor((len + gap) / (dash + gap) + 0.5))
+    local ink = len - gap * (n - 1)
+    local base = math.floor(ink / n)
+    local extra = ink - base * n
+    local from = math.floor((n - extra) / 2)
+    local p = at
+    for i = 0, n - 1 do
+        local d = base + ((i >= from and i < from + extra) and 1 or 0)
+        if horizontal then
+            self:drawRect(p, fixed, d, th, a, c.r, c.g, c.b)
+        else
+            self:drawRect(fixed, p, th, d, a, c.r, c.g, c.b)
+        end
+        p = p + d + gap
+    end
+end
+
+function KnoxGridView:drawHeld(e)
+    local x, y, pw, ph = self:tileRect(e)
+    if not x then return end
+    -- the thing's own picture, as its tile draws it, under a veil of the plate's grey over the
+    -- whole place: the plate ends as the mockup's (0.55), the picture faded and greyed with it.
+    -- (the grey picture Knox makes - T.greyIcon - came out jagged, a stray dotted square round
+    -- it: the author's bench, 2026-11-07; a veil over the picture alone hid the grid line under it)
+    T.rect(self, x, y, pw, ph, HELD_PLATE, 0.2)
+    local tex = e.item:getTex()
+    if tex then
+        local side = math.floor(math.min(pw, ph) * 0.85)
+        self:drawTextureScaledAspect(tex, x + math.floor((pw - side) / 2), y + math.floor((ph - side) / 2), side, side, 0.5, 1, 1, 1)
+    end
+    T.rect(self, x, y, pw, ph, HELD_PLATE, 0.45)
+    local k = T.cell / 48
+    -- (2 px at 1080p: 1 px was lost - the author's bench, 2026-11-07)
+    local th = math.max(1, math.floor(2 * k + 0.5))
+    local dash, gap = math.max(2, math.floor(4 * k + 0.5)), math.max(2, math.floor(3 * k + 0.5))
+    dashSide(self, x, y, pw, true, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, x, y + ph - th, pw, true, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, y, x, ph, false, dash, gap, th, HELD_DASH, 0.9)
+    dashSide(self, y, x + pw - th, ph, false, dash, gap, th, HELD_DASH, 0.9)
+end
+
 function KnoxGridView:cellUnderMouse()
     local cx, cy = self:cellAtPx(self:getMouseX(), self:getMouseY())
     -- (in a gap between a bag's compartments: no cell - one far outside the grid)
@@ -346,8 +397,37 @@ end
 -- so the grid is also rebuilt every so often.
 local REBUILD_MS = 250
 
+--- The panel asked for with the mouse on a tile of magazines (the author, 2026-11-05 and
+--- 2026-11-06): they are checked from now on, the stripes give way to their level at once.
+function KnoxGridView.checkMags(e)
+    local K = KnoxMagKnown
+    if not K then return end
+    local any = false
+    for _, it in ipairs(e.items) do
+        if not K.is(it) then
+            K.mark(it)
+            any = true
+        end
+    end
+    if any then e.draw = nil end
+end
+
+--- Rounds in a tile's magazines and what they can hold, while their panel is up.
+function KnoxGridView.magRounds(e)
+    local n, cap = 0, 0
+    for _, it in ipairs(e.items) do
+        n = n + it:getCurrentAmmoCount()
+        cap = cap + it:getMaxAmmo()
+    end
+    return string.format("%d/%d", n, cap)
+end
+
 function KnoxGridView:prerender()
     local now = getTimestampMs()
+    local over = self.hovered
+    if over and over.draw and over.draw.mag and KnoxLoad and KnoxLoad.counting(over.item) and not KnoxDrag.isActive() then
+        KnoxGridView.checkMags(over)
+    end
     self.prerenderMs = now   -- (the grid is up and built: its bag's meter counts by it, KnoxInventoryPanel)
     -- the middle button has no event of its own: its press is looked for
     local mmb = isMouseButtonDown(2)
@@ -383,12 +463,6 @@ function KnoxGridView:prerender()
 end
 
 -- Drawing -------------------------------------------------------------------
-
-local function condColor(f)
-    if f > 0.6 then return T.color.good end
-    if f > 0.25 then return T.color.warn end
-    return T.color.bad
-end
 
 -- Search by name (the field in the screen's top bar): what matches gets a sand
 -- frame, the rest is dimmed; containers say how many things in them match.
@@ -575,17 +649,26 @@ function KnoxGridView:tileInfo(e)
     d.cookBase, d.cookBar, d.cookFrac = T.cookState(item)
     d.frozen = d.cookBar == T.COOK_BLUE
     d.heat, d.heatK = T.heatState(item)   -- a pot of water on the stove: red as it heats
-    if instanceof(item, "HandWeapon") or (instanceof(item, "Clothing") and item:getConditionMax() > 0) then
-        d.cond = item:getCondition() / math.max(1, item:getConditionMax())
-    end
     d.broken = item:isBroken()
-    if item:IsDrainable() and not d.broken then
+    -- how high its colour is filled (T.tileFill, condition_v3, the author, 2026-10-31):
+    -- a stack of batteries, tape...: what is left in all of them together
+    local kind = T.levelKind(item)
+    d.mag = kind == "m"
+    if kind == "u" and not d.broken then
         local sum = 0
         for _, it in ipairs(e.items) do sum = sum + it:getCurrentUsesFloat() end
-        d.uses = sum / math.max(1, #e.items)
+        d.level = sum / math.max(1, #e.items)
+    elseif kind == "m" and #e.items > 1 then
+        -- a stack of magazines: what is left in all of them, stripes if any is not checked
+        local sum = 0
+        for _, it in ipairs(e.items) do
+            local l = T.magLevel(it)
+            if l == T.LEVEL_UNKNOWN then sum = nil break end
+            sum = sum + l
+        end
+        d.level = sum and sum / #e.items or T.LEVEL_UNKNOWN
     else
-        local fluid = item:getFluidContainer()
-        if fluid and fluid:getCapacity() > 0 then d.fluid = fluid:getAmount() / fluid:getCapacity() end
+        d.level = T.itemLevel(item, kind)
     end
     -- the icon: as ISInventoryItem.renderItemIcon draws it (a thing with a liquid
     -- mask is drawn opaque, whatever the tile's fade)
@@ -734,11 +817,14 @@ function KnoxGridView:isQuiet(e)
         return false
     end
     if KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then return false end
+    if KnoxLoad and KnoxLoad.shown[item] then return false end   -- (lit up, or fading out)
+    if KnoxLoad and KnoxLoad.opened == item then return false end   -- (its rounds told, its panel up)
     if KnoxGrid.useOf(e.items) then return false end
     -- (a favorite's star, the heat tint and a frozen tile's blue frame are drawn
     -- here, not by the Java part: the frame showed only under the mouse - 2026-10-18)
+    -- (a broken thing's grey icon and a magazine's stripes too: few, and not worth the Java part's time)
     local d = self:tileInfo(e)
-    if d.fav or d.heat or d.frozen then return false end
+    if d.fav or d.heat or d.frozen or d.broken or d.level == T.LEVEL_UNKNOWN then return false end
     return true
 end
 
@@ -785,7 +871,7 @@ function KnoxGridView:drawTile(e, alpha)
     -- went over the bag's header (the author, 2026-10-19)
     if y < 0 then y = 0 end
 
-    T.rect(self, x, y, pw, ph, d.cat, alpha)
+    T.tileFill(self, x, y, pw, ph, d.level, d.cat, alpha)
     -- food: frozen, cooking, done, burning - the tile takes that color
     if d.cookBase then self:drawRect(x, y, pw, ph, 0.22 * alpha, d.cookBase.r, d.cookBase.g, d.cookBase.b) end
     -- hot (red) or cold (blue), stronger the further from room temperature
@@ -816,6 +902,7 @@ function KnoxGridView:drawTile(e, alpha)
             or (KnoxFluidWindow and KnoxFluidWindow.isOpen(item))
             or (KnoxFluidInfo and KnoxFluidInfo.isOpen(item))) then
         T.border(self, x, y, pw, ph, T.color.accent, alpha)   -- its bag, inspect, split or fluid window is open
+        T.border(self, x + 1, y + 1, pw - 2, ph - 2, T.color.tileFrame, alpha)   -- (the fill stops 2 px in, as at any frame)
     elseif e.overflow then
         T.tileFrame(self, x, y, pw, ph, T.color.bad, alpha)   -- doesn't fit the grid: take it out
     elseif d.frozen then
@@ -842,7 +929,9 @@ function KnoxGridView:drawTile(e, alpha)
     -- (what ISInventoryItem.renderItemIcon does, with its questions to the game asked once: tileInfo)
     if d.hasTex then
         local ix, iy = x + math.floor((pw - side) / 2) + jx, y + math.floor((ph - side) / 2) + jy
-        if d.iconOpaque and e.from then
+        if d.broken then
+            T.brokenIcon(self, item, ix, iy, side, alpha)
+        elseif d.iconOpaque and e.from then
             -- fading out where it has just gone from: a thing with a liquid mask
             -- (a water bottle) can't be drawn faded with its liquid, and stood
             -- whole on a vanishing tile - a bare icon left behind for a moment
@@ -853,22 +942,11 @@ function KnoxGridView:drawTile(e, alpha)
         end
     end
 
-    -- thin meters at the bottom (the exact values are in the tooltip):
-    -- condition (things that wear out) lowest, uses left or liquid above it;
     -- a stack's count as outlined text in the corner, like Tarkov
-    local level = 0
-    if d.cond then
-        T.tileMeter(self, x, y, pw, ph, d.cond, condColor(d.cond), alpha, 0)
-        level = 1
-    end
-    if d.uses then
-        -- a stack of batteries, tape...: what is left in all of them together
-        T.tileMeter(self, x, y, pw, ph, d.uses, T.color.accent, alpha, level)
-    elseif d.fluid then
-        T.tileMeter(self, x, y, pw, ph, d.fluid, T.color.liquid, alpha, level)
-    end
-    if d.broken then
-        T.outlinedRight(self, "0%", x + pw - 4, y + ph - fh - 3, T.color.bad, f, alpha)
+    if d.mag and KnoxLoad and ((hovered and KnoxLoad.panelFor == item) or KnoxLoad.opened == item) then
+        -- (magazines with their panel: rounds in them / what they can hold - the author, 2026-11-05;
+        -- by the key's press, and on with the mouse on the panel, 2026-11-06)
+        T.outlinedRight(self, KnoxGridView.magRounds(e), x + pw - 4, y + ph - fh - 3, T.color.bright, f, alpha)
     elseif #e.items > 1 then
         -- (in sand: not all alike - the mouse on it shows them one by one)
         T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3, d.mixed and T.color.accent or T.color.bright, f, alpha)
@@ -922,8 +1000,19 @@ function KnoxGridView:drawTile(e, alpha)
             self:drawRect(x, y, pw, ph, 0.16 * k * alpha, c.r, c.g, c.b)
         end
     end
-    -- offered by the quick pick panel of a hovered empty slot
-    if not e.ghost and KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then T.target(self, x, y, pw, ph, KnoxSlotPicker.offerColor) end
+    -- offered by the quick pick panel of a hovered empty slot; pointed at from a
+    -- cell of the magazine / battery panel: the sand frame of the panel's own
+    -- cell (the author, 2026-10-30)
+    if not e.ghost and KnoxSlotPicker and KnoxSlotPicker.isOffered(item) then
+        local p = KnoxSlotPicker.instance
+        if p.load or p.battery then
+            T.tileFrame(self, x, y, pw, ph, T.color.accent, KnoxSlotPicker.offerA)
+        else
+            T.target(self, x, y, pw, ph, KnoxSlotPicker.offerColor, KnoxSlotPicker.offerA)
+        end
+    -- fits the magazine, gun, rounds, part or flashlight under the mouse (KnoxLoad:
+    -- the bright T.fits, fading in and out, 2026-10-30)
+    elseif not e.ghost and KnoxLoad and KnoxLoad.litA > 0 and KnoxLoad.shown[item] then T.fits(self, x, y, pw, ph, KnoxLoad.litA) end
     if not e.ghost then drawFlash(self, e, x, y, pw, ph) end
 
     -- an action using the item (eating, bandaging, reading...): fills up like a move
@@ -1085,7 +1174,9 @@ end
 --- Java part draws it with the others: `quietOk`) or "raised" (lifted: drawn after
 --- the others, or the tile above would cover its top).
 local function drawEntry(self, e, quietOk)
-    if e.reserved then
+    if e.held then
+        self:drawHeld(e)
+    elseif e.reserved then
         -- cells an item is coming to: only a breathing frame, no item yet
         local rx, ry, rw, rh = self:tileRect(e)
         if rx then
@@ -1183,6 +1274,7 @@ function KnoxGridView:renderGrid()
     self:updateLift()
     self:offerKinds()
     self:offerBattery()
+    self:offerLoad()
     local dragged = KnoxDrag.entity
     -- only the rows that can be seen: the grid lies in a scrolled column (or
     -- window) that shows a part of it, and a long one has hundreds of tiles
@@ -1216,13 +1308,17 @@ function KnoxGridView:renderGrid()
             self.tileRun = run
         end
         local rows, hov = top * 100000 + bottom, self.hovered or false
-        if run.ok and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
+        -- (what fits the thing under the mouse, lit green: those tiles aren't quiet - the list kept them
+        -- unlit till something else changed, then they came at full strength - QA, 2026-11-04)
+        local lit = KnoxLoad and KnoxLoad.shown or false
+        local opened = KnoxLoad and KnoxLoad.opened or false
+        if run.ok and run.opened == opened and run.list == TL and run.layout == L and run.rows == rows and run.hov == hov
                 and run.epoch == tilesEpoch and run.sel == KnoxSelect.items and run.toggles == KnoxSelect.toggles
-                and run.fresh == KnoxGridView.fresh then
+                and run.fresh == KnoxGridView.fresh and run.lit == lit then
             mode = run.mode
         else
-            run.ok, run.list, run.layout, run.rows, run.hov = true, TL, L, rows, hov
-            run.epoch, run.sel, run.toggles, run.fresh = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh
+            run.ok, run.list, run.layout, run.rows, run.hov, run.opened = true, TL, L, rows, hov, opened
+            run.epoch, run.sel, run.toggles, run.fresh, run.lit = tilesEpoch, KnoxSelect.items, KnoxSelect.toggles, KnoxGridView.fresh, lit
             run.stamp = run.stamp + 1
             run.nl = 0
             mode = "write"
@@ -1300,14 +1396,10 @@ function KnoxGridView:renderGrid()
         for i = 1, nq do
             local e = quiet[i]
             local d = e.draw
-            if d.broken or #e.items > 1 then
+            if #e.items > 1 then
                 local x, y, pw, ph = self:tileRect(e)
-                if d.broken then
-                    T.outlinedRight(self, "0%", x + pw - 4, y + ph - fh - 3, T.color.bad, f, 1)
-                else
-                    T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3,
-                        d.mixed and T.color.accent or T.color.bright, f, 1)
-                end
+                T.outlinedRight(self, tostring(#e.items), x + pw - 4, y + ph - fh - 3,
+                    d.mixed and T.color.accent or T.color.bright, f, 1)
             end
         end
         if listed then
@@ -1344,9 +1436,16 @@ function KnoxGridView:renderGrid()
         local x, y = self:dropCell()
         local w, h = KnoxDrag.dims()
         local merge = KnoxDrag.mergeTarget(self)
-        local bag = not merge and KnoxDrag.bagUnderMouse(self)
+        local magTile, mag
+        if not merge then magTile, mag = KnoxDrag.magTarget(self) end
+        local bag = not merge and not magTile and KnoxDrag.bagUnderMouse(self)
         local ok, why
-        if merge then
+        if magTile then
+            -- rounds onto a magazine: it lights up, they will go in
+            x, y = magTile.x, magTile.y
+            w, h = KnoxGrid.dims(magTile, magTile.r)
+            ok, why = true, nil
+        elseif merge then
             x, y = merge.x, merge.y
             w, h = KnoxGrid.dims(merge, merge.r)
             ok, why = KnoxDrag.canDrop(L, x, y, self:player(), merge)
@@ -1380,7 +1479,7 @@ function KnoxGridView:renderGrid()
             end
         end
         -- (walked away with it in hand: red, the drop is refused - KnoxDrag.tooFarFor)
-        if ok and KnoxDrag.tooFarFor(self:player(), bag and bag.item:getInventory() or L.container) then
+        if ok and KnoxDrag.tooFarFor(self:player(), mag and mag:getContainer() or bag and bag.item:getInventory() or L.container) then
             ok, why = false, "IGUI_Knox_TooFar"
         end
         local c = ok and T.color.ok or T.color.bad
@@ -1444,7 +1543,8 @@ function KnoxDragLayer:prerender()
     end
     self.rmbWas, self.mmbWas = rmb, mmb
     self:bringToTop()
-    KnoxTooltip.apply()
+    -- (the live grid of a news post applies it itself, before the UI is drawn: KnoxNewsLive)
+    if not self.noTooltip then KnoxTooltip.apply() end
 end
 
 -- Inertia: the held tile follows the cursor as a weight on a spring - a
@@ -1958,7 +2058,8 @@ function KnoxGridView:offerBattery()
         self.batteryRef = ref
     end
     ref.e = e
-    if not KnoxSlotPicker.isOpenFor(ref) and now - ref.sinceMs < KINDS_HOVER_MS then return end
+    -- (only once the quick items' key asked for it, 2026-10-30: the tooltip till then)
+    if not KnoxSlotPicker.isOpenFor(ref) and (not KnoxLoad or KnoxLoad.panelFor ~= e.item or now - ref.sinceMs < KINDS_HOVER_MS) then return end
     -- The character's batteries, fullest first, with their charge (the author,
     -- 2026-10-29: choose which goes in - with one in as well, to swap it).
     -- (looked for twice a second, not every frame the mouse rests on the radio)
@@ -1992,6 +2093,25 @@ function KnoxGridView:offerBattery()
     KnoxSlotPicker.wantBattery(ref, getText("IGUI_Knox_Battery"), b, self.playerNum)
 end
 
+--- A thing under the mouse: what fits it lights up green in the grids; a magazine
+--- or a gun gets its panel next to it (KnoxLoad, the author, 2026-10-30).
+function KnoxGridView:offerLoad()
+    if not KnoxLoad then return end
+    local e = self.hovered
+    if not e or e.ghost or KnoxDrag.isActive() or (self.band and self.band.active) then return end
+    KnoxLoad.hover(e.item)
+    -- (a stack showing its kinds keeps its own panel)
+    if self.kindsRef and KnoxSlotPicker.isOpenFor(self.kindsRef) then return end
+    KnoxLoad.follow(self.loadRef, e)
+    local ref = self.loadRef
+    if not ref or ref.item ~= e.item then
+        ref = setmetatable({view = self, item = e.item, sinceMs = getTimestampMs()}, TileRef)
+        self.loadRef = ref
+    end
+    ref.e = e
+    KnoxLoad.offer(ref, e.item, self:player(), self.playerNum, "right")
+end
+
 function KnoxGridView:updateTooltip()
     if self.band and self.band.active then return end   -- drawing a selection frame
     -- (a stack showing its kinds: each of them has its tooltip in the panel)
@@ -2000,7 +2120,13 @@ function KnoxGridView:updateTooltip()
         return
     end
     if self.hovered then
-        KnoxTooltip.want(self.hovered.item, self.playerNum)
+        -- (a thing with its battery or magazine panel up, or the key for it held:
+        -- no tooltip, it lay over the panel's cells - the author, 2026-10-30; the
+        -- cells have theirs)
+        local e = self.hovered
+        local has = (self.batteryRef ~= nil and self.batteryRef.item == e.item)
+            or (KnoxLoad ~= nil and not e.ghost and KnoxLoad.panelOf(e.item) ~= nil)
+        KnoxTooltip.want(e.item, self.playerNum, KnoxLoad ~= nil and KnoxLoad.tipQuiet(e.item, has))
         for _, it in ipairs(self.hovered.items) do KnoxGridView.fresh[it] = nil end   -- seen
     end
 end

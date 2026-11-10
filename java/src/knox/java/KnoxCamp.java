@@ -38,8 +38,14 @@ public class KnoxCamp {
     // the grass (asked for, 2026-10-16)
     static final String[] LOOP_FILE = {
         "media/sound/PZ_Fire.wav", "media/sound/ambientOutsideCricketsOwlNight.wav", "media/sound/ambientOutsideWindyNight.wav",
-        "media/sound/Cricket_Single_Close_Reverb.wav"};
-    static final float[] LOOP_VOL = {0.38f, 0.8f, 0.34f, 0.12f};
+        "media/sound/Cricket_Single_Close_Reverb.wav",
+        // (the winter bar's wind, outside and in: KnoxBarSound starts them and sets their volumes;
+        // the storm howling through the boards, the old house creaking and its window rattling in
+        // the gusts - the author, 2026-11-01)
+        "media/sound/ambientOutsideWindyNight.wav", "media/sound/ambientInsideWind.wav",
+        "media/sound/windowwind.wav", "media/sound/wooddoorcreaks.wav", "media/sound/windowrattle.wav"};
+    static final float[] LOOP_VOL = {0.38f, 0.8f, 0.34f, 0.12f, 0f, 0f, 0f, 0f, 0f};
+    static final int CAMP_LOOPS = 4, WIND_OUT = 4, WIND_IN = 5, HOWL = 6, CREAKS = 7, RATTLE = 8;
     // the cricket sings now and then, not on and on, and a little slower (0.3
     // and always singing were too much - the author, 2026-10-16)
     static final int CRICKET = 3;
@@ -67,8 +73,11 @@ public class KnoxCamp {
         return i == CRICKET ? cricket(now) : 1f;
     }
     // seconds each dies out in once the hero has gone: the fire left behind
-    // first, then the cricket, the forest, the wind last
-    static final float[] LOOP_FADE_S = {7f, 18f, 26f, 12f};
+    // first, then the cricket, the forest, the wind last; the bar's howl, creaks
+    // and rattle as its wind outside (one per loop - six for nine threw in tick()
+    // every frame, the catch there swallowed it, and they never died out on the
+    // loading screen: QA, 2026-11-04)
+    static final float[] LOOP_FADE_S = {7f, 18f, 26f, 12f, 16f, 26f, 16f, 16f, 16f};
     // once the world has loaded, what is left of them goes in this long
     static final float LOADED_FADE_S = 2.5f;
     // the camp's end in the game: what is left dies out in this long (cut at
@@ -80,6 +89,13 @@ public class KnoxCamp {
     static {
         for (int i = 0; i < STEPS.length; i++) STEPS[i] = String.format("media/sound/knox_steps/boots_%02d.ogg", i + 1);
     }
+    // (in the winter bar: the game's own steps on boards, 2026-10-31)
+    static final String[] WOOD_STEPS = new String[7];
+    static {
+        for (int i = 0; i < WOOD_STEPS.length; i++) WOOD_STEPS[i] = String.format("media/sound/PZ_WoodFoot_%02d.wav", i + 1);
+    }
+    static final float WOOD_GAIN = 0.8f;
+    static boolean onWood;
     static final float STEP_VOL = 0.10f;   // (0.4, then 0.25 were still loud in the game - the author, 2026-10-15)
     // The dead beyond the fence (the author, 2026-10-16): their moans and the
     // shuffle of their feet as they walk. The game's own recordings - B42's
@@ -190,6 +206,10 @@ public class KnoxCamp {
     static final double FOOT_A = 0.2, FOOT_B = 0.65;
 
     static final long[] loopCh = new long[LOOP_FILE.length];
+    // every looping channel started and not yet stopped: one whose handle was given up (taken for
+    // gone while it still played) is stopped with the rest - the camp's fire went on in the bar
+    // after Tab (the author, 2026-11-01)
+    static final java.util.ArrayList<Long> LOOPS_ON = new java.util.ArrayList<>();
     static final float[] curVol = new float[LOOP_FILE.length], endVol = new float[LOOP_FILE.length];
     static final Random rnd = new Random();
     static int lastPick = -1;
@@ -216,6 +236,7 @@ public class KnoxCamp {
             fmod.javafmod.FMOD_Channel_SetVolume(ch, volume);
             fmod.javafmod.FMOD_Channel_SetPitch(ch, pitch);
             fmod.javafmod.FMOD_Channel_SetPaused(ch, false);
+            if (loop) LOOPS_ON.add(ch);
             return ch;
         } catch (Throwable t) {
             return 0L;
@@ -224,10 +245,11 @@ public class KnoxCamp {
 
     /** A step: one of them, never the same twice running, a little varied. */
     static void step(float volume) {
-        int i = rnd.nextInt(STEPS.length);
-        if (i == lastPick) i = (i + 1 + rnd.nextInt(STEPS.length - 1)) % STEPS.length;
+        String[] set = onWood ? WOOD_STEPS : STEPS;
+        int i = rnd.nextInt(set.length);
+        if (i == lastPick) i = (i + 1 + rnd.nextInt(set.length - 1)) % set.length;
         lastPick = i;
-        play(STEPS[i], volume * (0.85f + rnd.nextFloat() * 0.15f), 0.94f + rnd.nextFloat() * 0.12f, false);
+        play(set[i], (onWood ? WOOD_GAIN : 1f) * volume * (0.85f + rnd.nextFloat() * 0.15f), 0.94f + rnd.nextFloat() * 0.12f, false);
     }
 
     static boolean alive(long ch) {
@@ -251,6 +273,16 @@ public class KnoxCamp {
             stop(loopCh[i]);
             loopCh[i] = 0L;
         }
+        for (long ch : LOOPS_ON) stop(ch);
+        LOOPS_ON.clear();
+    }
+
+    /** One loop off for good (its place free for another). */
+    static void stopLoop(int i) {
+        if (loopCh[i] == 0L) return;
+        stop(loopCh[i]);
+        LOOPS_ON.remove(Long.valueOf(loopCh[i]));
+        loopCh[i] = 0L;
     }
 
     static void setLoop(int i, float v) {
@@ -277,6 +309,51 @@ public class KnoxCamp {
 
     // ---------------------------------------------------------------- from Lua
 
+    // A swipe to the other scene (the author, 2026-11-02: the sound of the place changed at once): what
+    // plays dies out by itself, the other's comes up meanwhile (the bar's: KnoxBarSound's START_S). From
+    // when the picture moves (knoxCampSwipe), the new scene's long first frame no jump in the volume;
+    // it holds no longer than this if it never does
+    static final long SWAP_FADE_MS = 1600L, SWAP_HOLD_MS = 1500L;
+    static long campInFrom;
+    // (tools\sfx\swipe.py. At its loudest a little under the camp's fire: not to draw the ear - the author)
+    static final float SWIPE_VOL = 0.3f;
+
+    @LuaMethod(name = "knoxCampCrossfade", global = true)
+    public static void knoxCampCrossfade() {
+        long from = System.currentTimeMillis() + SWAP_HOLD_MS;
+        for (int i = 0; i < loopCh.length; i++) {
+            long ch = loopCh[i];
+            if (!alive(ch)) continue;
+            LOOPS_ON.remove(Long.valueOf(ch));
+            CUTS.add(new long[] {ch, from, from + SWAP_FADE_MS, 1L});
+            CUT_VOL.put(ch, curVol[i]);
+            loopCh[i] = 0L;
+        }
+        campInFrom = from;
+        // (as knoxCampEnd, what's dying out left to itself)
+        endCamp(false);
+    }
+
+    /** Who's dying out dies out, whichever scene is still to tick its sounds (a swipe's every frame). */
+    @LuaMethod(name = "knoxCampFades", global = true)
+    public static void knoxCampFades() {
+        if (!CUTS.isEmpty()) cuts(System.currentTimeMillis());
+    }
+
+    /** The swipe's own sound, across the stereo the way the scene goes (dir -1: it comes from the left). */
+    @LuaMethod(name = "knoxCampSwipe", global = true)
+    public static void knoxCampSwipe(double dir) {
+        long now = System.currentTimeMillis();
+        for (long[] c : CUTS) {
+            if (c.length > 3) {
+                c[1] = now;
+                c[2] = now + SWAP_FADE_MS;
+            }
+        }
+        if (campInFrom != 0L) campInFrom = now;
+        play(dir < 0 ? "media/sound/knox_swipe_ltr.wav" : "media/sound/knox_swipe_rtl.wav", SWIPE_VOL, 1f, false);
+    }
+
     /**
      * The camp's loops on (started where not playing, at their volumes; called every
      * frame - the cricket's song comes and goes) or off.
@@ -289,14 +366,25 @@ public class KnoxCamp {
             stopLoops();
             return;
         }
+        onWood = false;
+        KnoxRadioFx.broken = false;
         long now = System.currentTimeMillis();
         if (!CUTS.isEmpty()) cuts(now);
-        for (int i = 0; i < loopCh.length; i++) {
-            float g = gate(i, now);
+        // (the bar's storm is not the camp's)
+        for (int i = CAMP_LOOPS; i < loopCh.length; i++) stopLoop(i);
+        KnoxBarSound.worldOff();
+        float in = 1f;
+        if (campInFrom != 0L) {
+            in = Math.max(0f, Math.min(1f, (now - campInFrom) / (float) SWAP_FADE_MS));
+            if (in >= 1f) campInFrom = 0L;
+        }
+        for (int i = 0; i < CAMP_LOOPS; i++) {
+            float g = gate(i, now) * in;
             if (!alive(loopCh[i])) {
+                stopLoop(i);
                 loopCh[i] = play(LOOP_FILE[i], LOOP_VOL[i] * g, i == CRICKET ? CRICKET_PITCH : 1f, true);
                 curVol[i] = LOOP_VOL[i] * g;
-            } else if (i == CRICKET) {
+            } else if (i == CRICKET || in < 1f || curVol[i] != LOOP_VOL[i]) {
                 setLoop(i, LOOP_VOL[i] * g);
             }
         }
@@ -313,10 +401,14 @@ public class KnoxCamp {
     /** The screen is black and the save loads: his last steps and the camp's end are ours from here. */
     @LuaMethod(name = "knoxCampDepart", global = true)
     public static void knoxCampDepart(double cycleSeconds) {
+        // (out of the winter bar: into the snow, off the boards)
+        onWood = false;
         long now = System.currentTimeMillis();
         departAt = now;
         loadedAt = 0L;
         endAt = 0L;
+        // (the game's own winter under the bar dies out with its storm)
+        KnoxBarSound.worldOff();
         if (cycleSeconds > 0.3 && lastStepAt != 0L && now - lastStepAt < 2000L) {
             cycle = cycleSeconds;
             nextStepAt = Math.max(now, lastStepAt + gap());
@@ -338,6 +430,18 @@ public class KnoxCamp {
      */
     @LuaMethod(name = "knoxCampEnd", global = true)
     public static void knoxCampEnd(boolean soft) {
+        // (a swipe's sound still dying out: nobody would tick it from here, it'd loop on in the game)
+        for (long[] c : CUTS) stop(c[0]);
+        CUTS.clear();
+        CUT_VOL.clear();
+        endCamp(soft);
+    }
+
+    private static void endCamp(boolean soft) {
+        onWood = false;
+        // (the car's radio goes through the same speaker: the bar's break stays in the bar)
+        KnoxRadioFx.broken = false;
+        KnoxBarSound.over();
         departAt = 0L;
         loadedAt = 0L;
         lastStepAt = 0L;
@@ -374,13 +478,15 @@ public class KnoxCamp {
 
     static void tick() {
         long now = System.currentTimeMillis();
+        // (a swipe's loops dying out: a hero picked right after Tab, nobody else ticks them now - they
+        // played on through the whole loading - overhaul, 2026-11-04)
+        if (!CUTS.isEmpty()) cuts(now);
         if (endAt != 0L) {
             float f = ease((now - endAt) / (double) END_FADE_MS);
             for (int i = 0; i < loopCh.length; i++) {
                 if (loopCh[i] == 0L) continue;
                 if (f <= 0f || !alive(loopCh[i])) {
-                    stop(loopCh[i]);
-                    loopCh[i] = 0L;
+                    stopLoop(i);
                 } else {
                     setLoop(i, endVol[i] * f);
                 }
@@ -399,8 +505,7 @@ public class KnoxCamp {
                 float f = ease((now - departAt) / 1000.0 / LOOP_FADE_S[i]);
                 if (loadedAt != 0L) f = Math.min(f, ease((now - loadedAt) / 1000.0 / LOADED_FADE_S));
                 if (f <= 0f || !alive(loopCh[i])) {
-                    stop(loopCh[i]);
-                    loopCh[i] = 0L;
+                    stopLoop(i);
                     continue;
                 }
                 anyLoop = true;

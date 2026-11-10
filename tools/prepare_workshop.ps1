@@ -1,12 +1,11 @@
 # Builds the Steam Workshop upload folder:
 #   Zomboid\Workshop\KnoxInventory\
 #     preview.png                          (256x256: 42\poster.png)
-#     Contents\mods\KnoxInventory\         the released 0.9.8.7 (kept in Zomboid\backups\knox_0.9.8.7_release)
-#     Contents\mods\KnoxInventoryBeta\     the work as "Knox Inventory 1.0 BETA" (42\ and common\ only:
+#     Contents\mods\KnoxInventoryBeta\     the work as "Knox Inventory" (42\ and common\ only:
 #                                           no tools, no notes; the Java part is
 #                                           42\media\java\client\KnoxInventoryJava.jar,
 #                                           built by java\build.ps1)
-# When 1.0 itself is released, this goes back to one mod: the work as KnoxInventory.
+# (the released 0.9.8.7 was a second mod here until 2026-11-08: see below)
 # The in-game uploader (main menu > Workshop) creates workshop.txt on first upload.
 # Re-run before every update; the Contents folder is replaced, workshop.txt is kept
 # (its title and description are rebuilt from WORKSHOP_DESCRIPTION.txt).
@@ -46,67 +45,15 @@ if (-not (Test-Path (Join-Path $root "42\media\java\client\KnoxInventoryJava.jar
 $utf8 = New-Object Text.UTF8Encoding $false
 
 # ---------------------------------------------------------------------------------
-# Two mods in the one Workshop item since the 1.0 beta (the author, 2026-10-20):
-#   Contents\mods\KnoxInventory\       the released 0.9.8.7, as it was
-#   Contents\mods\KnoxInventoryBeta\   the work: "Knox Inventory 1.0 BETA"
-# The player picks one in the mod list; they can't be on together (incompatible=).
-# The work folder (Zomboid\mods\Knox Inventory) keeps the id KnoxInventory - the
-# author's own saves are on it; it becomes the beta only here.
+# One mod in the Workshop item again since 2026-11-08 (the author: "удали legacy
+# версию мода. Теперь 1.0 beta единственная и основная версия knox"): the frozen
+# 0.9.8.7 (KnoxInventory, 2026-10-20 .. 2026-11-08) is gone from the item.
+#   Contents\mods\KnoxInventoryBeta\   the work, named "Knox Inventory"
+# The id stays KnoxInventoryBeta (the author's choice): the saves of the beta's
+# players keep their mod. The work folder (Zomboid\mods\Knox Inventory) keeps the
+# id KnoxInventory - the author's own saves are on it; it becomes KnoxInventoryBeta
+# only here. The release's last copy stays in Zomboid\backups\knox_0.9.8.7_release.
 # ---------------------------------------------------------------------------------
-
-# The release: a copy of 0.9.8.7 kept apart, taken once from what Steam installed
-# (after an upload of this layout Steam's own folder holds both mods - the copy
-# keeps the release as it was published).
-$stableKeep = Join-Path $env:USERPROFILE "Zomboid\backups\knox_0.9.8.7_release"
-if (-not (Test-Path (Join-Path $stableKeep "42\mod.info"))) {
-    $steam = "C:\Program Files (x86)\Steam\steamapps\workshop\content\108600\3816775774\mods\KnoxInventory"
-    if (-not (Test-Path (Join-Path $steam "42\mod.info"))) { throw "No copy of the released 0.9.8.7: neither $stableKeep nor $steam" }
-    $v = (Select-String -Path (Join-Path $steam "42\mod.info") -Pattern '^modversion=(.+)$').Matches[0].Groups[1].Value.Trim()
-    if ($v -ne "0.9.8.7") { throw "Steam's copy is $v, not the released 0.9.8.7: put the release into $stableKeep by hand" }
-    New-Item -ItemType Directory -Force $stableKeep | Out-Null
-    Copy-Item -Path (Join-Path $steam "*") -Destination $stableKeep -Recurse -Force
-    Write-Host "Kept the released 0.9.8.7 in $stableKeep"
-}
-$stable = Join-Path $contents "KnoxInventory"
-New-Item -ItemType Directory -Force $stable | Out-Null
-Copy-Item -Path (Join-Path $stableKeep "*") -Destination $stable -Recurse -Force
-
-# What the release gets from the beta's coming: three changes (and the pictures of the
-# beta's post, step 3), nothing else.
-# 1. it can't be on together with the beta
-$mi = Join-Path $stable "42\mod.info"
-$lines = [IO.File]::ReadAllLines($mi, $utf8) | Where-Object { $_ -notmatch '^incompatible=' }
-$lines = @($lines) + "incompatible=\KnoxInventoryBeta"
-[IO.File]::WriteAllLines($mi, [string[]]$lines, $utf8)
-# 2. a save played with the beta has Knox: the release's save guard must not add itself to it
-$sg = Join-Path $stable "42\media\lua\client\Knox\KnoxSaveGuard.lua"
-$t = [IO.File]::ReadAllText($sg, $utf8)
-$from = 'if okSnap and snap and not has(info.activeMods, MOD_ID) then'
-$to = 'if okSnap and snap and not has(info.activeMods, MOD_ID) and not has(info.activeMods, "KnoxInventoryBeta") then'
-if (-not $t.Contains($from)) { throw "The release's KnoxSaveGuard.lua is not as expected: $sg" }
-[IO.File]::WriteAllText($sg, $t.Replace($from, $to), $utf8)
-# 3. the news of the beta, so that the release's players hear of it (the post between
-#    the BETA-POST marks of the work's news, put on top of the release's posts)
-foreach ($lang in "ru", "en") {
-    $work = [IO.File]::ReadAllText((Join-Path $root "42\media\knox\news_$lang.txt"), $utf8)
-    $m = [regex]::Match($work, '(?s); BETA-POST-BEGIN\r?\n(.*?); BETA-POST-END')
-    if (-not $m.Success) { throw "news_$lang.txt: the BETA-POST marks are missing" }
-    $nf = Join-Path $stable "42\media\knox\news_$lang.txt"
-    $rel = [IO.File]::ReadAllLines($nf, $utf8)
-    $at = 0
-    while ($at -lt $rel.Count -and $rel[$at] -notmatch '^# ') { $at++ }
-    $out = @($rel[0..($at - 1)]) + ($m.Groups[1].Value.TrimEnd() -split "\r?\n") + @('') + @($rel[$at..($rel.Count - 1)])
-    [IO.File]::WriteAllLines($nf, [string[]]$out, $utf8)
-    # ...and the pictures it names (@banner, @art, @), which the frozen release lacks
-    # (the gear of a technical update, 2026-10-22: else the release showed its stock forest)
-    foreach ($pm in [regex]::Matches($m.Groups[1].Value, '(?m)^@(?:banner|art)?\s*(\S+\.png)\s*$')) {
-        $pic = $pm.Groups[1].Value
-        $src = Join-Path $root "42\media\knox\news\$pic"
-        $dstPic = Join-Path $stable "42\media\knox\news\$pic"
-        if (-not (Test-Path $src)) { throw "news_$lang.txt: the beta post's picture $pic is missing" }
-        if (-not (Test-Path $dstPic)) { Copy-Item -LiteralPath $src -Destination $dstPic }
-    }
-}
 
 # The beta: the work as it is now.
 $dst = Join-Path $contents "KnoxInventoryBeta"
@@ -131,17 +78,17 @@ foreach ($devOnly in "42\media\lua\client\Knox\KnoxTestBench.lua", "42\media\lua
 # its own id, name and version, and the file that tells its Lua which mod it is
 $mi = Join-Path $dst "42\mod.info"
 $lines = [IO.File]::ReadAllLines($mi, $utf8) | Where-Object { $_ -notmatch '^incompatible=' } | ForEach-Object {
-    if ($_ -match '^name=') { "name=Knox Inventory 1.0 BETA" }
+    if ($_ -match '^name=') { "name=Knox Inventory" }
     elseif ($_ -match '^id=') { "id=KnoxInventoryBeta" }
     elseif ($_ -match '^modversion=') { "modversion=1.0-beta" }
-    elseif ($_ -match '^description=') { "description=TEST VERSION of Knox Inventory 1.0 - for trying the new features and reporting bugs, not for a full playthrough. Back up your saves. Only one of Knox Inventory and Knox Inventory 1.0 BETA can be enabled. Requires ZombieBuddy." }
+    elseif ($_ -match '^description=') { "description=Knox Inventory 1.0 BETA: the whole Project Zomboid UI in the style of Escape From Tarkov - a grid inventory around your live 3D character, rigs and bags in bags, its own right-click menu, a car dashboard and a main menu that is a camp by the fire or a bar in a blizzard. Requires ZombieBuddy." }
     else { $_ }
 }
 $lines = @($lines) + "incompatible=\KnoxInventory"
 [IO.File]::WriteAllLines($mi, [string[]]$lines, $utf8)
 $idFile = Join-Path $dst "42\media\lua\shared\Knox\KnoxModId.lua"
 [IO.File]::WriteAllLines($idFile, [string[]]@(
-    "-- Written by tools\prepare_workshop.ps1 into the beta's copy only: which of Knox's mods this is (KnoxTheme.MOD_ID).",
+    "-- Written by tools\prepare_workshop.ps1 into the Workshop copy only: which of Knox's mods this is (KnoxTheme.MOD_ID).",
     'KnoxModId = "KnoxInventoryBeta"'), $utf8)
 
 Copy-Item -LiteralPath (Join-Path $root "42\poster.png") -Destination (Join-Path $ws "preview.png") -Force
@@ -158,7 +105,7 @@ while ($desc.Count -and $desc[-1].Trim() -eq '') { $desc = $desc[0..($desc.Count
 if ($desc | Where-Object { $_ -match '^=' }) { throw "WORKSHOP_DESCRIPTION.txt: lines starting with '=' break workshop.txt" }
 if ($desc | Where-Object { $_ -match '\[img\]\{' }) { throw "WORKSHOP_DESCRIPTION.txt: [img]{...} placeholders are left - put the uploaded pictures' links in first" }
 $bytes = $utf8.GetByteCount(($desc -join "`n"))
-if ($bytes -gt 7800) { throw "WORKSHOP_DESCRIPTION.txt is $bytes bytes: over Steam's 8000-byte limit (keep it under 7800)" }
+if ($bytes -gt 7950) { throw "WORKSHOP_DESCRIPTION.txt is $bytes bytes: over Steam's 8000-byte limit (keep it under 7950, as upload_page.ps1 does)" }
 
 $wt = Join-Path $ws "workshop.txt"
 if (Test-Path $wt) {

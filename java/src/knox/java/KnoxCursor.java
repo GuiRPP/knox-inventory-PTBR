@@ -2,6 +2,7 @@ package knox.java;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
 import org.lwjglx.input.Cursor;
@@ -44,7 +45,7 @@ public class KnoxCursor {
             Cursor cursor = load(FILE);
             if (cursor == null) return false;
             set("defaultCursor", cursor);
-            org.lwjglx.input.Mouse.setNativeCursor(cursor);
+            if (!hidden) org.lwjglx.input.Mouse.setNativeCursor(cursor);
             Texture tex = texture(FILE);
             if (tex != null) set("mouseCursorTexture", tex);
             applied = true;
@@ -150,7 +151,7 @@ public class KnoxCursor {
             }
             Cursor cursor = on ? down : up;
             set("defaultCursor", cursor);
-            org.lwjglx.input.Mouse.setNativeCursor(cursor);
+            if (!hidden) org.lwjglx.input.Mouse.setNativeCursor(cursor);
             Texture tex = on ? downTex : upTex;
             if (tex != null) set("mouseCursorTexture", tex);
             pressed = on;
@@ -179,6 +180,45 @@ public class KnoxCursor {
         down = null;
         if (!applied || pressBroken) return false;
         return show(pressed);
+    }
+
+    // The cursor hidden while the menu on R is open (KnoxInput.knoxSetRMenuOpen, the author,
+    // 2026-10-31): the game's blank one as the system cursor and no drawn one; a press
+    // of the left button meanwhile changes only what comes back.
+    static boolean hidden, drawnWas = true;
+
+    // Not the game's cursor_blank.png (the author, 2026-11-05: a white square in place of the
+    // cursor with R held): it is white with alpha 0 in every pixel, and Windows takes a picture
+    // with no alpha at all as having none, so it can show as an opaque square. One pixel with
+    // the faintest alpha is enough for Windows to read the alpha, and nothing can be seen of it.
+    private static Cursor blank;
+
+    private static Cursor makeBlank() throws Exception {
+        IntBuffer px = ByteBuffer.allocateDirect(32 * 32 * 4).order(ByteOrder.nativeOrder()).asIntBuffer();
+        px.put(0, 0x01010101);   // (alpha 1 and next to black, whatever the order of the bytes)
+        return new Cursor(32, 32, 0, 0, 1, px, null);
+    }
+
+    static void hide(boolean on) {
+        if (hidden == on) return;
+        try {
+            if (on) {
+                if (blank == null) blank = makeBlank();
+                org.lwjglx.input.Mouse.setNativeCursor(blank);
+                drawnWas = Mouse.isCursorVisible();
+                Mouse.setCursorVisible(false);
+                hidden = true;
+            } else {
+                hidden = false;
+                Mouse.setCursorVisible(drawnWas);
+                Field f = Mouse.class.getDeclaredField("defaultCursor");
+                f.setAccessible(true);
+                Cursor back = (Cursor) f.get(null);
+                if (back != null) org.lwjglx.input.Mouse.setNativeCursor(back);
+            }
+        } catch (Exception | LinkageError e) {
+            System.out.println("[Knox] cursor hide: " + e);
+        }
     }
 
     static void set(String name, Object value) throws ReflectiveOperationException {

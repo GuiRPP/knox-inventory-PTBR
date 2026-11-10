@@ -405,7 +405,7 @@ local function engineOk(v)
 end
 
 local function keyName(k)
-    local ok, s = pcall(function() return Keyboard.getKeyName(k) end)
+    local ok, s = pcall(function() return knoxKeyName and knoxKeyName(k) or Keyboard.getKeyName(k) end)
     return ok and s or "?"
 end
 

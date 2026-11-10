@@ -29,8 +29,7 @@ $title = $Matches[1].Trim()
 $desc = $lines | Select-Object -Skip 2
 while ($desc.Count -and $desc[-1].Trim() -eq '') { $desc = $desc[0..($desc.Count - 2)] }
 $desc = @($desc | Where-Object { $_ -notmatch '^\s*(Workshop ID|Mod ID):' })
-$modId = (Select-String -Path (Join-Path $root "42\mod.info") -Pattern '^id=(.+)$').Matches[0].Groups[1].Value.Trim()
-$full = @($desc) + @('', 'Workshop ID: 3816775774', "Mod ID: $modId", "Mod ID: KnoxInventoryBeta")
+$full = @($desc) + @('', 'Workshop ID: 3816775774', "Mod ID: KnoxInventoryBeta")
 $text = $full -join "`n"
 $holders = [regex]::Matches($text, '\[img\]\{(\w+)\}\[/img\]') | ForEach-Object { $_.Groups[1].Value }
 $bytes = $utf8.GetByteCount($text)

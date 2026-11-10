@@ -4,6 +4,7 @@
 -- `entity.slotId` names the slot it came from. Dragging a selected tile drags
 -- the other selected tiles along (`extras`).
 
+require "Knox/KnoxTheme"
 require "Knox/KnoxGrid"
 require "TimedActions/ISInventoryTransferUtil"
 
@@ -173,6 +174,35 @@ function D.mergeTarget(view)
     local target = view:entityUnderMouse()
     -- (a stack with any room left: it takes what fits, the rest stays behind)
     if KnoxGrid.mergeRoom(D.entity, target) > 0 then return target end
+    return nil
+end
+
+-- Dropping rounds onto a magazine's tile loads it (the author, 2026-11-05): the game's action,
+-- as the Shift panel does it. One known to be full takes nothing; one not checked always
+-- looks as if it would, so the drop tells no more than trying does.
+
+--- The magazine in this tile that would take these rounds, nil if none.
+local function magFor(t, key)
+    local K = KnoxMagKnown
+    for _, m in ipairs(t.items) do
+        if (K and K.hide and not K.is(m)) or m:getCurrentAmmoCount() < m:getMaxAmmo() then
+            local at = m:getAmmoType()
+            if at and (at:getItemKey() == key or (KnoxCompat and KnoxCompat.roundFits(m, key))) then return m end
+        end
+    end
+    return nil
+end
+
+--- The magazines' tile under the cursor that the dragged rounds would go in, and the magazine.
+function D.magTarget(view)
+    local e = D.entity
+    if not e or #D.extras > 0 or not view:isMouseOver() then return nil end
+    local t = view:entityUnderMouse()
+    if not t or t.item == e.item then return nil end
+    local item = t.item
+    if instanceof(item, "HandWeapon") or item:getMaxAmmo() <= 0 then return nil end
+    local m = magFor(t, e.item:getFullType())
+    if m then return t, m end
     return nil
 end
 
@@ -407,8 +437,17 @@ function D.canDrop(layout, x, y, player, merge)
     local w, h = D.dims()
     if y + h > (layout.baseRows or layout.rows) then return false end   -- the overflow rows take nothing
     -- (its own cells are free for a tile moved within its grid; not for some of
-    -- a stack taken out of it: the stack stays where it is)
-    if not layout:fits(x, y, w, h, (sameGrid and not e.part) and e or nil) then return false end
+    -- a stack taken out of it: the stack stays where it is. From elsewhere, its
+    -- own place waiting for it there - KnoxHome's silhouette - is free to it too)
+    local ignore = nil
+    if sameGrid then
+        if not e.part then ignore = e end
+    else
+        ignore = e
+    end
+    -- (a place held for another thing - its silhouette - may be covered: that thing goes back
+    -- as near to it as it can; the author's bench 2026-11-08)
+    if not layout:fits(x, y, w, h, ignore, true) then return false end
     if sameGrid then return true end
     return D.allowedIn(e.item, dest, player)
 end
@@ -459,6 +498,19 @@ end
 --- Put the dragged tile(s) at x,y of the target view's container.
 function D.drop(view, x, y, player)
     local e = D.entity
+    local magTile, mag = D.magTarget(view)
+    if magTile then
+        local far = outOfReach(player, e, mag:getContainer())
+        local items = e.items
+        D.cancel()
+        if far then
+            D.explain(player, "IGUI_Knox_TooFar")
+            return false
+        end
+        KnoxLoad.loadMagazine(player, mag, {items = items})
+        view:markDirty()
+        return true
+    end
     local bag = D.bagUnderMouse(view)
     if bag then
         local ok = dropIntoBag(bag, player, D.sourceInfo(), D.extras)
@@ -608,7 +660,7 @@ end
 
 -- Kept up to date before the UI is drawn (top-level elements may be added or
 -- removed only outside of drawing).
-Events.OnPreUIDraw.Add(function()
+local function watchHanded()
     local h = D.handed
     if not h then return end
     local ours = ISMouseDrag.dragging == h.items
@@ -633,6 +685,8 @@ Events.OnPreUIDraw.Add(function()
         h.layer:addToUIManager()
     end
     h.layer:bringToTop()
-end)
+end
+Events.OnPreUIDraw.Add(watchHanded)
+KnoxTheme.offInGame(Events.OnPreUIDraw, watchHanded, "inventory", "hotbar")
 
 return KnoxDrag

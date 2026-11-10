@@ -1,15 +1,13 @@
-Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+Title: [B42] Knox Inventory - Complete UI Overhaul
 
 [h1]Knox Inventory[/h1]
 [b]Not just a Tarkov-style inventory: one interface for the whole of Project Zomboid, in one style.[/b] Its own fonts, plates, frames, tooltips, cursor and sounds - from your bags to the car's dashboard and the main menu. The inventory is one module of ten, and each can be switched off.
 [img]{hero}[/img]
 
-[h1]1.0 BETA and 0.9.8.7[/h1]
-This item has two mods: [b]Knox Inventory[/b] (0.9.8.7, released) and [b]Knox Inventory 1.0 BETA[/b] (all that is new on this page). Enable only one. [b]The beta is a test version - back up your saves.[/b]
+[h1]1.0 BETA[/h1]
+[b]Knox Inventory 1.0 BETA is now the one and only version of the mod.[/b] It is still in testing - back up your saves and tell us what breaks.
 [list]
-[*]New game: Mods - swap Knox Inventory for the beta, restart the game.
-[*]Existing save: Load, pick it, Mods - swap there (a save keeps its own mod list).
-[*]The beta's inventory corner says 1.0 BETA; Stage 1 means 0.9.8.7.
+[*]Played the old 0.9.8.7? Its saves just need Knox turned on again: Load, pick the save, Mods, enable Knox Inventory.
 [/list]
 
 [h1]Modules[/h1]

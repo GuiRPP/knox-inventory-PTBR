@@ -29,6 +29,12 @@ public class KnoxMusic {
 
     private static long sound;
     private static long channel;
+
+    /** What plays now: a new one, a new track (the bar's radio needle). */
+    static long channelNow() {
+        return channel;
+    }
+
     private static String current;
 
     /** Zomboid/knox_music, made with a note in it the first time. */
@@ -303,8 +309,8 @@ public class KnoxMusic {
     }
 
     // The radio lying by the fire (the author's wish, 2026-10-15): the music as if
-    // from its small speaker. Its sound is KnoxRadioFx's chain of FMOD effects;
-    // where those can't be made, the channel's low-pass (`gain` below 1: the
+    // from its small speaker. Its sound is KnoxRadioFx's EQ;
+    // where that can't be made, the channel's low-pass (`gain` below 1: the
     // radio on - Lua's call stays as it was).
     private static float lowPass = 1f;
     private static boolean radio;
@@ -595,10 +601,15 @@ public class KnoxMusic {
             // (no fade here: the track plays on over "Click to start" and fades
             // after the click, in the game - begun at the world's load it was
             // nearly gone by the click: the author, 2026-10-16)
-            if (fadeFrom != 0L) fadeStep();
-            else apply();
+            if (fadeFrom != 0L) {
+                fadeStep();
+            } else {
+                KnoxRadioFx.loading = true;
+                apply();
+                KnoxRadioFx.loading = false;
+            }
         } catch (Throwable t) {
-            // the music goes on as it is; the game stops it
+            KnoxRadioFx.loading = false;   // the music goes on as it is; the game stops it
         }
     }
 

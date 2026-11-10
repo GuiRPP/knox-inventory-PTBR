@@ -1,8 +1,15 @@
 package knox.java;
 
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+
 import me.zed_0xff.zombie_buddy.Patch;
 
 import se.krka.kahlua.integration.annotations.LuaMethod;
+import zombie.ZomboidFileSystem;
+import zombie.core.textures.Texture;
+import zombie.core.utils.NativeImage;
 
 /**
  * While the Knox screen is open the game counts the mouse as over its
@@ -16,16 +23,174 @@ public class KnoxInput {
     /** Set by Lua when the Knox screen opens and closes. */
     public static volatile boolean screenOpen;
 
+    /**
+     * The menu on R is open (KnoxRMenu.lua, the author, 2026-10-31). Clicks made while it
+     * is open it takes itself, on an element over the whole screen; this holds what was
+     * already down when it opened (the right button aiming) and the keys bound to the
+     * mouse. The cursor is hidden meanwhile.
+     */
+    public static volatile boolean rMenuOpen;
+
     @LuaMethod(name = "knoxSetScreenOpen", global = true)
     public static void knoxSetScreenOpen(boolean open) {
         screenOpen = open;
+    }
+
+    @LuaMethod(name = "knoxSetRMenuOpen", global = true)
+    public static void knoxSetRMenuOpen(boolean open) {
+        rMenuOpen = open;
+        KnoxCursor.hide(open);
+    }
+
+    // The game's interact key did something (the author 2026-11-10: the key that calls the
+    // hidden hotbar up must not call it when it opened a door, climbed through a window or
+    // over a fence...): IsoPlayer.doContext is what that key runs - doors, windows, fences,
+    // walls, corners, a car's part - and it answers whether something was done.
+    public static long contextDoneAt;
+
+    /** When the interact key last did something in the world (ms, System.currentTimeMillis). */
+    @LuaMethod(name = "knoxContextDoneAt", global = true)
+    public static double knoxContextDoneAt() {
+        return contextDoneAt;
+    }
+
+    /** The time now, the same clock as knoxContextDoneAt. */
+    @LuaMethod(name = "knoxNowMs", global = true)
+    public static double knoxNowMs() {
+        return System.currentTimeMillis();
+    }
+
+    @Patch(className = "zombie.characters.IsoPlayer", methodName = "doContext")
+    public static class DoContext {
+        @Patch.OnExit
+        public static void exit(@Patch.Return boolean result) {
+            if (result) KnoxInput.contextDoneAt = System.currentTimeMillis();
+        }
+    }
+
+    // A key's name for Knox's hints, always in Latin letters (the author 2026-11-08: started
+    // with the Russian layout the hints read a Cyrillic letter for F until the game restarts). The game
+    // names keys once, at its start, by the layout on then (Keyboard.initKeyNames ->
+    // glfwGetKeyName). A name with letters past Latin-1 is taken from the key's field in
+    // Keyboard instead (KEY_F -> "F"), as Viewpoint's KeyChord.latinName does; a Latin
+    // layout's own names (AZERTY, QWERTZ) are kept.
+    private static Map<Integer, String> latinKeys;
+
+    private static String latinKey(int key) {
+        if (latinKeys == null) {
+            Map<Integer, String> m = new HashMap<>();
+            Map<String, String> signs = new HashMap<>();
+            String[][] pairs = {{"SEMICOLON", ";"}, {"APOSTROPHE", "'"}, {"COMMA", ","}, {"PERIOD", "."},
+                    {"SLASH", "/"}, {"BACKSLASH", "\\"}, {"LBRACKET", "["}, {"RBRACKET", "]"},
+                    {"MINUS", "-"}, {"EQUALS", "="}, {"GRAVE", "`"}};
+            for (String[] p : pairs) signs.put(p[0], p[1]);
+            try {
+                for (java.lang.reflect.Field f : org.lwjglx.input.Keyboard.class.getFields()) {
+                    int mod = f.getModifiers();
+                    if (!java.lang.reflect.Modifier.isStatic(mod) || f.getType() != int.class || !f.getName().startsWith("KEY_")) continue;
+                    String n = f.getName().substring(4);
+                    m.putIfAbsent(f.getInt(null), signs.getOrDefault(n, n));
+                }
+            } catch (Throwable t) {
+                // (left as far as it got)
+            }
+            latinKeys = m;
+        }
+        return latinKeys.get(key);
+    }
+
+    /** The name to show for a key: the game's, or its Latin one when the game's is not Latin. */
+    @LuaMethod(name = "knoxKeyName", global = true)
+    public static String knoxKeyName(int key) {
+        String n = null;
+        try {
+            n = org.lwjglx.input.Keyboard.getKeyName(key);
+        } catch (Throwable t) {
+            // (out of the table)
+        }
+        return latin(key, n);
+    }
+
+    /** The game's name of a key made Latin (Viewpoint's panel keys go through it too). */
+    public static String latin(int key, String n) {
+        if (n == null || n.isEmpty()) return latinKey(key);
+        for (int i = 0; i < n.length(); i++) {
+            if (n.charAt(i) > 0xFF) {
+                String l = latinKey(key);
+                return l != null ? l : n;
+            }
+        }
+        return n;
     }
 
     @Patch(className = "zombie.ui.UIManager", methodName = "isMouseOverInventory")
     public static class OverInventory {
         @Patch.OnExit
         public static void exit(@Patch.Return(readOnly = false) boolean result) {
-            if (KnoxInput.screenOpen) result = true;
+            if (KnoxInput.screenOpen || KnoxInput.rMenuOpen) result = true;
         }
+    }
+
+    // Where a picture's pixels are (the menu on R centres its pictures by them, the author,
+    // 2026-10-31). The game's packs cut the empty edges off a picture and it draws such
+    // one by what is left, so it is in the middle as it is; a picture of its own file
+    // keeps them: read from the file once.
+    static final Map<Texture, double[]> inks = new HashMap<>();
+    static final double[] NO_INK = {0, 0};
+
+    /** How far the pixels' middle is from the picture's, in parts of its longer side. */
+    static double[] inkOf(Texture t) {
+        if (t == null) return NO_INK;
+        double[] c = inks.get(t);
+        if (c != null) return c;
+        c = NO_INK;
+        try {
+            if (t.getWidth() == t.getWidthOrig() && t.getHeight() == t.getHeightOrig()) c = read(t.getName());
+        } catch (Exception | LinkageError e) {
+            System.out.println("[Knox] picture " + t.getName() + ": " + e);
+        }
+        inks.put(t, c);
+        return c;
+    }
+
+    static double[] read(String name) {
+        if (name == null) return NO_INK;
+        String[] tries = {name, "media/textures/" + name + ".png", "media/ui/" + name + ".png"};
+        for (String file : tries) {
+            String path = ZomboidFileSystem.instance.getAbsolutePath(file);
+            if (path == null) continue;
+            try (NativeImage image = NativeImage.read(path, false)) {
+                if (image == null) continue;
+                return inkIn(image.pixels(), image.width(), image.height());
+            }
+        }
+        return NO_INK;
+    }
+
+    /** From an image's rows of RGBA bytes. */
+    static double[] inkIn(ByteBuffer px, int w, int h) {
+        int left = w, right = -1, top = h, bottom = -1;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if ((px.get((y * w + x) * 4 + 3) & 255) < 16) continue;
+                if (x < left) left = x;
+                if (x > right) right = x;
+                if (y < top) top = y;
+                if (y > bottom) bottom = y;
+            }
+        }
+        if (right < 0) return NO_INK;
+        double side = Math.max(w, h);
+        return new double[] {((left + right + 1) / 2.0 - w / 2.0) / side, ((top + bottom + 1) / 2.0 - h / 2.0) / side};
+    }
+
+    @LuaMethod(name = "knoxTexInkX", global = true)
+    public static double knoxTexInkX(Texture t) {
+        return inkOf(t)[0];
+    }
+
+    @LuaMethod(name = "knoxTexInkY", global = true)
+    public static double knoxTexInkY(Texture t) {
+        return inkOf(t)[1];
     }
 }

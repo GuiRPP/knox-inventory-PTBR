@@ -23,6 +23,7 @@ KnoxTestBench = ISPanel:derive("KnoxTestBench")
 local B = KnoxTestBench
 local T = KnoxTheme
 local REPORT = "knox_testbench.txt"
+local SEL_FILE = "knox_testbench_sel.txt"   -- the point last open (the author 2026-11-10: reopened, the bench stays where it was)
 local RELEASE = "1.0 BETA"
 
 B.state = B.state or {}   -- id -> {verdict = "ok" | "bad", auto, autoOk, note}
@@ -655,6 +656,22 @@ local function readLines(file)
     return out
 end
 
+--- The point the window opens on: the one open when it was closed (by id - points come and go).
+local function savedSel()
+    local id = readLines(SEL_FILE)[1]
+    for i, p in ipairs(B.POINTS) do
+        if p.id == id then return i end
+    end
+    return 1
+end
+
+local function saveSel(id)
+    local w = getFileWriter(SEL_FILE, true, false)
+    if not w then return end
+    w:write(tostring(id or ""))
+    w:close()
+end
+
 -- Checks: read the result from the grids -------------------------------------------
 
 local function noBag() return false, getText("IGUI_KnoxTB_Res_NoBag") end
@@ -992,6 +1009,202 @@ local function giveBatteries(p)
         local it = tag(inv:AddItem("Base.Battery"))
         if it then pcall(function() it:setCurrentUsesFloat(c) end) end
     end
+    dirtyAll()
+end
+
+--- Magazines and guns (the author, 2026-10-30): a pistol, its magazines empty and
+--- with 7, rounds of it in the bag on the back (else the pockets), a shotgun and
+--- shells, a revolver and its rounds, a laser; on the floor a box of the pistol's
+--- rounds, a box of shells and rounds that fit none of these (.308).
+local function giveGuns(p)
+    local inv = p:getInventory()
+    local back = p:getClothingItem_Back()
+    local bag = back and back.getItemContainer and back:getItemContainer() or inv
+    local function add(c, ft, n)
+        local last = nil
+        for _ = 1, n or 1 do
+            if exists(ft) then last = tag(c:AddItem(ft)) end
+        end
+        return last
+    end
+    add(inv, "Base.Pistol")
+    for _, n in ipairs({0, 7}) do
+        local m = add(inv, "Base.9mmClip")
+        if m then pcall(function() m:setCurrentAmmoCount(n) end) end
+    end
+    add(bag, "Base.Bullets9mm", 30)
+    add(inv, "Base.Shotgun")
+    add(inv, "Base.ShotgunShells", 12)
+    add(inv, "Base.Revolver")
+    add(inv, "Base.Bullets357", 12)
+    add(inv, "Base.Laser")
+    local sq = p:getCurrentSquare()
+    if sq then
+        B.dumped = B.dumped or {}
+        for _, ft in ipairs({"Base.Bullets9mmBox", "Base.ShotgunShellsBox"}) do
+            local it = exists(ft) and sq:AddWorldInventoryItem(ft, 0.5, 0.5, 0)
+            if it then table.insert(B.dumped, tag(it)) end
+        end
+        for _ = 1, 20 do
+            local it = exists("Base.308Bullets") and sq:AddWorldInventoryItem("Base.308Bullets", 0.4, 0.6, 0)
+            if it then table.insert(B.dumped, tag(it)) end
+        end
+    end
+    dirtyAll()
+end
+
+--- Things in every state (condition_v3, the author, 2026-10-31): a hammer at half, a
+--- knife nearly worn out, a pistol at 20%, a broken screwdriver and socks, a water
+--- bottle at 40%, a torch, a new knife.
+local function giveWorn(p)
+    local inv = p:getInventory()
+    local function add(ft, frac, broken)
+        local it = exists(ft) and tag(inv:AddItem(ft))
+        if not it then return nil end
+        if frac then pcall(function() it:setCondition(math.floor(it:getConditionMax() * frac + 0.5)) end) end
+        if broken then pcall(function() it:setCondition(0) it:setBroken(true) end) end
+        return it
+    end
+    add("Base.Hammer", 0.5)
+    add("Base.KitchenKnife", 0.08)
+    add("Base.Pistol", 0.2)
+    add("Base.Screwdriver", nil, true)
+    add("Base.Socks_Ankle", nil, true)
+    add("Base.HuntingKnife")
+    add("Base.HandTorch")
+    local bottle = add("Base.WaterBottle")
+    if bottle then
+        pcall(function()
+            local fc = bottle:getFluidContainer()
+            fc:Empty()
+            fc:addFluid("Water", fc:getCapacity() * 0.4)
+        end)
+    end
+    dirtyAll()
+end
+
+--- For a stack: batteries at different charges, broken screwdrivers.
+function B.giveWornStacks(p)
+    local inv = p:getInventory()
+    for _, f in ipairs({1, 0.5, 0.1}) do
+        local it = exists("Base.Battery") and tag(inv:AddItem("Base.Battery"))
+        if it then pcall(function() it:setCurrentUsesFloat(f) end) end
+    end
+    for _ = 1, 3 do
+        local it = exists("Base.Screwdriver") and tag(inv:AddItem("Base.Screwdriver"))
+        if it then pcall(function() it:setCondition(0) it:setBroken(true) end) end
+    end
+    dirtyAll()
+end
+
+-- The menu on R (ammo_live, the author, 2026-10-31): each gun as the mockup has it, in hand.
+local function giveR(p, gunType, n, magType, spares, loose)
+    local inv = p:getInventory()
+    if not exists(gunType) then return nil end
+    local gun = tag(inv:AddItem(gunType))
+    pcall(function()
+        if magType then gun:setContainsClip(true) end
+        gun:setCurrentAmmoCount(n)
+        if gun:haveChamber() then gun:setRoundChambered(true) end
+    end)
+    p:setPrimaryHandItem(gun)
+    for _, s in ipairs(spares) do
+        local m = exists(magType) and tag(inv:AddItem(magType))
+        if m then
+            pcall(function() m:setCurrentAmmoCount(s[1]) end)
+            if s[2] then KnoxMagKnown.mark(m, p) end
+        end
+    end
+    local at = gun:getAmmoType()
+    local key = at and at:getItemKey()
+    for _ = 1, loose do
+        if key and exists(key) then tag(inv:AddItem(key)) end
+    end
+    dirtyAll()
+    return gun
+end
+
+function B.giveRPistol(p)
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", {{15, true}, {7, true}, {3, false}}, 47)
+end
+
+function B.giveRRifle(p)
+    giveR(p, "Base.AssaultRifle", 22, "Base.556Clip", {{30, true}, {12, true}, {8, false}}, 95)
+end
+
+function B.giveRShotgun(p)
+    giveR(p, "Base.Shotgun", 4, nil, {}, 19)
+end
+
+function B.giveRRevolver(p)
+    giveR(p, "Base.Revolver", 5, nil, {}, 17)
+end
+
+--- Nothing in the hands: two magazines, loose rounds, a box.
+function B.giveRBare(p)
+    local inv = p:getInventory()
+    p:setPrimaryHandItem(nil)
+    p:setSecondaryHandItem(nil)
+    for _, s in ipairs({{7, true}, {3, false}}) do
+        local m = exists("Base.9mmClip") and tag(inv:AddItem("Base.9mmClip"))
+        if m then
+            pcall(function() m:setCurrentAmmoCount(s[1]) end)
+            if s[2] then KnoxMagKnown.mark(m, p) end
+        end
+    end
+    for _ = 1, 20 do
+        if exists("Base.Bullets9mm") then tag(inv:AddItem("Base.Bullets9mm")) end
+    end
+    if exists("Base.Bullets9mmBox") then tag(inv:AddItem("Base.Bullets9mmBox")) end
+    dirtyAll()
+end
+
+function B.giveRMany(p)
+    local spares = {}
+    for i = 1, 12 do spares[i] = {i, true} end
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", spares, 30)
+end
+
+--- The gun in hand jams.
+function B.jamR(p)
+    local gun = p:getPrimaryHandItem()
+    if gun and instanceof(gun, "HandWeapon") then gun:setJammed(true) end
+end
+
+--- Two pistols: the right hand's magazine full, the left's nearly empty.
+function B.giveRTwo(p)
+    local gun = giveR(p, "Base.Pistol", 15, "Base.9mmClip", {}, 0)
+    local other = exists("Base.Pistol") and tag(p:getInventory():AddItem("Base.Pistol"))
+    if gun and other then
+        pcall(function()
+            other:setContainsClip(true)
+            other:setCurrentAmmoCount(2)
+        end)
+        p:setSecondaryHandItem(other)
+    end
+end
+
+--- A pistol in hand and a magazine as found: not known, some rounds in it.
+function B.giveHiddenFound(p)
+    giveR(p, "Base.Pistol", 11, "Base.9mmClip", {{9, false}}, 0)
+end
+
+--- A water bottle at 40% in the inventory and one on the ground.
+function B.giveWornFloor(p)
+    local function fill(it)
+        pcall(function()
+            local fc = it:getFluidContainer()
+            fc:Empty()
+            fc:addFluid("Water", fc:getCapacity() * 0.4)
+        end)
+    end
+    if not exists("Base.WaterBottle") then return end
+    fill(tag(p:getInventory():AddItem("Base.WaterBottle")))
+    local sq = p:getCurrentSquare()
+    local it = instanceItem("Base.WaterBottle")
+    fill(it)
+    local w = sq and sq:AddWorldInventoryItem(it, 0.5, 0.5, 0)
+    if w then table.insert(B.dumped, w) end
     dirtyAll()
 end
 
@@ -1343,91 +1556,166 @@ local function checkHiss()
     return not on or inCar, getText("IGUI_KnoxTB_Res_Hiss", tostring(on), tostring(T.settings["menu.radio"] or "0"), tostring(inCar))
 end
 
-B.POINTS = {
-    -- the inventory's FPS: measuring, by itself since stage 0 (the author, 2026-10-28)
-    {id = "perf_inv", actions = {{"AutoPerf", function(p) B.autoPerf(p) end},
-        {"AutoPerfDetail", function(p) B.autoPerf(p, true) end},
-        {"Mark", function() mark("perf_inv") end}, {"PerfDetail", function() B.perfDetail() end},
-        {"Ammo500", function(p) B.ammo(p) end}, {"Dump", function(p) B.dump(p) end},
-        {"Wardrobe", function(p) B.wardrobe(p) end}}, check = checkPerfInv},
-    -- the author's own finds, 2026-10-29
-    {id = "a_pour"},
-    {id = "a_battery", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
-    {id = "a_torch", actions = {{"TorchKit", function(p) giveKit(p, {"Base.HandTorch", "Base.Battery"}) end}}},
-    {id = "a_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "a_trash"},
-    {id = "a_hands", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    -- the author's wishes from the bench, 2026-10-29 (the crosshair panel)
-    {id = "b_vp_live"},
-    {id = "b_vp_bag", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_remember", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_keys"},
-    {id = "b_vp_locked"},
-    {id = "b_battery", actions = {{"Batteries", function(p) giveBatteries(p) end}}},
-    {id = "b_slot_swap", actions = {{"Belt", function(p) giveKit(p, {"Base.HuntingKnife", "Base.Hammer", "Base.Screwdriver"}) end}}},
-    {id = "b_vp_gen"},
-    {id = "b_vp_icons", actions = {{"IconLog", function(p)
-        if not KnoxCrosshair or not KnoxCrosshair.logNoIcons then return end
-        KnoxCrosshair.logNoIcons(not KnoxCrosshair.noIconLog)
-        halo(p, KnoxCrosshair.noIconLog and "IGUI_KnoxTB_IconLogOn" or "IGUI_KnoxTB_IconLogOff")
-    end}}},
-    -- the crosshair panel's actions in the right-click menu's groups (the author, 2026-10-29)
-    {id = "b_vp_groups", actions = {{"DirtyClothes", function(p)
-        local worn = p:getWornItems()
-        for i = 0, worn:size() - 1 do
-            local it = worn:get(i):getItem()
-            if instanceof(it, "Clothing") then
-                it:setDirtiness(60)
-                it:setBloodLevel(40)
+-- the winter bar (the author, 2026-10-31): which scene the menu has now, how many
+-- of its models were made, and which one is kept for the season
+local function checkBar()
+    local s = KnoxMenuScene and KnoxMenuScene.instance
+    local name = s and s.Type or "-"
+    local kept = "-"
+    pcall(function()
+        local r = getFileReader(KnoxMenuPlace.FILE, false)
+        if r then
+            r:readLine()
+            kept = string.gsub(tostring(r:readLine() or "-"), "\t", " ")
+            r:close()
+        end
+    end)
+    return s ~= nil, getText("IGUI_KnoxTB_Res_Bar", name, tostring(s and s.objects and #s.objects or 0), kept)
+end
+
+--- Things going back to their place (KnoxHome): what waits to go back, what places wait
+--- in the test backpack.
+local function checkHome(player)
+    local L = B.layout(player)
+    if not L then return noBag() end
+    local held, homes = 0, 0
+    for _, e in ipairs(L.placed) do
+        if e.held then held = held + 1 end
+    end
+    for _ in pairs(KnoxHome and KnoxHome.homes or {}) do homes = homes + 1 end
+    return true, getText("IGUI_KnoxTB_Res_Home", homes, held, tostring(T.switch("home")))
+end
+
+-- Furniture placed from anywhere (the author, 2026-11-09: "Place" wherever the thing is,
+-- the Knox screen hides while the spot is picked). A chair as a world-sprite item, the way
+-- the game's debug menu makes one. (furniture_seating_indoor_01_0 was half a red sofa - the author
+-- 2026-11-10: "only one part, it cannot be placed"): the first one-tile moveable named a chair.
+local function chairSprite()
+    if B.chairSprite then return B.chairSprite end
+    local any = nil
+    for set = 1, 3 do
+        for i = 0, 63 do
+            local name = string.format("furniture_seating_indoor_%02d_%d", set, i)
+            local spr = getSprite(name)
+            local props = spr and spr:getProperties()
+            if props and props:has("IsMoveAble") and spr:getSpriteGrid() == nil then
+                local custom = props:has("CustomName") and props:get("CustomName") or ""
+                if string.find(string.lower(custom), "chair", 1, true) then
+                    B.chairSprite = name
+                    return name
+                end
+                any = any or name
             end
         end
-        p:resetModelNextFrame()
-        halo(p, "IGUI_KnoxTB_A_DirtyClothes")
-    end}}},
-    -- the author's bench, 2026-10-29 (evening): a locked door, the car, "Disassemble", the car's radio
-    {id = "b_vp_door"},
-    {id = "b_vp_car"},
-    {id = "b_vp_scrap"},
-    {id = "b_car_radio_cursor"},
-    -- (the author's radio and TV, 2026-10-29: "Device Options" the main one, "Disassemble" centred)
-    {id = "b_vp_device"},
-    -- (the author, 2026-10-29: F held at a fence climbed nothing while the panel was up)
-    {id = "b_vp_fence"},
-    -- stage 2 of the Steam reports, 2026-10-28
-    {id = "s2_sandbox", menu = true},
-    {id = "s2_colors", menu = true, check = checkColors},
-    {id = "s2_eat_move", actions = {{"Food", giveFood}, {"Watch", function() B.watchQueue() end}}},
-    {id = "s2_stack", actions = {{"Ammo500", function(p) B.ammo(p) end}, {"Hitch", function() B.hitch() end},
-        {"Mark", function() mark("s2_stack") end}}, check = checkHitch},
-    {id = "s2_hiss", menu = true, check = checkHiss},
-    {id = "s2_traits", menu = true},
-    -- stage 1 of the Steam reports, 2026-10-28
-    {id = "s1_editor", menu = true, actions = {{"Editor", openEditorCounted}}, check = checkEditorErrors},
-    {id = "s1_editor_menu", menu = true},
-    {id = "s1_disassemble"},
-    {id = "s1_item_tips"},
-    {id = "s1_far", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "s1_near", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    -- the reason plate by the held thing (option A, "Чертёж": the author 2026-10-28)
-    {id = "s1_reason", actions = {{"Dump", function(p) B.dump(p) end}, {"ClearDump", function() B.clearDump() end}}},
-    {id = "s1_bench_menu", menu = true},
-    -- the trunk's button on the pickup's body (linlin; the plate wider - the author, 2026-10-28)
-    {id = "s1_trunk", actions = {{"Van", function(p) B.car(p, "Base.Van") end}, {"Pickup", function(p) B.car(p, "Base.PickUpTruck") end},
-        {"Car", function(p) B.car(p) end}}},
-}
-
--- the health tab: hidden until 2.0, on the bench only with it (dev.health=1)
-if T.modules and T.modules.health then
-    for _, p in ipairs({
-        {id = "health_tab", check = checkHealthTab},
-        {id = "health_wounds", actions = woundActions(), check = checkHealthWounds},
-        {id = "health_bones", actions = boneActions(), check = checkFractures},
-        {id = "health_treat", actions = {{"Kit", function(p) B.kit(p) end}}, check = checkHealthTab},
-        {id = "health_menu", check = checkHealthTab},
-        {id = "health_heal", actions = {{"Heal", function(p) B.heal(p) end}}, check = checkHealthTab},
-        {id = "health_vanilla"},
-    }) do table.insert(B.POINTS, p) end
+    end
+    B.chairSprite = any
+    return any
 end
+
+local function newChair()
+    local spr = chairSprite()
+    local it = spr and instanceItem("Moveables.Moveable")
+    if it and it:ReadFromWorldSprite(spr) then return tag(it) end
+    return nil
+end
+
+local function placeInBag(player, playerNum)
+    if not B.bag(player) then B.prepare(player, playerNum) end
+    local bag = B.bag(player)
+    local it = bag and newChair()
+    if it then bag:getInventory():AddItem(it) end
+    dirtyAll()
+end
+
+local function placeInHands(player)
+    local it = newChair()
+    if not it then return end
+    player:getInventory():AddItem(it)
+    player:setPrimaryHandItem(it)
+    player:setSecondaryHandItem(it)
+    dirtyAll()
+end
+
+local function placeNear(player)
+    local cont = nearFurniture(player)
+    if not cont then
+        halo(player, "IGUI_KnoxTB_WardrobeNone")
+        return
+    end
+    local it = newChair()
+    if it then cont:AddItem(it) end
+    dirtyAll()
+end
+
+--- Where the bench's chairs are now (the check of the three place_* points).
+local function checkPlace(player)
+    local bag, hands, inv, near = 0, 0, 0, 0
+    local function count(cont, into)
+        local items = cont and cont:getItems()
+        local n = 0
+        for i = 0, (items and items:size() or 0) - 1 do
+            local it = items:get(i)
+            if it:getModData().knoxBench and instanceof(it, "Moveable") then n = n + 1 end
+        end
+        return into + n
+    end
+    local b = B.bag(player)
+    bag = count(b and b:getInventory(), bag)
+    inv = count(player:getInventory(), inv)
+    local h = player:getPrimaryHandItem()
+    if h and h:getModData().knoxBench and instanceof(h, "Moveable") then hands = 1 end
+    near = count(nearFurniture(player), near)
+    return true, getText("IGUI_KnoxTB_Res_Place", bag, hands, inv, near)
+end
+
+-- The hero for the menu on the game's 42.22 (the author's console 2026-11-09: it was not written
+-- since the update - NoSuchMethodError; jar v150).
+B.snapWritten = nil
+local function checkSnap()
+    local v = knoxJavaVersion and tonumber(knoxJavaVersion()) or 0
+    local ok = v >= 150 and B.snapWritten == true
+    local w = B.snapWritten == nil and "-" or tostring(B.snapWritten)
+    return ok, getText("IGUI_KnoxTB_Res_Snap", tostring(v), w)
+end
+
+-- Mending clothes (rama 2026-11-04: looked for it in Knox's 3D "Inspect"; the game's one is named
+-- "Holes and patches" now): a shirt with holes and what mends it, into the pockets.
+local function sewKit(player)
+    local inv = player:getInventory()
+    local shirt = tag(inv:AddItem("Base.Shirt_FormalWhite"))
+    if shirt and shirt.addRandomHole then
+        shirt:addRandomHole()
+        shirt:addRandomHole()
+    end
+    for _, ft in ipairs({"Base.Needle", "Base.Thread", "Base.DenimStrips", "Base.DenimStrips", "Base.DenimStrips"}) do
+        if exists(ft) then tag(inv:AddItem(ft)) end
+    end
+    dirtyAll()
+end
+
+-- Eating and a move at once (D and Love <3, Steam, 2026-11-03: a move queued while eating shows
+-- as waiting, then is cancelled when the eating ends; not seen on the bench 2026-10-28). Food that
+-- leaves something behind (a can) and a drink, into the test backpack; the game prints
+-- "bugged action ... cleared queue" when it drops the whole queue.
+local function eatKit(player, playerNum)
+    if not B.bag(player) then B.prepare(player, playerNum) end
+    local bag = B.bag(player)
+    if not bag then return end
+    local inv = bag:getInventory()
+    for _, ft in ipairs({"Base.Apple", "Base.WaterBottle", "Base.OpenBeans", "Base.Crisps"}) do
+        if exists(ft) then tag(inv:AddItem(ft)) end
+    end
+    dirtyAll()
+end
+
+-- (all the earlier points taken off by the author, 2026-11-07: "it is all cluttered";
+-- their marks are kept in Zomboid/Lua/knox_testbench_beta16.txt; the home_* points passed
+-- on 2026-11-09 are kept in knox_testbench_home.txt, the ones passed 2026-11-10 in knox_testbench_1110.txt)
+B.POINTS = {
+    -- (group: the report a point checks - a caption row above its points, the author 2026-11-09:
+    -- "to see which report I am checking")
+    {id = "place_bag", group = "Place", actions = {{"ChairBag", function(p, n) placeInBag(p, n) end}}, check = checkPlace},
+}
 
 -- The report ----------------------------------------------------------------------
 
@@ -1477,8 +1765,23 @@ end
 
 function B:player() return getSpecificPlayer(self.playerNum) end
 
+--- The list's rows: a caption row where the group changes, then the points
+--- ({group = key} or {point = i}); rowOf[i] is point i's row.
+function B:buildRows()
+    self.rows, self.rowOf = {}, {}
+    local was = nil
+    for i, p in ipairs(B.POINTS) do
+        if p.group and p.group ~= was then table.insert(self.rows, {group = p.group}) end
+        was = p.group
+        table.insert(self.rows, {point = i})
+        self.rowOf[i] = #self.rows
+    end
+end
+
 function B:createChildren()
     load()
+    self.sel = savedSel()
+    self:buildRows()
     local c, pad = T.cell, T.pad
     self.headerH = T.sectionH + 4
     self.listW = math.floor(c * 4.6)
@@ -1486,7 +1789,7 @@ function B:createChildren()
     -- (no taller than 12 cells - the list scrolls with the wheel: with every point shown the
     -- window outgrew the screen and covered the game, the author 2026-10-22)
     local footH = (T.fontH(T.fontText) + 2) * 3 + T.fontTileH * 2
-    local listH = self.headerH + pad + #B.POINTS * (self.rowH + 2) + pad + footH
+    local listH = self.headerH + pad + #self.rows * (self.rowH + 2) + pad + footH
     local w, h = math.floor(c * 15), math.max(math.floor(c * 10.5), math.min(listH + pad, math.floor(c * 12)))
     self.listTop = self.headerH + pad
     self.listBottom = h - pad - footH
@@ -1543,14 +1846,18 @@ function B:rowRect(i)
     return {T.pad, self.listTop + (i - 1 - self.scroll) * (self.rowH + 2), self.listW, self.rowH}
 end
 
---- Is point i in the list's window (scrolled to)?
+--- Is row i in the list's window (scrolled to)?
 function B:rowShown(i)
     return i > self.scroll and i <= self.scroll + self.visRows
 end
 
-function B:scrollTo(i)
-    local most = math.max(0, #B.POINTS - self.visRows)
-    if i <= self.scroll then self.scroll = i - 1 elseif i > self.scroll + self.visRows then self.scroll = i - self.visRows end
+function B:scrollTo(point)
+    local i = self.rowOf[point] or point
+    -- (the group's caption shown too when its first point is scrolled to)
+    local cap = self.rows[i - 1]
+    local top = (cap and cap.group) and i - 1 or i
+    local most = math.max(0, #self.rows - self.visRows)
+    if top <= self.scroll then self.scroll = top - 1 elseif i > self.scroll + self.visRows then self.scroll = i - self.visRows end
     self.scroll = math.max(0, math.min(most, self.scroll))
 end
 
@@ -1579,10 +1886,22 @@ function B:prerender()
     end
 
     -- the list: a mark (green works, red broken, grey not yet), the number, the name
-    if self.sel ~= self.shownSel then self.shownSel = self.sel self:scrollTo(self.sel) end
-    for i, p in ipairs(B.POINTS) do
-        if self:rowShown(i) then
-            local r = self:rowRect(i)
+    if self.sel ~= self.shownSel then
+        self.shownSel = self.sel
+        self:scrollTo(self.sel)
+        saveSel(self:point().id)
+    end
+    for ri, row in ipairs(self.rows) do
+        if self:rowShown(ri) and row.group then
+            -- the caption: which report the points below check, and a line after it
+            local r = self:rowRect(ri)
+            local cap = T.fit(T.upper(getText("IGUI_KnoxTB_G_" .. row.group)), T.fontTile, r[3] - 8)
+            local ty = r[2] + r[4] - T.fontTileH - 3
+            T.text(self, cap, r[1] + 2, ty, T.color.accent, T.fontTile)
+            T.rect(self, r[1], r[2] + r[4] - 1, r[3], 1, T.color.accent)
+        elseif self:rowShown(ri) then
+            local i, p = row.point, B.POINTS[row.point]
+            local r = self:rowRect(ri)
             local s = B.state[p.id] or {}
             local on = i == self.sel
             T.rect(self, r[1], r[2], r[3], r[4], on and T.color.header or T.color.cell)
@@ -1597,11 +1916,11 @@ function B:prerender()
         end
     end
     -- the scroll bar: where the shown rows are in the whole list
-    if #B.POINTS > self.visRows then
+    if #self.rows > self.visRows then
         local tx, th = pad + self.listW + 3, self.listBottom - self.listTop
         T.rect(self, tx, self.listTop, 3, th, T.color.cell)
-        local ty = self.listTop + math.floor(th * self.scroll / #B.POINTS)
-        T.rect(self, tx, ty, 3, math.max(8, math.floor(th * self.visRows / #B.POINTS)), T.color.tileEdge)
+        local ty = self.listTop + math.floor(th * self.scroll / #self.rows)
+        T.rect(self, tx, ty, 3, math.max(8, math.floor(th * self.visRows / #self.rows)), T.color.tileEdge)
     end
     local done = 0
     for _, p in ipairs(B.POINTS) do
@@ -1712,9 +2031,9 @@ function B:onMouseDown(x, y)
             return true
         end
     end
-    for i = 1, #B.POINTS do
-        if self:rowShown(i) and T.inRect(x, y, self:rowRect(i)) then
-            self.sel = i
+    for ri, row in ipairs(self.rows) do
+        if row.point and self:rowShown(ri) and T.inRect(x, y, self:rowRect(ri)) then
+            self.sel = row.point
             self:showNote()
             getSoundManager():playUISound("UIActivateButton")
             return true
@@ -1764,7 +2083,7 @@ KnoxWindowDrag.install(B)
 function B:onRightMouseUp(x, y) return true end
 function B:onMouseWheel(del)
     if self:getMouseX() < T.pad + self.listW + 8 then
-        self.scroll = math.max(0, math.min(math.max(0, #B.POINTS - self.visRows), self.scroll + (del > 0 and 1 or -1)))
+        self.scroll = math.max(0, math.min(math.max(0, #self.rows - self.visRows), self.scroll + (del > 0 and 1 or -1)))
     end
     return true
 end

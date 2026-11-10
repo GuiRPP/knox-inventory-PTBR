@@ -458,6 +458,9 @@ function KnoxInventoryPanel:prerender()
     -- the stencil is in panel coordinates; drawing below is in scrolled content
     -- coordinates (the engine adds the scroll)
     self:setStencilRect(0, 0, self:getWidth(), self:getHeight())
+    local box = self.clipBox or {0, 0, 0, 0}
+    self.clipBox = box
+    box[3], box[4] = self:getWidth(), self:getHeight()
 
     local player = self:player()
     local ft = T.fontH(T.fontText)
@@ -541,7 +544,7 @@ function KnoxInventoryPanel:prerender()
             tst = {}
             self.titleSt[s.title] = tst
         end
-        T.marquee(self, tst, title, s.x + 8, tyInk, infoRight - s.x - infoW - 18, isActive and T.color.accent or T.color.text, T.fontCaps)
+        T.marquee(self, tst, title, s.x + 8, tyInk, infoRight - s.x - infoW - 18, isActive and T.color.accent or T.color.text, T.fontCaps, 1, box)
       end
     end
 end

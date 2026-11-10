@@ -11,8 +11,12 @@ K.wanted = nil
 K.tip = nil
 K.playerNum = 0
 
-function K.want(item, playerNum)
+--- `quiet`: the item is under the mouse (the slots show where it would go), but
+--- its tooltip is not shown - it has a panel of its own beside it (a magazine,
+--- a gun, a flashlight: the tooltip lay over the panel's cells, 2026-10-30).
+function K.want(item, playerNum, quiet)
     K.wanted = item
+    K.quiet = quiet == true
     K.playerNum = playerNum or 0
 end
 
@@ -74,6 +78,8 @@ function K.apply()
     local item = K.wanted
     K.wanted = nil
     K.lastHover = item   -- read next frame by the equipment slots (where it would be worn)
+    if K.quiet then item = nil end
+    K.quiet = false
     if folding() then return end   -- (it stays up while it folds, under the menu)
     local menu = getPlayerContextMenu(K.playerNum)
     if KnoxDrag and KnoxDrag.isActive() then item = nil end
@@ -99,6 +105,10 @@ function K.apply()
             shrink(tip)
             tip:addToUIManager()
         end
+        -- it fades in (renderTip): coming up, and on to the next thing too - in
+        -- the grids the mouse goes from tile to tile with no gap, it only faded
+        -- in on the hotbar (the author, 2026-10-30)
+        tip.knoxShowMs = getTimestampMs()
         tip:setVisible(true)
         tip.knoxShown = true
     end
@@ -110,6 +120,7 @@ function K.reset()
     K.hide()
     K.tip = nil
     K.wanted = nil
+    K.quiet = false
 end
 
 -- Look of every item tooltip ---------------------------------------------------
@@ -163,7 +174,7 @@ local function descriptionOf(item)
     return text
 end
 
-local function doTooltip(tip, noTitle, wrapWidth)
+local function doTooltip(tip, noTitle, wrapWidth, fade)
     if not tip.item then return false end
     local styled = false
     if T.javaFonts and isItem(tip.item) then
@@ -180,6 +191,7 @@ local function doTooltip(tip, noTitle, wrapWidth)
             if desc then knoxTooltipDropLine(desc) end
         end
         if styled and wrapWidth then knoxTooltipWrapWidth(wrapWidth) end
+        if styled and fade and fade < 1 and knoxTooltipFade then knoxTooltipFade(fade) end
     end
     local ok, err = pcall(function() tip.item:DoTooltip(tip.tooltip) end)
     if styled then
@@ -332,7 +344,7 @@ local function hints()
             end
         end
         for _, h in ipairs(list) do
-            h.w = T.measure(T.fontTile, h.key) + 10 + 6 + T.measure(T.fontText, h.label)
+            h.w = T.keyW(h.key) + 6 + T.measure(T.fontText, h.label)
             table.insert(hintCache, h)
         end
     end
@@ -340,6 +352,38 @@ local function hints()
 end
 
 local HINT_GAP = 16
+local TIP_FADE_MS = 150   -- (coming up: renderTip)
+local HINT_ROW_GAP = 6
+
+-- The quick items' key (the author, 2026-10-30): on the tooltip of a thing that
+-- has the panel - a magazine, a gun, a flashlight, a radio on batteries. After
+-- the two hints when there is room, else in a row of its own under them (the
+-- tooltip is no wider for it: Knox's item menu takes its width).
+local quickCache, quickStamp
+local function quickHint()
+    local stamp = KnoxControls and KnoxControls.stamp or 0
+    if quickStamp ~= stamp then
+        quickStamp, quickCache = stamp, false
+        local g = KnoxControls and KnoxControls.get("quickItems") or ""
+        if g ~= "" then
+            local h = {key = KnoxControls.label(g), label = getText("IGUI_Knox_TipHint_quickItems")}
+            h.w = T.keyW(h.key) + 6 + T.measure(T.fontText, h.label)
+            quickCache = h
+        end
+    end
+    return quickCache or nil
+end
+
+--- Does the tooltip's item have the quick items' panel? (kept for its item)
+local function hasQuick(tip)
+    local item = tip.item
+    if tip.knoxQuickFor ~= item then
+        tip.knoxQuickFor = item
+        tip.knoxQuick = KnoxLoad ~= nil and isItem(item)
+            and (KnoxLoad.panelOf(item) ~= nil or (KnoxGridView ~= nil and KnoxGridView.batteryOf(item) ~= nil))
+    end
+    return tip.knoxQuick
+end
 
 local GAP = 8   -- the same space between the parts: header, lines, line over the hints, hints, bottom
 K.GAP = GAP
@@ -438,20 +482,20 @@ local function meterColor(f)
 end
 
 --- A label and a Knox meter on one line of the plate (like the Java part's bars).
-local function drawMeterRow(ui, row, x, y, w)
+local function drawMeterRow(ui, row, x, y, w, a)
     local fh = T.fontH(T.fontText)
     local label = row.label or ""
-    T.text(ui, label, x, y, LABEL, T.fontText)
+    T.text(ui, label, x, y, LABEL, T.fontText, a)
     local bx = x + T.measure(T.fontText, label) + 12
     local bw = x + w - bx
     if bw < 20 then return end
     local f = math.max(0, math.min(1, row.frac or 0))
     local bh = math.max(6, math.floor(fh / 3))
     local by = y + math.floor((fh - bh) / 2)
-    T.rect(ui, bx, by, bw, bh, METER_FRAME)
-    T.rect(ui, bx + 1, by + 1, bw - 2, bh - 2, METER_TRACK)
+    T.rect(ui, bx, by, bw, bh, METER_FRAME, a)
+    T.rect(ui, bx + 1, by + 1, bw - 2, bh - 2, METER_TRACK, a)
     local done = math.floor((bw - 2) * f)
-    if done > 0 then T.rect(ui, bx + 1, by + 1, done, bh - 2, meterColor(f)) end
+    if done > 0 then T.rect(ui, bx + 1, by + 1, done, bh - 2, meterColor(f), a) end
 end
 
 -- without the Java part the game's tooltips stay as they are (see KnoxTheme.active)
@@ -461,6 +505,12 @@ local function renderTip(self, fold)
     -- like the game's: no item tooltip while a context menu is up (but while it folds into the menu)
     if not fold and ISContextMenu.instance and ISContextMenu.instance.visibleCheck then return end
     if not self.item then return end
+    -- it fades in when it comes up and on each next thing (the author, 2026-10-30:
+    -- it popped up at once); not while it folds into a menu
+    local k = 1
+    if not fold and self.knoxShowMs and not (T.animOn and not T.animOn()) then
+        k = K.ease((getTimestampMs() - self.knoxShowMs) / TIP_FADE_MS)
+    end
 
     local mx, my = getMouseX() + 24, getMouseY() + 24
     if not self.followMouse then
@@ -505,6 +555,7 @@ local function renderTip(self, fold)
     local W, H, cut, bodyH, desc, descH = tw, th, 0, 0, nil, 0
     local descLineH = T.fontH(T.fontText) + 3
     local rows, rowsH = nil, 0
+    local quick, quickRow = nil, false
     if header then
         cut = self.knoxPadY + self.knoxLine + 5                 -- where its lines start under its name
         -- the game's last line ends with its line spacing below the text; cut
@@ -515,6 +566,12 @@ local function renderTip(self, fold)
         W = math.max(tw, baseW)
         -- a stats line wider than planned widened the plate: refill the header at that width
         if W > baseW then hd = headerAt(W) end
+        -- the quick items' key: after the hints, or under them
+        quick = hasQuick(self) and quickHint() or nil
+        if quick and footW + HINT_GAP + quick.w > W - m * 2 then
+            quickRow = true
+            footH = footH + T.fontTileH + 4 + HINT_ROW_GAP
+        end
         -- meter rows of other mods, right under the game's lines
         rows = extraRows(self.item)
         if #rows > 0 then
@@ -602,9 +659,9 @@ local function renderTip(self, fold)
     self:setHeight(H)
 
     -- plate: shadow, window color, frame
-    self:drawRect(4, 6, W, H, 0.45, 0, 0, 0)
-    T.rect(self, 0, 0, W, H, T.color.window, 0.97)
-    self:drawRectBorder(0, 0, W, H, 1, EDGE.r, EDGE.g, EDGE.b)
+    self:drawRect(4, 6, W, H, 0.45 * k, 0, 0, 0)
+    T.rect(self, 0, 0, W, H, T.color.window, 0.97 * k)
+    self:drawRectBorder(0, 0, W, H, k, EDGE.r, EDGE.g, EDGE.b)
 
     if not header then
         self.knoxHeadH = nil
@@ -617,19 +674,19 @@ local function renderTip(self, fold)
 
     -- header in the item's category color
     -- (the frame GAP from the plate's edges; its contents line up with the lines below)
-    drawHeader(self, hd, GAP, GAP, W - GAP * 2)
+    drawHeader(self, hd, GAP, GAP, W - GAP * 2, k)
 
     -- the game's lines under it
     self.tooltip:setX(x)
     self.tooltip:setY(y + GAP + hd.h + GAP - cut)
-    if bodyH > 0 then doTooltip(self, true, wrapW) end
+    if bodyH > 0 then doTooltip(self, true, wrapW, k) end
 
     -- other mods' meter rows under them
     if rows then
         local ry = GAP + hd.h + GAP + bodyH
         if bodyH > 0 then ry = ry + descLineH - T.fontH(T.fontText) end
         for _, row in ipairs(rows) do
-            drawMeterRow(self, row, m, ry, W - m * 2)
+            drawMeterRow(self, row, m, ry, W - m * 2, k)
             ry = ry + descLineH
         end
     end
@@ -638,7 +695,7 @@ local function renderTip(self, fold)
     if desc then
         local dy = GAP + hd.h + GAP + bodyH + rowsH
         if bodyH + rowsH > 0 then
-            T.rect(self, GAP, dy + GAP, W - GAP * 2, 1, T.color.border)
+            T.rect(self, GAP, dy + GAP, W - GAP * 2, 1, T.color.border, k)
             dy = dy + GAP + 1 + GAP
         end
         local leading = descLineH - T.fontH(T.fontText)
@@ -649,14 +706,14 @@ local function renderTip(self, fold)
             elseif l.sep then
                 -- notes above, the description below
                 dy = dy + GAP - leading
-                T.rect(self, GAP, dy, W - GAP * 2, 1, T.color.border)
+                T.rect(self, GAP, dy, W - GAP * 2, 1, T.color.border, k)
                 dy = dy + 1 + GAP
             else
                 if l.marker then
                     local s = math.max(4, math.floor(fh / 4))
-                    T.rect(self, m, dy + math.floor((fh - s) / 2), s, s, T.color.accent)
+                    T.rect(self, m, dy + math.floor((fh - s) / 2), s, s, T.color.accent, k)
                 end
-                T.text(self, l.text, m + (l.indent or 0), dy, l.color, T.fontText)
+                T.text(self, l.text, m + (l.indent or 0), dy, l.color, T.fontText, k)
                 dy = dy + descLineH
             end
         end
@@ -664,12 +721,19 @@ local function renderTip(self, fold)
 
     -- footer: key hints under a thin line
     local fy = H - footH
-    T.rect(self, GAP, fy + GAP, W - GAP * 2, 1, T.color.border)
+    T.rect(self, GAP, fy + GAP, W - GAP * 2, 1, T.color.border, k)
     local hx = m
     local kh = T.fontTileH + 4
     for _, h in ipairs(hints()) do
-        T.keyHint(self, hx, fy + GAP + 1 + GAP, h.key, h.label, kh)
+        T.keyHint(self, hx, fy + GAP + 1 + GAP, h.key, h.label, kh, k)
         hx = hx + h.w + HINT_GAP
+    end
+    if quick then
+        if quickRow then
+            T.keyHint(self, m, fy + GAP + 1 + GAP + kh + HINT_ROW_GAP, quick.key, quick.label, kh, k)
+        else
+            T.keyHint(self, hx, fy + GAP + 1 + GAP, quick.key, quick.label, kh, k)
+        end
     end
 end
 

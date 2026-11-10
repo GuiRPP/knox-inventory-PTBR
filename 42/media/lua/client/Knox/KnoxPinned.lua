@@ -26,6 +26,7 @@ local bez = M.bez
 local tex = M.tex
 
 P.URL = "https://boosty.to/knoxinventory/donate"
+P.DISCORD_URL = "https://discord.gg/HKpREqdDqD"
 local DOT = string.char(183)
 local SHINE = {r = 1, g = 226 / 255, b = 160 / 255}
 local SHINE_FRAME = {r = 1, g = 250 / 255, b = 232 / 255}
@@ -35,10 +36,19 @@ local EDGE_DARK = {r = 0x7d / 255, g = 0x6e / 255, b = 0x44 / 255}
 local DARK = {r = 0, g = 0, b = 0}
 local FACE = {r = 1, g = 1, b = 1}
 local WHITE = {r = 1, g = 1, b = 1}
+-- The coin and "thank you" in the Ice skin's colours, for a winter post's right panel (the author,
+-- 2026-11-05: "the thank you from the previous post... in the Ice style"). The edge: the gold coin's
+-- two tones taken from the ice colour as they are from the gold.
+P.ICE = {color = {r = 0x8e / 255, g = 0xc5 / 255, b = 0xe0 / 255},
+         cell = {r = 0x0b / 255, g = 0x0f / 255, b = 0x12 / 255},
+         bright = {r = 0xe6 / 255, g = 0xed / 255, b = 0xf2 / 255},
+         edgeLight = {r = 0x6f / 255, g = 0x9a / 255, b = 0xaf / 255},
+         edgeDark = {r = 0x51 / 255, g = 0x70 / 255, b = 0x80 / 255},
+         face = "logo_winter"}
 
 --- Every picture of the news asked for at the game's start (T.preloadTex): read by the time
 --- they are shown, never the game's red-white squares in their place (the author, 2026-10-25).
-local PINNED_PICS = {"banner", "logo", "logo_clean_128", "logo_clean_64", "glow", "fade", "band", "topo",
+local PINNED_PICS = {"banner", "logo", "logo_winter", "logo_clean_128", "logo_clean_128_winter", "logo_clean_64", "glow", "fade", "band", "topo",
                      "coin_lines", "coin_fill", "pin"}
 function P.preload()
     local paths = {"media/ui/knoxdash/disc.png", "media/ui/knoxdash/bar.png", "media/ui/knoxdash/soft.png", "media/ui/knoxmenu/news_banner.png", "media/ui/knoxmenu/news_art.png"}
@@ -70,6 +80,12 @@ end
 function P.openBoosty()
     getSoundManager():playUISound("UIActivateButton")
     if knoxOpenUrl then knoxOpenUrl(P.URL) end
+end
+
+--- Knox's Discord server in the browser (the support block's second button, the author 2026-11-05).
+function P.openDiscord()
+    getSoundManager():playUISound("UIActivateButton")
+    if knoxOpenUrl then knoxOpenUrl(P.DISCORD_URL) end
 end
 
 -- The shimmer ----------------------------------------------------------------------
@@ -188,14 +204,15 @@ local function square(r, z, mirror)
     Q[7], Q[8] = project(l, r, z)
 end
 
-local function drawCoin(ui, cx, cy, size, sec)
+local function drawCoin(ui, cx, cy, size, sec, look)
     local s = size / 300
     local f = T.mod(sec, 10) / 10
     local rx, ry = sway(f)
     cosX, sinX, cosY, sinY = math.cos(rx), math.sin(rx), math.cos(ry), math.sin(ry)
     ccx, ccy = cx, cy
-    local face = tex("logo")
+    local face = tex(look and look.face or "logo")
     local disc = T.readyTex(DISC)
+    local edgeLight, edgeDark = look and look.edgeLight or EDGE_LIGHT, look and look.edgeDark or EDGE_DARK
     -- facing us: the front; else the back (the same face, mirrored)
     local front = cosX * cosY > 0
     -- the reeded edge: discs a px apart between the faces, light and dark in turn, far to near
@@ -204,7 +221,7 @@ local function drawCoin(ui, cx, cy, size, sec)
         for i = 0, 16 do
             local z = front and (i - 8) or (8 - i)
             square(r, z * s, false)
-            local c = (T.mod(z, 2) == 1) and EDGE_LIGHT or EDGE_DARK
+            local c = (T.mod(z, 2) == 1) and edgeLight or edgeDark
             T.quad(ui, disc, Q[1], Q[2], Q[3], Q[4], Q[5], Q[6], Q[7], Q[8], c, 1)
         end
     end
@@ -229,43 +246,45 @@ local function drawCoin(ui, cx, cy, size, sec)
 end
 
 --- The right panel: a lit grid, a soft breathing glow, the coin and its shadow, "thank you".
+--- (`look`: other colours, P.ICE; none - the pinned post's gold.)
 local capR, capOpts = {0, 0, 0, 0}, {}
-function P.drawRight(ui, x, y, w, h)
+function P.drawRight(ui, x, y, w, h, look)
     local s = T.cell / 48
     local sec = getTimestampMs() / 1000
-    T.rect(ui, x, y, w, h, T.color.cell)
+    local c = look and look.color or GOLD
+    T.rect(ui, x, y, w, h, look and look.cell or T.color.cell)
     -- the grid, 48 px, from the middle
     local g = 48 * s
     local mx = x + w / 2
     local gx = mx - g / 2 - math.floor((w / 2) / g + 1) * g
     while gx < x + w do
-        if gx >= x then ui:drawRect(math.floor(gx), y, 1, h, 0.06, GOLD.r, GOLD.g, GOLD.b) end
+        if gx >= x then ui:drawRect(math.floor(gx), y, 1, h, 0.06, c.r, c.g, c.b) end
         gx = gx + g
     end
     local my = y + h / 2
     local gy = my - g / 2 - math.floor((h / 2) / g + 1) * g
     while gy < y + h do
-        if gy >= y then ui:drawRect(x, math.floor(gy), w, 1, 0.06, GOLD.r, GOLD.g, GOLD.b) end
+        if gy >= y then ui:drawRect(x, math.floor(gy), w, 1, 0.06, c.r, c.g, c.b) end
         gy = gy + g
     end
     local cx, cy = x + w / 2, y + h * 0.42
     T.clip(ui, x, y, w, h)
     local pulse = 0.75 + 0.25 * M.easeInOut(1 - math.abs(T.mod(sec, 4) / 2 - 1))
-    M.glow(ui, cx, cy, 310 * s * 0.62 / 0.8, 310 * s * 0.62 / 0.8, GOLD, 0.16 * pulse)
+    M.glow(ui, cx, cy, 310 * s * 0.62 / 0.8, 310 * s * 0.62 / 0.8, c, 0.16 * pulse)
     -- the coin, its shadow under it
     local size = 300 * s
     -- (the shadow first: the coin stands over it)
     local f = T.mod(sec, 10) / 10
     local sw, sa = M.keys(SHADOW_W, f), M.keys(SHADOW_A, f)
     M.glow(ui, cx, cy + (168 + 13) * s, 115 * s * sw / 0.8, 13 * s / 0.8, DARK, 0.6 * sa)
-    drawCoin(ui, cx, cy, size, sec)
+    drawCoin(ui, cx, cy, size, sec, look)
     T.unclip(ui)
     local font = P.bigFont()
     capOpts.font, capOpts.ls = font, s
     capR[1], capR[2], capR[3], capR[4] = x, cy + 190 * s, w, 42 * s
-    T.spaced(ui, getText("IGUI_Knox_PinnedThanks"), capR, T.color.bright, capOpts)
+    T.spaced(ui, getText("IGUI_Knox_PinnedThanks"), capR, look and look.bright or T.color.bright, capOpts)
     capR[2] = capR[2] + 42 * s
-    T.spaced(ui, T.upper(getText("IGUI_Knox_PinnedThanks2")), capR, GOLD, capOpts)
+    T.spaced(ui, T.upper(getText("IGUI_Knox_PinnedThanks2")), capR, c, capOpts)
 end
 
 --- 35 px bold at 1080p: the head's lines and "thank you".
@@ -310,7 +329,7 @@ local function blocksOf(post, textW, font)
 end
 
 local paraR, paraOpts = {0, 0, 0, 0}, {align = "centre"}
-local btnR, btnOpts = {0, 0, 0, 0}, {align = "centre"}
+local btnOpts = {align = "centre"}
 local labR, labOpts = {0, 0, 0, 0}, {}
 local headR, headOpts = {0, 0, 0, 0}, {}
 
@@ -321,30 +340,58 @@ local function supportLayout(st, colW, s)
     st.fB = T.fontHeader
     st.fSpan = T.fontText
     st.fBtn = T.fontCaps
-    st.fUnder = T.javaFonts and T.makeFont("body", T.cell * 0.25) or T.fontTile
     st.btnText = T.upper(getText("IGUI_Knox_PinnedButton"))
-    st.under = getText("IGUI_Knox_PinnedUnder")
-    st.btnW = T.measure(st.fBtn, st.btnText) + 48 * s
-    st.rightW = math.max(st.btnW, T.measure(st.fUnder, st.under))
-    local txtW = colW - 4 - 40 * s - 64 * s - 20 * s - 20 * s - st.rightW
+    st.btn2Text = T.upper(getText("IGUI_Knox_PinnedDiscord"))
+    -- (two buttons of one width, the wider caption's)
+    st.btnW = math.max(T.measure(st.fBtn, st.btnText), T.measure(st.fBtn, st.btn2Text)) + 48 * s
+    local txtW = colW - 4 - 40 * s - 64 * s - 20 * s - 20 * s - st.btnW
     st.txtW = txtW
     st.spanLines = T.wrap(getText("IGUI_Knox_PinnedSupportText"), st.fSpan, txtW)
     local txtH = 24 * s + 2 * s + #st.spanLines * 20 * s
-    st.supInner = math.max(64 * s, txtH, 34 * s + 6 * s + 15 * s)
+    st.supInner = math.max(64 * s, txtH, 34 * s + 8 * s + 34 * s)
     st.supH = st.supInner + 30 * s + 4
 end
 
---- The support block at x, y (colW wide); returns its height.
-local function drawSupport(ui, st, x, y, colW, s, mx, my, now)
+--- One button of the support block, at its rect `r`; `hotKey` is where st keeps when the mouse came.
+local function supportButton(ui, st, r, hotKey, text, mx, my, now)
+    local hot = st.inView and T.inRect(mx, my, r)
+    if hot and not st[hotKey] then st[hotKey] = now end
+    if not hot then st[hotKey] = nil end
+    local C = st.color or GOLD
+    T.rect(ui, r[1], r[2], r[3], r[4], hot and (st.hotColor or BUTTON_HOT) or C)
+    -- under the mouse it shimmers as the card does: the same light, ~1 s over it, every 2.6 s,
+    -- under its caption (the letters stay sharp)
+    if hot and T.animOn() then
+        local p = shineAt((now - st[hotKey]) / 1000, 2.6)
+        if p > 0 then
+            T.clip(ui, r[1], r[2], r[3], r[4])
+            band(ui, r[1], r[2], r[3], r[4], p, 0.24, st.shine or SHINE, 0.62)
+            if st.clip then T.clip(ui, st.clip[1] + 2, st.clip[2], st.clip[3] - 4, st.clip[4]) end
+        end
+        T.border(ui, r[1], r[2], r[3], r[4], T.color.bright)
+        T.border(ui, r[1] + 1, r[2] + 1, r[3] - 2, r[4] - 2, T.color.bright)
+    else
+        T.border(ui, r[1], r[2], r[3], r[4], C)
+    end
+    btnOpts.font = st.fBtn
+    T.label(ui, text, r, T.color.ink, btnOpts)
+end
+
+--- The support block at x, y (colW wide); returns its height. (In gold on the pinned post; a
+--- post in its style brings its own colours and logo: st.color, st.hotColor, st.shine, st.logo -
+--- every post has it under its head from now on, the author 2026-11-05. Two buttons, Boosty over
+--- Discord, in one plate: the author chose it from the mockups, 2026-11-05.)
+function P.drawSupport(ui, st, x, y, colW, s, mx, my, now)
     supportLayout(st, colW, s)
     local h = st.supH
+    local C = st.color or GOLD
     -- a light gold wash, top to bottom, in a 2 px gold frame
-    T.rect(ui, x, y, colW, h, GOLD, 0.02)
-    M.vfade(ui, x, y, colW, h, GOLD, 0.05, true)
-    T.tileFrame(ui, x, y, colW, h, GOLD)
+    T.rect(ui, x, y, colW, h, C, 0.02)
+    M.vfade(ui, x, y, colW, h, C, 0.05, true)
+    T.tileFrame(ui, x, y, colW, h, C)
     local ix, iy = x + 2 + 20 * s, y + 2 + 16 * s
     local inner = st.supInner
-    local logo = tex("logo_clean_128")
+    local logo = tex(st.logo or "logo_clean_128")
     if logo then ui:drawTextureScaled(logo, ix, iy + (inner - 64 * s) / 2, 64 * s, 64 * s, 1, 1, 1, 1) end
     -- the text
     local tx = ix + 64 * s + 20 * s
@@ -360,41 +407,40 @@ local function drawSupport(ui, st, x, y, colW, s, mx, my, now)
         T.label(ui, l, labR, T.color.text, labOpts)
         ty = ty + 20 * s
     end
-    -- the button, "opens in your browser" under it
-    local colH = 34 * s + 6 * s + 15 * s
-    local rx = x + colW - 2 - 20 * s - st.rightW
+    -- the buttons, one over the other
+    local colH = 34 * s + 8 * s + 34 * s
     local by = iy + (inner - colH) / 2
     -- (on whole pixels: at a fraction its 1 px frames fell between pixels, uneven - "the button
     -- is crooked", the author 2026-10-25)
-    btnR[1], btnR[2] = math.floor(rx + st.rightW - st.btnW + 0.5), math.floor(by + 0.5)
-    btnR[3], btnR[4] = math.floor(st.btnW + 0.5), math.floor(34 * s + 0.5)
+    local bx, bw, bh = math.floor(x + colW - 2 - 20 * s - st.btnW + 0.5), math.floor(st.btnW + 0.5), math.floor(34 * s + 0.5)
     st.btn = st.btn or {0, 0, 0, 0}
-    st.btn[1], st.btn[2], st.btn[3], st.btn[4] = btnR[1], btnR[2], btnR[3], btnR[4]
-    local hot = st.inView and T.inRect(mx, my, btnR)
-    if hot and not st.btnHotAt then st.btnHotAt = now end
-    if not hot then st.btnHotAt = nil end
-    T.rect(ui, btnR[1], btnR[2], btnR[3], btnR[4], hot and BUTTON_HOT or GOLD)
-    -- under the mouse it shimmers as the card does: the same light, ~1 s over it, every 2.6 s,
-    -- under its caption (the letters stay sharp)
-    if hot and T.animOn() then
-        local p = shineAt((now - st.btnHotAt) / 1000, 2.6)
-        if p > 0 then
-            T.clip(ui, btnR[1], btnR[2], btnR[3], btnR[4])
-            band(ui, btnR[1], btnR[2], btnR[3], btnR[4], p, 0.24, SHINE, 0.62)
-            if st.clip then T.clip(ui, st.clip[1] + 2, st.clip[2], st.clip[3] - 4, st.clip[4]) end
-        end
-        T.border(ui, btnR[1], btnR[2], btnR[3], btnR[4], T.color.bright)
-        T.border(ui, btnR[1] + 1, btnR[2] + 1, btnR[3] - 2, btnR[4] - 2, T.color.bright)
-    else
-        T.border(ui, btnR[1], btnR[2], btnR[3], btnR[4], GOLD)
-    end
-    btnOpts.font = st.fBtn
-    T.label(ui, st.btnText, btnR, T.color.ink, btnOpts)
-    labR[1], labR[2], labR[3], labR[4] = rx, by + 40 * s, st.rightW, 15 * s
-    labOpts.font, labOpts.align = st.fUnder, "right"
-    T.label(ui, st.under, labR, T.color.dim, labOpts)
+    st.btn[1], st.btn[2], st.btn[3], st.btn[4] = bx, math.floor(by + 0.5), bw, bh
+    st.btn2 = st.btn2 or {0, 0, 0, 0}
+    st.btn2[1], st.btn2[2], st.btn2[3], st.btn2[4] = bx, st.btn[2] + bh + math.floor(8 * s + 0.5), bw, bh
+    supportButton(ui, st, st.btn, "btnHotAt", st.btnText, mx, my, now)
+    supportButton(ui, st, st.btn2, "btn2HotAt", st.btn2Text, mx, my, now)
     labOpts.align = nil
     return h
+end
+
+--- The head of the pinned post, of any colour (every post has one like it from now on, the author
+--- 2026-11-05): a band of the header's colour lit from its line like a fire, the title and the
+--- line under it in big letters. `title` and `meta` as they are drawn (capitals).
+function P.drawHead(ui, title, meta, c, hx, hy, hw, sec)
+    local s = T.cell / 48
+    local hh = 124 * s
+    T.rect(ui, hx, hy, hw, hh, T.color.header)
+    M.vfade(ui, hx, hy + hh * 0.3, hw, hh * 0.7, c, 0.06, false)
+    T.clip(ui, hx, hy, hw, hh)
+    local ew = hw * 1.3
+    M.glow(ui, hx + hw / 2 + M.drift(sec) * ew, hy + hh, ew * 0.48, hh * 1.2, c, 0.2 * M.fire(sec))
+    T.unclip(ui)
+    T.rect(ui, hx, hy + hh, hw, 4 * s, c)
+    headR[1], headR[2], headR[3], headR[4] = hx, hy + 22 * s, hw, 42 * s
+    headOpts.font, headOpts.ls = P.bigFont(), s
+    T.spaced(ui, title, headR, T.color.bright, headOpts)
+    headR[2] = headR[2] + 42 * s
+    T.spaced(ui, meta, headR, c, headOpts)
 end
 
 --- The roadmap's title: ROADMAP in gold between two lines fading out to the sides, each
@@ -431,21 +477,8 @@ function P.drawLeft(ui, post, st, px, top, pw, ph, scroll)
     ui.backGrid = ui.backGrid or {}
     ui.backGrid[1], ui.backGrid[2], ui.backGrid[3] = GOLD, 0, "road"
     -- the head: a band of the header's colour, lit from its gold line like the fire
-    local hx, hy, hw, hh = px + 2, top + 2, pw - 4, 124 * s
-    T.rect(ui, hx, hy, hw, hh, T.color.header)
-    M.vfade(ui, hx, hy + hh * 0.3, hw, hh * 0.7, GOLD, 0.06, false)
-    T.clip(ui, hx, hy, hw, hh)
-    local ew = hw * 1.3
-    M.glow(ui, hx + hw / 2 + M.drift(sec) * ew, hy + hh, ew * 0.48, hh * 1.2, GOLD, 0.2 * M.fire(sec))
-    T.unclip(ui)
-    T.rect(ui, hx, hy + hh, hw, 4 * s, GOLD)
-    local big = P.bigFont()
-    headR[1], headR[2], headR[3], headR[4] = hx, hy + 22 * s, hw, 42 * s
-    headOpts.font, headOpts.ls = big, s
-    T.spaced(ui, T.upper(post.title), headR, T.color.bright, headOpts)
-    headR[2] = headR[2] + 42 * s
     st.meta = st.meta or T.upper(getText("IGUI_Knox_NewsTag_pinned") .. "  " .. DOT .. "  " .. getText("IGUI_Knox_PinnedUpdated", post.date))
-    T.spaced(ui, st.meta, headR, GOLD, headOpts)
+    P.drawHead(ui, T.upper(post.title), st.meta, GOLD, px + 2, top + 2, pw - 4, sec)
 
     -- the body, scrolled
     local viewTop = top + 2 + 144 * s
@@ -484,7 +517,7 @@ function P.drawLeft(ui, post, st, px, top, pw, ph, scroll)
         elseif b.kind == "boosty" then
             y = y + 6 * s
             st.supY = y
-            y = y + drawSupport(ui, st, colX, y, colW, s, mx, my, now) + 4 * s
+            y = y + P.drawSupport(ui, st, colX, y, colW, s, mx, my, now) + 4 * s
         elseif b.kind == "road" then
             y = y + 26 * s
             drawRoadTitle(ui, colX, y, colW, s)

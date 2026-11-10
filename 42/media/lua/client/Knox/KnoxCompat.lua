@@ -25,6 +25,58 @@ local function words(s)
     return out
 end
 
+-- Gunworks (SWMG, Workshop 3722064198) and the packs on it, Escape From Zomboid Firearms
+-- (3824755284) among them: a magazine takes a family of rounds, its AmmoType names only
+-- one (a Discord player's request, the author 2026-11-06). Their rounds go in by the
+-- action's own argument, as the packs' menus do it. Without the mod nothing changes.
+local gunworks = nil     -- its Ammo module, false when it isn't here
+local familyRounds = {}  -- family -> {round type = true}, made once a family
+
+local function gunworksAmmo()
+    if gunworks == nil then
+        gunworks = false
+        local mods = getActivatedMods and getActivatedMods()
+        if mods and (mods:contains("SWMG") or mods:contains("\\SWMG")) then
+            local ok, ammo = pcall(require, "WeaponSystems/Utils/Ammo")
+            if ok and type(ammo) == "table" and ammo.GetFamilyForItem and ammo.GetBulletTypesForFamily
+                    and ammo.GetAutomaticReloadAmmoType then
+                gunworks = ammo
+            end
+        end
+    end
+    return gunworks
+end
+
+--- The round types of a magazine's or a gun's Gunworks family, by the item's type; nil
+--- when it has none.
+function C.roundsOfType(ft)
+    local ammo = gunworksAmmo()
+    local family = ammo and ammo.ItemAmmoFamily and ammo.ItemAmmoFamily[ft]
+    return family and ammo.GetBulletTypesForFamily(family) or nil
+end
+
+--- Does the item (a magazine) take rounds of this type by its Gunworks family?
+function C.roundFits(item, key)
+    local ammo = gunworksAmmo()
+    local family = ammo and ammo.GetFamilyForItem(item)
+    if not family then return false end
+    local set = familyRounds[family]
+    if not set then
+        set = {}
+        for _, t in ipairs(ammo.GetBulletTypesForFamily(family) or {}) do set[t] = true end
+        familyRounds[family] = set
+    end
+    return set[key] == true
+end
+
+--- The rounds Gunworks would load next into this magazine, by the player's own order of
+--- the family; nil when the magazine has no family or none of them is carried.
+function C.nextRound(player, item)
+    local ammo = gunworksAmmo()
+    if ammo and ammo.GetFamilyForItem(item) then return ammo.GetAutomaticReloadAmmoType(player, item) end
+    return nil
+end
+
 local vp = nil
 
 --- What there is of Viewpoint: {present, version, oldpoint, oldpointVersion,
@@ -91,12 +143,89 @@ function C.luaHas(tableName, t, names)
     return ok
 end
 
+--- The container to open for Viewpoint's loot key: it gives the first of what is looked
+--- at (a fridge, never its freezer; a car's first part within reach) - the one whose row
+--- is chosen is opened instead, in Knox's crosshair panel or in Viewpoint's own.
+function C.vpChosen(container)
+    local chosen = KnoxCrosshair and KnoxCrosshair.owned and KnoxCrosshair.chosen() or nil
+    if not chosen then
+        chosen = C.vpHas("menu") and knoxViewpointChosen and knoxViewpointChosen() or nil
+    end
+    if chosen and container then return chosen end
+    return container
+end
+
+--- Viewpoint 0.1.7 has an inventory screen of its own: in its views it keeps the
+--- inventory key from the game and asks ViewpointInventory to open, close and say
+--- whether it is up; the sidebar's bag and heart ask it too (the players' report, the
+--- author 2026-11-04: Tab no longer opened Knox with Viewpoint's view on). Where Knox
+--- stands in for the game's inventory those answers are Knox's screen; its cursor
+--- stays as Knox keeps it (KnoxMain). Returns false with a Viewpoint without that screen.
+function C.routeViewpointScreen()
+    local inv = ViewpointInventory
+    if type(inv) ~= "table" then return false end
+    local has = C.luaHas("ViewpointInventory", inv, {"open", "close", "release", "up"})
+    if not C.luaHas("ViewpointLoot", ViewpointLoot, {"select"}) or not has then return true end
+    local open, close, release, up = inv.open, inv.close, inv.release, inv.up
+    local select = ViewpointLoot.select
+    inv.open = function(how, ...)
+        if not Knox.forPlayer(0) then return open(how, ...) end
+        -- (the key is one toggle: a screen opened otherwise - a click in the world, Knox's
+        -- own key - closes with it, and Viewpoint isn't told one is up)
+        if KnoxScreen.instance then
+            KnoxScreen.instance:close()
+            return false
+        end
+        Knox.viewpointLookAfter = true
+        if Knox.open(0) and KnoxScreen.instance then return true end
+        Knox.viewpointLookAfter = false
+        return open(how, ...)   -- (failed: Viewpoint's own)
+    end
+    inv.close = function(...)
+        if KnoxScreen.instance then
+            KnoxScreen.instance:close()
+            return
+        end
+        return close(...)
+    end
+    -- (asked each frame while it is open: closed by Knox itself - Esc - Viewpoint lets go)
+    inv.up = function(...)
+        if Knox.forPlayer(0) then return KnoxScreen.instance ~= nil end
+        return up(...)
+    end
+    -- (Viewpoint letting go without closing: its view was switched off - Knox's screen stays)
+    inv.release = function(...)
+        if Knox.forPlayer(0) then return end
+        return release(...)
+    end
+    -- (right after open, for its loot key: Knox's screen goes to that container)
+    ViewpointLoot.select = function(player, container, ...)
+        local n = player and player:getPlayerNum() or 0
+        if not Knox.forPlayer(n) then return select(player, container, ...) end
+        return Knox.open(n, C.vpChosen(container) or ISInventoryPage.GetFloorContainer(n))
+    end
+    -- the sidebar's bag and heart: the game's own click, which Knox already answers, as
+    -- without Viewpoint (its screen's "character" and "health" tabs are not Knox's)
+    local loot = Viewpoint and Viewpoint.Loot
+    local ask = type(loot) == "table" and loot.openScreen or nil
+    if ask then
+        local ok = pcall(function()
+            loot.openScreen = function(tab)
+                if Knox.forPlayer(0) then return false end
+                return ask(tab)
+            end
+        end)
+        if not ok then table.insert(C.luaMissing, "Viewpoint.Loot.openScreen") end
+    end
+    return true
+end
+
 --- One line in console.txt when a game starts: what was found, what is off.
 function C.report()
     local v = C.viewpoint()
     if not v.present then return end
     local on = {}
-    for _, n in ipairs({"cursor", "look", "view", "rows", "menu", "panel", "topdown", "oldpoint"}) do
+    for _, n in ipairs({"cursor", "look", "view", "rows", "menu", "panel", "keys", "topdown", "oldpoint"}) do
         if v.has[n] then table.insert(on, n) end
     end
     local off = v.missing

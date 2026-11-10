@@ -191,7 +191,10 @@ local function stepModels()
 end
 
 local function onTick()
-    if not run then return end
+    if not run then
+        Events.OnTick.Remove(onTick)
+        return
+    end
     if run.phase == "items" then
         local last = math.min(#run.scripts, run.index + ITEMS_PER_TICK - 1)
         for i = run.index, last do readItem(run.scripts[i]) end
@@ -222,8 +225,9 @@ function M.run()
            models = {}, modelList = {}, nextModel = 1, pending = {}, modelsDone = 0, modelsFailed = 0}
     M.last = nil
     print("[Knox] MEASURE started: " .. #scripts .. " item scripts")
+    -- (on the event only while it runs: 2026-11-06)
+    Events.OnTick.Remove(onTick)
+    Events.OnTick.Add(onTick)
 end
-
-Events.OnTick.Add(onTick)
 
 return KnoxMeasure

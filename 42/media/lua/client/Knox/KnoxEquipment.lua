@@ -522,34 +522,24 @@ end
 -- are drawn after it as ever.
 local slotLists = {}
 
---- The fill of the slot's condition meter, nil for none. (Clothing or a weapon - asked
---- of the item once, not every frame.)
+--- How high the item's colour fills the slot, nil for the whole of it (condition_v3,
+--- the author, 2026-10-31). (What it is read from - asked of the item once, not every frame.)
 local function meterFrac(slot, item)
     if not item then return nil end
-    if slot.meterFor ~= item then
-        slot.meterFor = item
-        slot.meterKind = instanceof(item, "Clothing") or instanceof(item, "HandWeapon")
-    end
-    if not slot.meterKind or item:getConditionMax() <= 0 then return nil end
-    return item:getCondition() / math.max(1, item:getConditionMax())
+    return T.levelOf(slot, item)
 end
 
 --- The slot's own look: its cell, the item, its condition, the name, the layers.
 local function drawSlotBody(self, w, h, items, idx, item, alpha, cat, hl, over, dy, da, frac, leaving)
     T.rect(self, 0, 0, w, h, T.color.cell, T.slotAlpha())
-    if cat then T.rect(self, 0, 0, w, h, cat, alpha) end
+    if cat then T.tileFill(self, 0, 0, w, h, frac, cat, alpha) end
     if hl then self:drawRect(0, 0, w, h, 0.06, 1, 1, 1) end
 
     local fh = T.fontTileH
     if item then
         local areaH = h - fh
         local side = math.floor(math.min(w, areaH) * 0.8)
-        ISInventoryItem.renderItemIcon(self, item, math.floor((w - side) / 2), fh + math.floor((areaH - side) / 2) + dy,
-            alpha * da, side, side)
-        if frac then
-            local c = frac > 0.6 and T.color.good or (frac > 0.25 and T.color.warn or T.color.bad)
-            T.tileMeter(self, 0, 0, w, h, frac, c, alpha, 0)
-        end
+        T.itemIcon(self, item, math.floor((w - side) / 2), fh + math.floor((areaH - side) / 2) + dy, side, alpha * da)
     end
     if self.label then
         -- the name leaves room for the layer counter ("1/2") in the corner
@@ -609,7 +599,7 @@ function KnoxEquipSlot:render()
         end
         local layers = (#items > 1 and not leaving) and idx * 100 + #items or 0
         local flags = (leaving and 1 or 0) + (twoHandGhost and 2 or 0) + (windowOpen and 4 or 0)
-        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, frac or -1, layers, cat) then L = false end
+        if T.listDraw(self, L, item or false, w * 10000 + h, flags, dy, da, T.levelKey(item, h, frac), layers, cat) then L = false end
     end
     if L ~= false then
         drawSlotBody(self, w, h, items, idx, item, alpha, cat, over and not dragging and live, over, dy, da, frac, leaving)
@@ -640,6 +630,7 @@ function KnoxEquipSlot:render()
             edge = T.color.accent   -- a window about it is open (inspect, pouring)
         end
         if live then T.tileFrame(self, 0, 0, w, h, edge) else T.border(self, 0, 0, w, h, edge) end
+        if leaving then T.border(self, 1, 1, w - 2, h - 2, T.color.tileFrame, alpha) end   -- (the fill stops 2 px in)
         if L then T.listEnd(L) end
     end
     -- what the hinted move would take off: red frame
@@ -654,7 +645,13 @@ function KnoxEquipSlot:render()
         T.target(self, 0, 0, w, h)
     end
 
-    if over and live and not dragging then KnoxTooltip.want(item, self.panel.playerNum) end
+    if over and live and not dragging then
+        -- a gun in hand: what fits it lit up, its panel beside it (KnoxLoad, 2026-10-30)
+        -- - with the quick items' key held; then no tooltip of its own over the panel's cells
+        local panel = KnoxLoad and not twoHandGhost and instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"
+        KnoxTooltip.want(item, self.panel.playerNum, panel and KnoxLoad.tipQuiet(item, true))
+        if KnoxLoad and not twoHandGhost then KnoxLoad.slotHover(self, item, self:player(), self.panel.playerNum, "right") end
+    end
 end
 
 --- The item a click or drag on this slot works with: the layer shown (not one in a move).

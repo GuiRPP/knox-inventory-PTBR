@@ -54,7 +54,7 @@ local function sizes()
     Z.CELL, Z.IC, Z.AIC = px(26), px(22), px(17)
     Z.TX = Z.L + Z.CELL + px(10)
     Z.MINW, Z.MAXW, Z.MAXV, Z.STRIP = px(260), px(340), 8, px(14)
-    Z.KH, Z.HINT_GAP = px(20), px(16)
+    Z.KH, Z.HINT_GAP, Z.HINT_ROW = px(20), px(16), px(6)
     Z.GROW_H, Z.GROW_CELL = px(6), px(4)
     Z.IND, Z.CHEV = px(20), px(26)
     Z.AWAY, Z.SRC = px(48), px(18)        -- from the crosshair (as Viewpoint's); the square it unfolds from
@@ -74,6 +74,7 @@ local function strings()
     if STR then return STR end
     STR = {
         take = getText("IGUI_Knox_VPTake"), all = getText("IGUI_Knox_VPTakeAll"), open = getText("IGUI_Knox_VPOpen"),
+        place = getText("IGUI_Knox_VPPlace"),
         use = getText("IGUI_Knox_VPUse"), peek = getText("IGUI_Knox_VPPeek"), fold = getText("IGUI_Knox_VPFold"),
         unfold = getText("IGUI_Knox_VPUnfold"),
         searching = getText("IGUI_Knox_VPSearching"), unsearched = getText("IGUI_Knox_VPUnsearched"),
@@ -87,6 +88,12 @@ local function strings()
         lockedTail = " [" .. getText("EC_Locked") .. "]",
     }
     STR.lockedCaps = T.upper(STR.locked)
+    -- Viewpoint's use key (0.1.7-rc3): what it does, by the game's text key it gives - Knox's
+    -- own short words, the plate keeps its width (the author 2026-11-08, variant C)
+    local hands = getText("IGUI_Knox_VPUseHands")
+    STR.useOf = {ContextMenu_Eat = getText("IGUI_Knox_VPUseEat"), ContextMenu_Drink = getText("IGUI_Knox_VPUseDrink"),
+                 ContextMenu_Wear = getText("IGUI_Knox_VPUseWear"), ContextMenu_Apply_Bandage = getText("IGUI_Knox_VPUseBandage"),
+                 ContextMenu_Equip_Primary = hands, ContextMenu_Equip_Secondary = hands, ContextMenu_Equip_Two_Hands = hands}
     STR.other = getText("IGUI_Knox_MenuOther")
     STR.titles = {use = getText("IGUI_Knox_MenuUse"), act = getText("IGUI_Knox_MenuActions"),
                   move = getText("IGUI_Knox_MenuMove"), build = getText("IGUI_Knox_MenuBuild")}
@@ -109,12 +116,18 @@ local function kgText(w) return round2(w) .. " " .. strings().kg end
 
 -- The keys, as the player has bound them in Viewpoint's options (asked now and
 -- then: they may be changed with the game running)
-local KEYS = {take = "F", all = "R", open = "Tab"}
+local KEYS = {take = "F", all = "R", open = "Tab", place = "Z", use = "G"}
 local keysMs = -1e9
 local function keyName(id, fallback)
-    local k = Viewpoint and Viewpoint.Keys
+    local k = KnoxControls and KnoxControls.vpKeys and KnoxControls.vpKeys() or (Viewpoint and Viewpoint.Keys)
     if not k or not k.get or not k.display then return fallback end
-    local ok, s = pcall(function() return k.display(k.get(id)) end)
+    -- (the value first: a key Viewpoint could not give comes back as nothing at all, and
+    -- display() with no argument is an error of its own - players' reports, 2026-11-05)
+    local ok, s = pcall(function()
+        local v = k.get(id)
+        if v == nil or v == "" then return nil end
+        return k.display(v)
+    end)
     if not ok or type(s) ~= "string" or s == "" or s == "NONE" then return fallback end
     -- (the game's names are in capitals: "TAB" as "Tab", as the mockup has it)
     if #s > 1 and string.find(s, "^%u+$") then s = string.sub(s, 1, 1) .. string.lower(string.sub(s, 2)) end
@@ -126,6 +139,14 @@ local function keys(now)
     KEYS.take = keyName("keys.lootTake", "F")
     KEYS.all = keyName("keys.lootTakeAll", "R")
     KEYS.open = keyName("keys.lootWindow", "Tab")
+    -- (only a Viewpoint that has it, 0.1.7: asked of 0.1.6, its Java throws, and the game logs
+    -- that past any pcall - an error every second for the players, 2026-11-05)
+    if knoxVpPanelPlaceKey and knoxVpPanelPlaceKey() == true then
+        KEYS.place = keyName("keys.lootPlace", "Z")
+    end
+    if knoxVpPanelUseKey and knoxVpPanelUseKey() == true then
+        KEYS.use = keyName("keys.lootUse", "G")
+    end
 end
 
 local function ease(k)
@@ -171,6 +192,11 @@ end
 function LIVE.actionFirst(i)
     local act = vpAction(i)
     return act ~= nil and act.first == true
+end
+-- (what Viewpoint never chooses by itself - knocking a wall down: only with the wheel; 0.1.7)
+function LIVE.actionDeliberate(i)
+    local act = vpAction(i)
+    return act ~= nil and act.deliberate == true
 end
 -- (the sub menu it came from: Viewpoint leaves its name off the options of the one it
 -- names the panel by - a TV's "Disassemble" read as the TV's name alone, the author 2026-10-29)
@@ -249,8 +275,47 @@ function LIVE.actionItem(i)
     end
     return nil
 end
-function LIVE.actionProgress(i) return knoxVpPanelActionProgress(i) end
-function LIVE.run(i) return knoxVpPanelRun(i) end
+-- What the character is doing (a player's report, 2026-11-05): Viewpoint knows only the row
+-- run last and gives it the progress of whatever is first in the queue, so "Wash yourself",
+-- "Wash all clothing" one after the other showed the second while the first was being done.
+-- Each action queued is remembered with its row, and the row of the first one is lit.
+local runOf = {}
+local function queueNow()
+    local q = ISTimedActionQueue.getTimedActionQueue(getSpecificPlayer(0))
+    return q and q.queue or nil
+end
+function LIVE.actionProgress(i)
+    local q = queueNow()
+    local cur = q and q[1]
+    local label = cur and runOf[cur]
+    if not label then return knoxVpPanelActionProgress(i) end
+    if label ~= knoxVpPanelActionLabel(i) then return 0 end
+    local p = cur.action and cur.action:getJobDelta() or 0
+    return math.max(p, 0.001)   -- (just begun: its row is lit all the same)
+end
+-- (what the menu adds by "get up first" - all of a sink's washing - is one wait: what it runs is
+-- queued when the wait ends, and takes the wait's row)
+local function markQueued(label)
+    for _, a in ipairs(queueNow() or {}) do
+        if not runOf[a] then
+            runOf[a] = label
+            local after = a.onCompleteFunc
+            if type(after) == "function" then
+                a.onCompleteFunc = function(...)
+                    after(...)
+                    markQueued(label)
+                end
+            end
+        end
+    end
+end
+function LIVE.run(i)
+    local label = knoxVpPanelActionLabel(i)
+    local q = queueNow()
+    if not q or #q == 0 then runOf = {} end
+    knoxVpPanelRun(i)
+    markQueued(label)
+end
 function LIVE.wheel() return knoxVpPanelWheel() end
 function LIVE.pressed() return knoxVpPanelPressed() end
 function LIVE.held() return knoxVpPanelHeld() end
@@ -333,6 +398,21 @@ function LIVE.grab(player, items)
     end
 end
 
+--- Viewpoint's place key (0.1.7): set the thing chosen down where it is aimed.
+function LIVE.placeKey() return knoxVpPanelPlaceKey ~= nil and knoxVpPanelPlaceKey() == true end
+function LIVE.placeable(it) return knoxVpPanelPlaceable ~= nil and knoxVpPanelPlaceable(it) == true end
+function LIVE.place(player, it)
+    if ViewpointLoot and ViewpointLoot.place then ViewpointLoot.place(player, it) end
+end
+
+--- Viewpoint's use key (0.1.7-rc3): eat, drink, wear, bandage or take in hand the thing
+--- chosen - what it would do is the game's text key (nil: nothing).
+function LIVE.useKey() return knoxVpPanelUseKey ~= nil and knoxVpPanelUseKey() == true end
+function LIVE.useWords(it) return knoxVpPanelUseWords ~= nil and knoxVpPanelUseWords(getSpecificPlayer(0), it) or nil end
+function LIVE.use(player, it, words)
+    if ViewpointLoot and ViewpointLoot.use then ViewpointLoot.use(player, it, words) end
+end
+
 --- Stop a held take let go early: its transfer comes off the queue.
 function LIVE.cancel(player, item)
     local rec = KnoxGrid.pending[item]
@@ -362,7 +442,10 @@ P.L = {}         -- the layout of this frame (heights, the list's window, the pl
 
 local function selectable(r)
     if r.kind == "item" then return not r.leave and not r.closing end
-    return r.kind == "act" and (r.on or r.locked) and not r.closing
+    -- (a group opens whatever is in it, and the wheel goes along its rows, the grey ones too:
+    -- it skipped them, out of a sink's list into the rows below, and what lay under the
+    -- strips could not be reached - the author, 2026-11-05)
+    return r.kind == "act" and (r.on or r.locked or r.grp ~= nil or r.gj ~= nil) and not r.closing
 end
 
 local function catColor(item) return T.category[P.src.category(item)] or T.category.misc end
@@ -564,7 +647,8 @@ local function actionRows(rows, na, titled)
         if locked then label = string.sub(label, 1, #label - #s.lockedTail) end
         local look = lookOf(label, i)
         local r = {kind = "act", name = label, label = label, index = i, on = P.src.actionOn(i), icon = look.icon or nil,
-                   danger = look.danger, g = look.g, locked = locked, key = "act|" .. i .. "|" .. label, region = "acts"}
+                   danger = look.danger, g = look.g, locked = locked, key = "act|" .. i .. "|" .. label, region = "acts",
+                   deliberate = P.src.actionDeliberate and P.src.actionDeliberate(i) or nil}
         local fn = P.src.actionFn and P.src.actionFn(i)
         -- (a car's doors opened or closed: under "Other" - first it is got into, the author 2026-10-29)
         if fn and ISVehicleMenu and (fn == ISVehicleMenu.onOpenDoor or fn == ISVehicleMenu.onCloseDoor) then r.g = "other" end
@@ -739,6 +823,7 @@ function P.build(player)
     P.rows = rows
     -- the rows the wheel stops on; the choice stays on its row, or where it was
     local key = P.pick[P.sel] and P.pick[P.sel].key
+    local was = P.pick[P.sel] and P.pick[P.sel].label
     P.pick = {}
     local at = 0
     for _, r in ipairs(rows) do
@@ -747,7 +832,30 @@ function P.build(player)
             if r.key == key then at = #P.pick end
         end
     end
-    if at == 0 then at = math.min(math.max(P.sel, 1), #P.pick) end
+    -- (a row gone from above - "Yourself" once clean: the rest are numbered anew, the choice
+    -- stays on its own by the name; the author, 2026-11-05)
+    if at == 0 and was then
+        for i, r in ipairs(P.pick) do
+            if r.label == was then at = i break end
+        end
+    end
+    if at == 0 then
+        at = math.min(math.max(P.sel, 1), #P.pick)
+        -- (not on what is done only on purpose, as Viewpoint: the nearest other row, or none
+        -- chosen till the wheel turns - the take key on a wall knocks nothing down; 2026-11-04)
+        local r = P.pick[at]
+        if r and r.deliberate then
+            local near = 0
+            for i = at + 1, #P.pick do
+                if not P.pick[i].deliberate then near = i break end
+            end
+            for i = at - 1, 1, -1 do
+                if near ~= 0 then break end
+                if not P.pick[i].deliberate then near = i end
+            end
+            at = near
+        end
+    end
     P.sel = at
 end
 
@@ -868,7 +976,28 @@ function P.measureNeed()
     if P.sub then need = math.max(need, Z.GAP * 2 + Z.M * 2 + Z.P10 + cell + T.measure(T.fontTile, P.sub)) end
     -- (as wide as the widest hints it can show: the chosen row changes them)
     local win = P.canOpen() and (Z.HINT_GAP + P.hintW(KEYS.open, s.open)) or 0
-    if hasItem then
+    -- (a container with things, and Viewpoint's place key: four keys, in two lines and two
+    -- columns - they did not fit one line within the plate's width. Always two lines there,
+    -- each key in its place: the plate keeps its height as the choice moves; the author's
+    -- pick, 2026-11-04, the mockup .claude/mockups/vp_panel_g_variants.png, B)
+    -- (and its use key, 0.1.7-rc3: three lines, the thing's keys on the left - take, use,
+    -- place - the container's on the right; the author's pick 2026-11-08, the mockup
+    -- .claude/mockups/vp_panel_use_variants.png, C)
+    local useKey = P.src.useKey ~= nil and P.src.useKey()
+    P.footTwo = (hasItem and P.canOpen() and ((P.src.placeKey ~= nil and P.src.placeKey()) or useKey)) and true or false
+    P.footRows = P.footTwo and (useKey and 3 or 2) or 1
+    if P.footTwo then
+        local col1 = math.max(P.hintW(KEYS.take, s.take), P.hintW(KEYS.place, s.place))
+        if useKey then
+            -- (as wide as its longest word: the plate doesn't widen as the choice moves)
+            for _, w in pairs(s.useOf) do col1 = math.max(col1, P.hintW(KEYS.use, w)) end
+        end
+        if hasBag then col1 = math.max(col1, P.hintW(KEYS.take, s.peek), P.hintW(KEYS.take, s.fold)) end
+        if hasAct then col1 = math.max(col1, P.hintW(KEYS.take, s.use)) end
+        if hasGrp then col1 = math.max(col1, P.hintW(KEYS.take, s.unfold), P.hintW(KEYS.take, s.fold)) end
+        P.col2 = math.ceil(col1) + Z.HINT_GAP
+        need = math.max(need, Z.L + P.col2 + math.max(P.hintW(KEYS.all, s.all), P.hintW(KEYS.open, s.open)) + Z.L)
+    elseif hasItem then
         need = math.max(need, Z.L + P.hintW(KEYS.take, s.take) + Z.HINT_GAP + P.hintW(KEYS.all, s.all) + win + Z.L)
         if hasBag then
             for _, l in ipairs({s.peek, s.fold}) do
@@ -876,8 +1005,8 @@ function P.measureNeed()
             end
         end
     end
-    if hasAct then need = math.max(need, Z.L + P.hintW(KEYS.take, s.use) + win + Z.L) end
-    if hasGrp then
+    if hasAct and not P.footTwo then need = math.max(need, Z.L + P.hintW(KEYS.take, s.use) + win + Z.L) end
+    if hasGrp and not P.footTwo then
         need = math.max(need, Z.L + P.hintW(KEYS.take, s.unfold) + win + Z.L, Z.L + P.hintW(KEYS.take, s.fold) + win + Z.L)
     end
     P.needW = math.min(Z.MAXW, math.max(Z.MINW, math.ceil(need)))
@@ -889,7 +1018,7 @@ function P.measureNeed()
 end
 
 function P.hintW(key, label)
-    return T.measure(T.fontTile, key) + 10 + 6 + math.ceil(T.measure(T.fontText, label))
+    return T.keyW(key) + 6 + math.ceil(T.measure(T.fontText, label))
 end
 
 function P.hasSub()
@@ -992,6 +1121,20 @@ end
 
 local function cancel(player, item) P.src.cancel(player, item) end
 
+--- A window's "Climb through" among the actions, when the chosen row opens or closes that
+--- window: the take key held on it climbs, as the game's own key held at a window does - the
+--- key is the panel's while it has a row chosen, so the game never sees it held (the author
+--- 2026-11-08). The action's index, else nil.
+local function climbFor(r)
+    local W = ISWorldObjectContextMenu
+    if not (W and W.onClimbThroughWindow and P.src.actionFn and r.index) then return nil end
+    if P.src.actionFn(r.index) ~= W.onOpenCloseWindow then return nil end
+    for i = 0, P.src.actions() - 1 do
+        if P.src.actionFn(i) == W.onClimbThroughWindow and P.src.actionOn(i) then return i end
+    end
+    return nil
+end
+
 local function input(player, now)
     local wheel = P.src.wheel()
     local pressed = P.src.pressed()
@@ -1001,7 +1144,16 @@ local function input(player, now)
     -- the take key held on a bag: past HOLD_MS the bag is taken; let go sooner,
     -- the bag opens (or folds)
     local h = P.hold
-    if h then
+    if h and h.act then
+        -- (a window's row: let go soon - the row's own action; held - climbed through)
+        if not P.src.held() then
+            P.hold = nil
+            P.src.run(h.act)
+        elseif now - h.ms >= HOLD_MS then
+            P.hold = nil
+            P.src.run(h.climb)
+        end
+    elseif h then
         if not P.src.held() then
             P.hold = nil
             if not h.started then
@@ -1023,9 +1175,36 @@ local function input(player, now)
         return
     end
     if not r then return end
+    -- (Viewpoint's use key: the same, with what it said it would do - P.useKey)
+    if pressed == 4 then
+        if r.kind == "item" and P.src.use and P.useWord and r == P.useRow then
+            for _, it in ipairs(r.items) do
+                if not pendingP(it) then
+                    P.src.use(player, it, P.useWord)
+                    break
+                end
+            end
+        end
+        return
+    end
+    -- (Viewpoint's place key: the thing chosen, what the Java part asked Lua about - P.frame)
+    if pressed == 3 then
+        if r.kind == "item" and P.src.place then
+            for _, it in ipairs(r.items) do
+                if not pendingP(it) then
+                    P.src.place(player, it)
+                    break
+                end
+            end
+        end
+        return
+    end
     if r.kind == "act" then
         if r.grp then toggleGroup(r)
-        elseif r.on then P.src.run(r.index)
+        elseif r.on then
+            local climb = not P.hold and climbFor(r)
+            if climb then P.hold = {ms = now, act = r.index, climb = climb}
+            else P.src.run(r.index) end
         elseif r.locked and P.src.rattle then P.src.rattle(r.index) end
     elseif r.kind == "item" then
         if r.bag and r.depth == 0 then
@@ -1165,7 +1344,9 @@ local function layout(now, dt)
     y = math.floor(acc + 0.5)
     L.hasFoot = P.hintCount > 0
     L.footY = L.hasFoot and (y + Z.GAP) or nil
-    if L.hasFoot then L.H = L.footY + 1 + Z.GAP + Z.KH + Z.GAP
+    -- (+1: the plate's frame takes a pixel of the gap under the keys - 8 over them, 8 under;
+    -- the critic's measure, the author's yes 2026-11-08)
+    if L.hasFoot then L.H = L.footY + 1 + Z.GAP + Z.KH + Z.GAP + 1 + ((P.footRows or 1) - 1) * (Z.KH + Z.HINT_ROW)
     elseif #rows > 0 then L.H = y + Z.GAP
     else L.H = Z.GAP + ph + Z.GAP end
 end
@@ -1459,6 +1640,7 @@ end
 
 -- the hints at the foot: {key, label} pairs of this frame (filled in, not made anew)
 local hintKeys, hintLabels = {}, {}
+local hintSlots = {}
 P.hintCount, P.prevCount = 0, 0
 
 local function addHint(n, k, l)
@@ -1478,34 +1660,63 @@ local function hints()
             n = addHint(n, KEYS.take, s.take)
         end
         n = addHint(n, KEYS.all, s.all)
-    elseif r and r.kind == "act" then
+    elseif r and r.kind == "act" and (r.grp or r.on or r.locked) then
         local st = r.grp and P.groups[r.grp]
         n = addHint(n, KEYS.take, (not r.grp and s.use) or (st and st.to and s.fold) or s.unfold)
     end
+    -- (the place key's: known here, or the hint would come a frame late and fade in twice)
+    P.placeKey(r)
+    if P.footTwo and P.places then n = addHint(n, KEYS.place, s.place) end
+    P.useKey(r)
+    local useAt = 0
+    if P.footRows == 3 and P.useWord then
+        n = addHint(n, KEYS.use, s.useOf[P.useWord] or s.useOf.ContextMenu_Equip_Primary)
+        useAt = n
+    end
     if P.canOpen() then n = addHint(n, KEYS.open, s.open) end
+    -- (where each stands: 1 2 on the upper line, 3 4 on the next, 5 under 3 - odd on the left,
+    -- even on the right; 0: one after another. Two lines: take all / place open; three: take
+    -- all / use open / place)
+    local placeSlot = P.footRows == 3 and 5 or 3
+    for i = 1, n do
+        local slot = 0
+        if P.footTwo then
+            local k = hintLabels[i]
+            slot = (i == useAt and 3) or (k == s.all and 2) or (k == s.place and placeSlot) or (k == s.open and 4) or 1
+        end
+        hintSlots[i] = slot
+    end
     -- (changed: the old ones fade out, the new come up into place)
     local same = n == P.hintCount
     for i = 1, n do
-        if hintKeys[i] ~= P.shownKeys[i] or hintLabels[i] ~= P.shownLabels[i] then same = false end
+        if hintKeys[i] ~= P.shownKeys[i] or hintLabels[i] ~= P.shownLabels[i] or hintSlots[i] ~= P.shownSlots[i] then same = false end
     end
     if not same then
         if P.hintCount > 0 or P.hintsMs then
-            for i = 1, P.hintCount do P.prevKeys[i], P.prevLabels[i] = P.shownKeys[i], P.shownLabels[i] end
+            for i = 1, P.hintCount do P.prevKeys[i], P.prevLabels[i], P.prevSlots[i] = P.shownKeys[i], P.shownLabels[i], P.shownSlots[i] end
             P.prevCount = P.hintCount
             P.hintsMs = getTimestampMs()
         end
-        for i = 1, n do P.shownKeys[i], P.shownLabels[i] = hintKeys[i], hintLabels[i] end
+        for i = 1, n do P.shownKeys[i], P.shownLabels[i], P.shownSlots[i] = hintKeys[i], hintLabels[i], hintSlots[i] end
         for i = n + 1, #P.shownKeys do P.shownKeys[i], P.shownLabels[i] = nil, nil end
         P.hintCount = n
     end
 end
 P.shownKeys, P.shownLabels, P.prevKeys, P.prevLabels = {}, {}, {}, {}
+P.shownSlots, P.prevSlots = {}, {}
 P.hintAt = {}   -- where each shown key's plate and label are: x, x2 a pair (a news demo's clicks)
 
 local function drawHints(ui, x, y, ks, ls, n, a)
     local at = ks == P.shownKeys and P.hintAt or nil
+    local slots = ks == P.shownKeys and P.shownSlots or P.prevSlots
+    local x0 = x
     for i = 1, n do
-        local x2 = T.keyHint(ui, x, y, ks[i], ls[i], Z.KH, a)
+        local slot, hy = slots[i] or 0, y
+        if slot > 0 then
+            x = (slot % 2 == 0) and (x0 + P.col2) or x0
+            hy = y + math.floor((slot - 1) / 2) * (Z.KH + Z.HINT_ROW)
+        end
+        local x2 = T.keyHint(ui, x, hy, ks[i], ls[i], Z.KH, a)
         if at then at[i * 2 - 1], at[i * 2] = x, x2 end
         x = x2 + Z.HINT_GAP
     end
@@ -1744,7 +1955,7 @@ local function draw(ui, ox, oy, now)
         local hk = P.hintsMs and math.min(1, (now - P.hintsMs) / HINT_MS) or 1
         if not T.animOn() then hk = 1 end
         if hk < 1 then
-            pushClip(ui, ox, ky - 2, W, Z.KH + 4)
+            pushClip(ui, ox, ky - 2, W, Z.KH + 4 + ((P.footRows or 1) - 1) * (Z.KH + Z.HINT_ROW))
             if hk < 0.5 then
                 local e = ease(hk * 2)
                 drawHints(ui, ox + Z.L, ky - math.floor(e * 3 + 0.5), P.prevKeys, P.prevLabels, P.prevCount, (1 - e) * a)
@@ -1793,7 +2004,7 @@ P.box = nil
 
 -- (all a plate's own state: a news demo's plate swaps its own in for its frame - P.swap)
 P.STATE = {"rows", "pick", "sel", "grow", "bags", "groups", "seen", "L", "w", "shownW", "hold", "retract", "hintsMs",
-    "hintCount", "prevCount", "shownKeys", "shownLabels", "prevKeys", "prevLabels", "hintAt", "roll", "marquee",
+    "hintCount", "prevCount", "shownKeys", "shownLabels", "prevKeys", "prevLabels", "shownSlots", "prevSlots", "footTwo", "footRows", "useWord", "useRow", "useMs", "uses", "col2", "hintAt", "roll", "marquee",
     "scroll", "hiY", "hiH", "hiA", "openMs", "sigMs", "dirty", "visible", "ghost", "box", "tobj", "tsq", "tkind",
     "target", "builtFor", "locked", "loot", "titleIsGroup", "containers", "tex", "icon", "title", "sub", "count", "sumW",
     "countText", "needW", "alpha", "sig", "ms", "subN", "hints", "src"}
@@ -1811,6 +2022,8 @@ local function reset(now)
     P.w, P.shownW, P.hold, P.retract, P.hintsMs = nil, nil, nil, nil, nil
     P.hintCount, P.prevCount = 0, 0
     P.shownKeys, P.shownLabels, P.prevKeys, P.prevLabels, P.hintAt = {}, {}, {}, {}, {}
+    P.shownSlots, P.prevSlots, P.footTwo, P.col2 = {}, {}, nil, nil
+    P.footRows, P.useWord, P.useRow, P.useMs = 1, nil, nil, 0
     P.roll, P.marquee = {}, {}
     P.scroll, P.hiY, P.hiH, P.hiA = 0, 0, 0, 0
     P.openMs = now
@@ -1830,6 +2043,9 @@ local function signature()
         local items = cs:get(i):getItems()
         local n = items:size()
         sig = sig * 31 + n
+        -- (an empty container is marked searched with nothing found: "Not searched yet" stood until
+        -- the eyes moved away - a player's report, 2026-11-05)
+        if src.needs(cs:get(i)) then sig = sig * 31 + 1 end
         if n > 0 then sig = sig * 31 + items:get(0):getID() + items:get(n - 1):getID() * 3 end
         sig = sig % 1000000007
     end
@@ -1877,6 +2093,42 @@ function P.wantKey(on)
     if knoxVpPanelWants then knoxVpPanelWants(on) end
 end
 
+--- The same for the place key: a thing chosen that Viewpoint can set down - in a bag
+--- unfolded in the container too: the game takes it out of the bag (the author 2026-11-08,
+--- "why no use and place for things in a bag's list"). Asked once per row chosen.
+P.places, P.placeRow = nil, nil
+function P.placeKey(r)
+    if r ~= P.placeRow or r == nil then
+        P.placeRow = r
+        local on = r ~= nil and r.kind == "item" and not P.locked and P.src.placeable ~= nil
+            and r.items[1] ~= nil and P.src.placeable(r.items[1])
+        if on ~= P.places then
+            P.places = on
+            if knoxVpPanelPlaces then knoxVpPanelPlaces(on) end
+        end
+    end
+end
+
+--- The same for the use key: what it does with the thing chosen (the game's text key, nil:
+--- nothing). Asked as the row changes and again twice a second: eating hangs on hunger,
+--- a bandage on a wound.
+P.useWord, P.useRow, P.useMs, P.uses = nil, nil, 0, nil
+function P.useKey(r)
+    local now = P.ms or 0   -- (this frame's, P.frame)
+    if r == P.useRow and r ~= nil and now - P.useMs < 500 then return end
+    P.useRow, P.useMs = r, now
+    local w = nil
+    if r ~= nil and r.kind == "item" and not P.locked and P.src.useWords ~= nil and r.items[1] ~= nil then
+        w = P.src.useWords(r.items[1])
+    end
+    P.useWord = w
+    local on = w ~= nil
+    if on ~= P.uses then
+        P.uses = on
+        if knoxVpPanelUses then knoxVpPanelUses(on) end
+    end
+end
+
 function P.frame(ui)
     local now = getTimestampMs()
     local dt = math.min(100, now - (P.ms or now))
@@ -1913,6 +2165,7 @@ function P.frame(ui)
             P.src.pressed()
         end
         P.wantKey(false)
+        P.placeKey(nil)
         return
     end
     P.step(player, now, dt)
@@ -1954,7 +2207,8 @@ function P.step(player, now, dt)
         end
     end
     if P.sel > #P.pick then P.sel = #P.pick end
-    if P.sel < 1 and #P.pick > 0 then P.sel = 1 end
+    -- (none chosen where all there is is done only on purpose: P.build)
+    if P.sel < 1 and #P.pick > 0 and not P.pick[1].deliberate then P.sel = 1 end
     animate(now, dt)
     hints()
     layout(now, dt)

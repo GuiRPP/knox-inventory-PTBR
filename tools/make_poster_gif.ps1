@@ -10,15 +10,32 @@
 # Usage: powershell -ExecutionPolicy Bypass -File tools\make_poster_gif.ps1 -Video <mp4>
 #        [-Start 17] [-Length 3.5] [-Size 512] [-Fps 8] [-Colors 112]   (961 081 bytes on 2026-10-14, with the grid filling up)
 # The crop (x y w h in the video) is for the 2560x1070 recording of 2026-10-14.
+# The winter preview (the author, 2026-11-04: the new menu's bar, 0:08-0:13 of menu.mp4 1920x1080,
+# the camera still there; the ice skin, a "Winter is coming" plate - make_poster2.ps1 -Winter):
+#   -Video menu.mp4 -Winter -Start 8 -Length 3.5 -Crop 1550:1060:300:0 -Fps 9 -Colors 96   (985 KB; the snow is costly: 10 fps was 1 029 KB, over Steam's limit)
+#   -> tools\art\preview_workshop_winter.gif (upload_page.ps1 -Preview <it>)
 
 param([Parameter(Mandatory = $true)][string]$Video, [double]$Start = 17, [double]$Length = 3.5,
-      [int]$Size = 512, [int]$Fps = 8, [string]$Crop = "1110:759:1020:250", [int]$Colors = 112, [string]$Dither = "none")
+      [int]$Size = 512, [int]$Fps = 8, [string]$Crop = "1110:759:1020:250", [int]$Colors = 112, [string]$Dither = "none",
+      [switch]$Winter, [int]$SceneY = 0,
+      [string]$SandFrames = "", [int]$SkinFade = 5, [string]$OutName = "")   # SceneY: the camp's picture that many px lower (of 1024), dark above it
 
 $ErrorActionPreference = "Stop"
 $art = Join-Path $PSScriptRoot "art"
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "make_poster2.ps1") -Overlay -Fps $Fps -Length $Length | Out-Null
+$args2 = @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "make_poster2.ps1"), "-Overlay", "-Fps", $Fps, "-Length", $Length)
+if ($Winter) { $args2 += "-Winter" }
+& powershell @args2 | Out-Null
+# -SandFrames "5-21" (with -Winter; the author, 2026-11-05: the sand skin while the string of
+# lights burns, the ice skin while it is off): the frames between go sand, softly over -SkinFade
+if ($SandFrames) {
+    & powershell @($args2 + "-SandSkin") | Out-Null
+    $from, $to = $SandFrames -split "-"
+    & python (Join-Path $PSScriptRoot "mix_skin_frames.py") $art $from $to $SkinFade
+    if ($LASTEXITCODE -ne 0) { throw "mix_skin_frames.py failed" }
+}
 $overlay = Join-Path $art "gif_frames\ov_%03d.png"   # (one a frame: the grid filling up)
-$out = Join-Path $art "preview_workshop.gif"
+$out = Join-Path $art $(if ($OutName) { $OutName } elseif ($Winter) { "preview_workshop_winter.gif" } else { "preview_workshop.gif" })
+$dark = $(if ($Winter) { "0x090c0f" } else { "0x0c0e0e" })   # the skin's screen
 
 # the camp 1024 x 700 at the top of a 1024 square, the poster over it, then the
 # whole scaled down; a palette made from the frames themselves, dithered lightly
@@ -29,11 +46,11 @@ $read = $Length + $x
 $cut = "[0:v]crop=$Crop,scale=1024:700:flags=lanczos,fps=$Fps,split[s1][s2]"
 $loop = "[s1]trim=start=${x}:end=${read},setpts=PTS-STARTPTS[a0];[s2]trim=start=0:end=${x},setpts=PTS-STARTPTS[b0];" +
         "[a0][b0]xfade=transition=fade:duration=${x}:offset=$($Length - $x)[lp]"
-$scene = "[lp]pad=1024:1024:0:0:color=0x0c0e0e[sc]"
+$scene = "[lp]pad=1024:1024:0:${SceneY}:color=$dark[sc]"
 $comp = "[sc][1:v]overlay=0:0:shortest=1,scale=${Size}:${Size}:flags=lanczos,split[a][b]"
 $pal = "[a]palettegen=max_colors=${Colors}:stats_mode=full[p];[b][p]paletteuse=dither=${Dither}:diff_mode=rectangle"
 $culture = [Globalization.CultureInfo]::InvariantCulture
 ffmpeg -v error -y -ss $Start.ToString($culture) -t $read.ToString($culture) -i $Video -framerate $Fps -i $overlay `
     -filter_complex "$cut;$loop;$scene;$comp;$pal" -loop 0 $out
 $bytes = (Get-Item $out).Length; $kb = [math]::Round($bytes / 1024)
-Write-Host "preview_workshop.gif: $Size px, $Fps fps, $Length s, $kb KB$(if ($bytes -ge 1000000) { '  - OVER Steam''s limit (1 000 000 bytes)' })"
+Write-Host "$(Split-Path $out -Leaf): $Size px, $Fps fps, $Length s, $kb KB$(if ($bytes -ge 1000000) { '  - OVER Steam''s limit (1 000 000 bytes)' })"

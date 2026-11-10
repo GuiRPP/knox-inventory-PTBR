@@ -602,6 +602,87 @@ do
     ISTimedActionQueue = nil
 end
 
+-- rounds into a magazine (the author, 2026-10-30: its bar stood still): the whole
+-- load - of the rounds that will go in - a round at a time and smooth between them,
+-- on the magazine only; unloading, down (2026-10-31). A magazine in (one
+-- animation): by the time, never standing still.
+do
+    local near = function(a, b) return a ~= nil and b ~= nil and math.abs(a - b) < 1e-6 end
+    local mag = item("Base.9mmClip", {ammo = 2, maxAmmo = 15})
+    function mag:getAmmoType() return {getItemKey = function() return "Base.Bullets9mm" end} end
+    local inv = container("main", 20)
+    local r1 = inv:add(item("Base.Bullets9mm"))
+    local carried = 4
+    function inv:getItemCountRecurse() return carried end
+    local who = {getInventory = function() return inv end}
+    -- (the game's R-reload asks for more than goes in: 2 in it + 4 carried)
+    local load = {action = {}, maxTime = -1, Type = "ISLoadBulletsInMagazine", magazine = mag, ammoCount = 6, character = who}
+    local q = {load}
+    ISTimedActionQueue = {queues = {[who] = {queue = q}}}
+    local function at(ms)
+        clock = clock + ms
+        G.updateUse(who)
+        -- (a magazine in maps no table-made item here - no userdata: its progress itself)
+        return G.useNow[mag] or (q[1] and G.useDelta(q[1]))
+    end
+    check("load: not started - empty", near(at(0), 0), at(0))
+    load.ammoCountStart = 2
+    check("load: started - empty", near(at(0), 0), at(0))
+    check("load: on the magazine only, not its rounds", G.useNow[r1] == nil)
+    do
+        local same = G.useNow
+        G.updateUse(who)
+        check("load: no new table every frame", G.useNow == same)
+        q[1] = nil
+        G.updateUse(who)
+        same = G.useNow
+        G.updateUse(who)
+        local left = 0
+        for _ in pairs(same) do left = left + 1 end
+        check("nothing under way: no new table every frame, empty", G.useNow == same and left == 0, left)
+        q[1] = load
+        G.updateUse(who)
+        q[1] = {action = {}, maxTime = -1, Type = "ISLoadBulletsInMagazine", ammoCount = 6, character = who}
+        G.updateUse(who)
+        check("load: the last one's magazine gone from it", G.useNow[mag] == nil)
+        q[1] = load
+    end
+    check("load: on its way to the first round of the 4 carried", near(at(350), 0.95 / 4 * 0.5), at(0))
+    check("load: never past the first round before it is in", near(at(5000), 0.95 / 4), at(0))
+    mag.o.ammo = 3
+    check("load: a round in - a quarter", near(at(0), 0.25), at(0))
+    check("load: between rounds by the time", near(at(600), 0.25 + 0.95 / 4 * 0.2), at(0))
+    mag.o.ammo = 4
+    check("load: then by the time a round took", near(at(0), 0.5) and near(at(300), 0.5 + 0.95 / 4 * 0.5), at(0))
+    mag.o.ammo = 6
+    check("load: the 4 carried in - full", near(at(16), 1), at(0))
+    -- unloading: down from full
+    mag.o.ammo = 4
+    q[1] = {action = {}, maxTime = -1, Type = "ISUnloadBulletsFromMagazine", magazine = mag, character = who}
+    check("unload: not started - full", near(at(0), 1), at(0))
+    q[1].ammoCountStart = 4
+    check("unload: started - full", near(at(0), 1), at(0))
+    mag.o.ammo = 2
+    check("unload: half out - half", near(at(0), 0.5), at(0))
+    check("unload: going down between rounds", at(100) < 0.5, at(0))
+    mag.o.ammo = 0
+    check("unload: out - empty", near(at(16), 0), at(0))
+    -- a magazine in: by the time, slowing past 80%, never standing at the end
+    local ins = {action = {}, maxTime = -1, Type = "ISInsertMagazine", magazine = mag}
+    q[1] = ins
+    check("insert: starts empty", near(at(0), 0), at(0))
+    local a1 = at(400)
+    check("insert: by the time", near(a1, 0.8), a1)
+    local a2 = at(100)
+    check("insert: past 80% it slows down, still going", a2 > a1 and a2 < 0.97 and at(100) > a2, a2)
+    q[1] = nil
+    at(16)
+    q[1] = {action = {}, maxTime = -1, Type = "ISInsertMagazine", magazine = mag}
+    check("insert: the next time by how long it took", near(at(0), 0) and near(at(308), 0.5), at(0))
+    q[1] = nil
+    ISTimedActionQueue = nil
+end
+
 -- what stacks: a type's kind looked at once (its class and tags), the rest each time -
 -- (ten looks at Java a thing: 500 bullets, a build up to 9 ms - the author's bench 2026-10-28)
 do
@@ -647,6 +728,21 @@ do
         item("Mod.KnoxMag", {maxAmmo = 15, ammo = 3})
     check("stacks: magazines apart by their rounds, the type known", K(m1) ~= K(m2) and K(m1) == K(m3), K(m1) .. " / " .. K(m2))
     check("stacks: no rounds in the key of a type that holds none", not string.find(K(item("Base.Bullets9mm")), "|r", 1, true))
+    -- the hidden rounds (the author, 2026-10-31): a magazine not known keeps to itself
+    local wasK = KnoxMagKnown
+    KnoxMagKnown = {hide = true, is = function(m) return m.md.knoxMag == true end}
+    check("hidden: two not known with as many rounds apart", K(m1) ~= K(m3))
+    check("hidden: the key tells nothing of the rounds", not string.find(K(m1), "|r", 1, true))
+    m1.md.knoxMag, m3.md.knoxMag = true, true
+    check("hidden: known ones with as many together", K(m1) == K(m3) and K(m1) ~= K(m2))
+    -- (a gun is known: as many rounds, together - the player's "stack N" kept; QA 2026-10-31)
+    local g1, g2 = item("Mod.KnoxGun3", {class = "HandWeapon", ranged = true, maxAmmo = 15, ammo = 0}),
+        item("Mod.KnoxGun3", {class = "HandWeapon", ranged = true, maxAmmo = 15, ammo = 0})
+    check("hidden: guns known, as empty together", K(g1) == K(g2), K(g1) .. " / " .. K(g2))
+    KnoxMagKnown.hide = false
+    m1.md.knoxMag, m3.md.knoxMag = nil, nil
+    check("not hidden: as before", K(m1) == K(m3))
+    KnoxMagKnown = wasK
     F.overrides["Mod.KnoxCan"] = {stack = 1}
     check("stacks: the player's \"stack 1\" after it was known", not S(item("Mod.KnoxCan")))
     F.overrides["Mod.KnoxCan"] = nil

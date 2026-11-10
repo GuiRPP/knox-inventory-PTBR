@@ -89,17 +89,19 @@ function B.capture(player)
             if not e.ghost and not e.reserved and e.item then
                 local it = e.item
                 local cond, meter, kind = -1, -1, ""
-                if instanceof(it, "HandWeapon") or (instanceof(it, "Clothing") and it:getConditionMax() > 0) then
-                    cond = it:getCondition() / math.max(1, it:getConditionMax())
-                end
+                -- (read as the grid reads it: T.levelKind)
+                local from = T.levelKind(it)
                 local broken = it:isBroken()
-                if it:IsDrainable() and not broken then
+                if from == "c" then
+                    cond = it:getCondition() / math.max(1, it:getConditionMax())
+                elseif from == "u" and not broken then
                     local sum = 0
                     for _, x in ipairs(e.items) do sum = sum + x:getCurrentUsesFloat() end
                     meter, kind = sum / math.max(1, #e.items), "u"
-                else
-                    local fluid = it:getFluidContainer()
-                    if fluid and fluid:getCapacity() > 0 then meter, kind = fluid:getAmount() / fluid:getCapacity(), "f" end
+                elseif from == "f" then
+                    meter, kind = T.itemLevel(it, "f"), "f"
+                elseif from == "m" then
+                    meter, kind = T.itemLevel(it, "m"), "m"
                 end
                 local kg = 0
                 for _, x in ipairs(e.items) do kg = kg + KnoxGrid.weightOf(x) end
@@ -183,12 +185,6 @@ local function iconOf(name)
     return texCache[name] or nil
 end
 
-local function condColor(f)
-    if f > 0.6 then return T.color.good end
-    if f > 0.25 then return T.color.warn end
-    return T.color.bad
-end
-
 -- The bag's sound, by what it is made of (the author, 2026-10-16: one zip
 -- didn't suit a bag made of a sheet). What it is made of is read from the
 -- sound the game gives that bag (the item's OpenSound: OpenBag, OpenSheetSlingBag,
@@ -211,8 +207,11 @@ local function bagSound(bag, open)
     local script = back and getScriptManager():getItem(back.type)
     local name = script and script:getOpenSound() or ""
     if name ~= "" and isCloth(name) and knoxCampSoundCut then
-        -- open: the first rustle, cut short; close: the whole of it, the bag set down
-        if knoxCampSoundCut("", open and 0.35 or 0.3, open and 450 or 0) then return end
+        -- open: the first rustle, cut short; close: the whole of it, the bag set down (in the bar by the
+        -- game's sound slider: KnoxMenuSceneBar)
+        local sc = KnoxMenuScene and KnoxMenuScene.instance
+        local k = sc and sc.sfxK and sc:sfxK() or 1
+        if knoxCampSoundCut("", (open and 0.35 or 0.3) * k, open and 450 or 0) then return end
     end
     getSoundManager():playUISound(open and "KnoxBagOpen" or "KnoxBagClose")
 end
@@ -220,6 +219,14 @@ B.sound = bagSound   -- (a keepsake put back into a bag: KnoxMenuScene)
 
 KnoxBagCard = ISPanel:derive("KnoxBagCard")
 local BC = KnoxBagCard
+
+--- Can a thing be taken out of the bag here, to be put down in the scene? Only in the camp: the bar has
+--- no keepsakes (the author, 2026-11-04 - there it had no hint, the camp's ground and bounds, and the
+--- thing turned up in the camp).
+local function keepsHere()
+    local sc = KnoxMenuScene and KnoxMenuScene.instance
+    return KnoxMenuKeep ~= nil and not (sc and sc.noKeeps)
+end
 
 function BC:new()
     local o = ISPanel:new(0, 0, 10, 10)
@@ -448,6 +455,7 @@ function BC:drawSection(b, a, mx, my)
     local hovered = nil
     local f, fh = T.fontTile, T.fontTileH
     local held = KnoxMenuKeep and KnoxMenuKeep.drag
+    local keeps = keepsHere()
     for _, it in ipairs(s.items) do
         local w2, h2 = it.w, it.h
         if it.r == 1 then w2, h2 = it.h, it.w end
@@ -462,9 +470,10 @@ function BC:drawSection(b, a, mx, my)
         local pw, ph = w2 * cs - 1, h2 * cs - 1
         local over = not held and mx >= tx and mx < tx + pw and my >= ty2 and my < ty2 + ph
         if over then hovered = it end
-        -- can it be put down in the camp (a model of it on the ground)? If not, dimmed
+        -- can it be put down in the camp (a model of it on the ground)? If not, dimmed (in the bar
+        -- nothing is taken out: none)
         if it.model == nil then it.model = (KnoxMenuKeep and KnoxMenuKeep.modelOf(it.type)) or false end
-        local ia = it.model and a or a * 0.45
+        local ia = (it.model or not keeps) and a or a * 0.45
         local taken = held and held.tile == it
         local ta = taken and a * 0.4 or a
         -- lifted under the mouse as in the inventory (KnoxGridView.liftPx): a
@@ -474,7 +483,9 @@ function BC:drawSection(b, a, mx, my)
             self:drawRect(tx + 2, ty2 + 3, pw - 2, ph - 2, 0.35 * a, 0, 0, 0)
             ty2 = ty2 - lp
         end
-        T.rect(self, tx, ty2, pw, ph, T.category[it.cat] or T.category.misc, ta)
+        -- (its state: the colour's height, as in the inventory - condition_v3, the author, 2026-10-31)
+        local level = it.broken and 0 or (it.kind == "m" and it.meter) or (it.cond >= 0 and it.cond) or (it.meter >= 0 and it.meter) or nil
+        T.tileFill(self, tx, ty2, pw, ph, level, T.category[it.cat] or T.category.misc, ta)
         if over then self:drawRect(tx, ty2, pw, ph, 0.06 * a, 1, 1, 1) end
         if taken then
             -- taken out (its likeness on its way to the camp): a sand frame, as a thing being moved
@@ -487,19 +498,14 @@ function BC:drawSection(b, a, mx, my)
         local tex = iconOf(it.tex)
         if tex then
             local side = math.floor(math.min(pw, ph) * 0.85)
-            self:drawTextureScaledAspect(tex, tx + math.floor((pw - side) / 2), ty2 + math.floor((ph - side) / 2), side, side, ia, 1, 1, 1)
+            local dim = 1
+            if it.broken then
+                local grey = T.greyIcon(tex)
+                tex, dim = grey or tex, grey and T.BROKEN_GREY or 0.6
+            end
+            self:drawTextureScaledAspect(tex, tx + math.floor((pw - side) / 2), ty2 + math.floor((ph - side) / 2), side, side, ia, dim, dim, dim)
         end
-        local level = 0
-        if it.cond >= 0 then
-            T.tileMeter(self, tx, ty2, pw, ph, it.cond, condColor(it.cond), ta, 0)
-            level = 1
-        end
-        if it.meter >= 0 then
-            T.tileMeter(self, tx, ty2, pw, ph, it.meter, it.kind == "f" and T.color.liquid or T.color.accent, ta, level)
-        end
-        if it.broken then
-            T.outlinedRight(self, "0%", tx + pw - 4, ty2 + ph - fh - 3, T.color.bad, f, ta)
-        elseif it.n > 1 then
+        if it.n > 1 then
             T.outlinedRight(self, tostring(it.n), tx + pw - 4, ty2 + ph - fh - 3, T.color.bright, f, ta)
         end
     end
@@ -559,7 +565,7 @@ function BC:render()
     local it = self.hovered
     if not it or self.k < 0.5 then return end
     local s = it.name .. (it.n > 1 and ("  x" .. it.n) or "")
-    if KnoxMenuKeep then
+    if keepsHere() then
         local hint = not it.model and "IGUI_Knox_Keep_NoModel"
             or (KnoxMenuKeep.full() and "IGUI_Knox_Keep_Full" or "IGUI_Knox_Keep_Drag")
         s = s .. "  " .. string.char(183) .. "  " .. getText(hint)
@@ -581,8 +587,10 @@ end
 -- A thing pressed on is taken out to be put down in the camp - its likeness:
 -- the thing itself stays in the bag (KnoxMenuKeep); the card steps aside.
 function BC:onMouseDown(x, y)
+    -- (going dark to the other scene, the author's bar, 2026-10-31: it would land there)
+    if KnoxMenuScene and KnoxMenuScene.instance and KnoxMenuScene.instance.switchK then return true end
     local it = self.hovered
-    if it and it.model and it.rect and KnoxMenuKeep and KnoxMenuKeep.beginDrag(it, self.hero, self.save) then
+    if it and it.model and it.rect and keepsHere() and KnoxMenuKeep.beginDrag(it, self.hero, self.save) then
         -- held where it was taken, as in the inventory (KnoxDrag: grab point)
         local d = KnoxMenuKeep.drag
         local r = it.rect

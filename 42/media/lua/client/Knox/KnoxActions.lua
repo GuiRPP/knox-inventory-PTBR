@@ -65,6 +65,14 @@ function A.activeContainer(player)
     return player:getInventory()
 end
 
+--- The bag chosen, the screen open or not (a magazine goes back to it from the world);
+--- nil: none chosen, or no longer on the character.
+function A.activeBag(player)
+    local active = activeOf(player)
+    if active and active:isInCharacterInventory(player) then return active end
+    return nil
+end
+
 function A.setActive(container, playerNum)
     A.active = container
     local player = getSpecificPlayer(playerNum)
@@ -119,6 +127,7 @@ function A.allViews()
     local out = A.playerViews()
     for _, v in ipairs(A.lootViews()) do table.insert(out, v) end
     for _, v in ipairs(A.windowViews()) do table.insert(out, v) end
+    if A.newsView then table.insert(out, A.newsView) end   -- (the live grid of a news post: KnoxNewsLive)
     return out
 end
 
@@ -500,7 +509,10 @@ function A.grab(player, items, walk)
     local views = ownViews(player)
     local taken, failed = 0, 0
     for _, item in ipairs(seen) do
-        if moveInto(views, tileOf(item), player, nil, true) then taken = taken + 1 else failed = failed + 1 end
+        -- (a key onto a key ring the character carries, as Shift+click puts it - a body
+        -- searched from Viewpoint's panel put it into the backpack; the author 2026-11-08)
+        local e = tileOf(item)
+        if toKeyRing(e, nil, player) or moveInto(views, e, player, nil, true) then taken = taken + 1 else failed = failed + 1 end
     end
     if failed > 0 then say(player, "IGUI_Knox_NoRoom") end
     for _, v in ipairs(A.allViews()) do v:markDirty() end

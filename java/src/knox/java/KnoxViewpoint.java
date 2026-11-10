@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntFunction;
 
 import me.zed_0xff.zombie_buddy.Patch;
 import se.krka.kahlua.integration.annotations.LuaMethod;
@@ -14,6 +15,7 @@ import zombie.characters.IsoPlayer;
 import zombie.inventory.InventoryItem;
 import zombie.inventory.ItemContainer;
 import zombie.iso.IsoGridSquare;
+import zombie.iso.IsoObject;
 
 /**
  * Viewpoint (first person, Workshop 3809306528) keeps the mouse for looking
@@ -101,6 +103,7 @@ public class KnoxViewpoint {
      *   rows    LootRows' rows and Row's fields - "not searched yet" in its loot panel
      *   menu    LootMenu.rows, LootRows.selected, Row.items - the container of the row chosen
      *   panel   LootMenu's target, keys and state, InteractActions - Knox's own crosshair panel
+     *   keys    Keys, KeyBind, KeyChord - the panel's keys in Knox's settings (Viewpoint 0.1.7 has no Lua for them)
      *   oldpoint, topdown  OldPoint's Bridge: its overhead camera, its rotation key
      */
     @LuaMethod(name = "knoxViewpointParts", global = true)
@@ -131,14 +134,19 @@ public class KnoxViewpoint {
         part(rows, "rows", found, missing);
         part(rows && menu(), "menu", found, missing);
         part(panelParts(), "panel", found, missing);
+        keysLooked = false;
+        part(keys(), "keys", found, missing);
         if (has(cl, "oldpoint.viewpoint.Bridge")) {
             part(topDownMethod() != null, "topdown", found, missing);
-            boolean key;
-            try {
-                Class.forName("oldpoint.viewpoint.Bridge", false, cl).getDeclaredMethod("rotationHeld");
-                key = true;
-            } catch (Throwable t) {
-                key = false;
+            boolean key = false;
+            // (Bridge.rotationHeld up to OldPoint's jar of 2026-10-29, CameraController's since)
+            for (String c : new String[] {"oldpoint.viewpoint.Bridge", "oldpoint.viewpoint.CameraController"}) {
+                try {
+                    Class.forName(c, false, cl).getDeclaredMethod("rotationHeld");
+                    key = true;
+                } catch (Throwable t) {
+                    // (not in this one)
+                }
             }
             part(key, "oldpoint", found, missing);
         }
@@ -231,6 +239,16 @@ public class KnoxViewpoint {
 
     @Patch(className = "oldpoint.viewpoint.Bridge", methodName = "rotationHeld")
     public static class OldPointRotation {
+        @Patch.OnExit
+        public static void exit(@Patch.Return(readOnly = false) boolean result) {
+            result = KnoxViewpoint.rotationHeld(result);
+        }
+    }
+
+    // (OldPoint 0.6.153, its jar of 2026-10-29: the key is asked in CameraController, private;
+    // Bridge.rotationHeld is gone - the patch above found nothing, the author 2026-11-08)
+    @Patch(className = "oldpoint.viewpoint.CameraController", methodName = "rotationHeld")
+    public static class OldPointRotationNow {
         @Patch.OnExit
         public static void exit(@Patch.Return(readOnly = false) boolean result) {
             result = KnoxViewpoint.rotationHeld(result);
@@ -473,14 +491,33 @@ public class KnoxViewpoint {
     private static int wheelAcc, pressed, takeKey = -1;
     /** Knox's panel has a row chosen its take key does something with (Lua: knoxVpPanelWants). */
     private static volatile boolean panelWants = true;
+    /** Knox's panel has a thing chosen its place key sets down (Lua: knoxVpPanelPlaces). */
+    private static volatile boolean panelPlaces;
+    private static final int PLACE = 7;   // LootMenu's: what its place key asks for
+    /** Knox's panel has a thing chosen its use key does something with (Lua: knoxVpPanelUses). */
+    private static volatile boolean panelUses;
+    private static final int USE = 8;     // LootMenu's: what its use key asks for (0.1.7-rc3)
 
     private static boolean panelLooked;
     private static Field lmShown, lmLoot, lmPending, lmTarget, lmHeld;   // LootMenu's
     private static Field tKind, tSquare, tObject, tLocked, tContainers;   // LootTargets$Target's
     private static Field shoulderF;                                       // View.shoulder: <0 the camera over the left
-    private static Method iaCount, iaLabel, iaEnabled, iaProgress, iaTitle, iaRun;   // InteractActions'
+    private static Method iaCount, iaLabel, iaEnabled, iaProgress, iaTitle;   // InteractActions'
+    private static Method iaRun, iaRunSide;                               // run(player, i) up to 0.1.6, run(player, i, side) since 0.1.7
+    private static Field tSide;                                           // Target.side: the wall's side looked at (0.1.7)
+    private static Method placeable;                                      // LootActions.placeable (0.1.7)
+    private static Object bindPlace;                                      // Keys.LOOT_PLACE (0.1.7)
+    private static Method useWords;                                       // LootActions.useWords (0.1.7-rc3)
+    private static Object bindUse;                                        // Keys.LOOT_USE (0.1.7-rc3)
     private static Method kiSlot, kiMenu, title, groundTitle;
     private static Object bindTake, bindAll;                              // Keys.LOOT_TAKE, Keys.LOOT_TAKE_ALL
+    private static Method iaGather;                                       // (may be missing: the list waits for the queue's end)
+    private static Object lastFirst;
+    private static final long WATER_MS = 1000;
+    private static long waterMs;
+    private static Object waterObject, waterBuilding;
+    private static int lastWater;
+    private static boolean waterFailed;
     private static Method iaVersion;                                      // (may be missing: the panel works on)
     private static Field iaRan;
     private static boolean wasBusy;
@@ -523,7 +560,17 @@ public class KnoxViewpoint {
                 iaEnabled = method(ia, "enabled", int.class);
                 iaProgress = method(ia, "progress", int.class);
                 iaTitle = method(ia, "title");
-                iaRun = method(ia, "run", IsoPlayer.class, int.class);
+                // (0.1.7 added the side of a wall looked at: its absence switched the whole panel
+                // off - the players' report, the author 2026-11-04)
+                try {
+                    iaRunSide = method(ia, "run", IsoPlayer.class, int.class, int.class);
+                    tSide = declared(tg, "side");
+                    iaRun = null;
+                } catch (NoSuchMethodException | NoSuchFieldException t) {
+                    iaRunSide = null;
+                    tSide = null;
+                    iaRun = method(ia, "run", IsoPlayer.class, int.class);
+                }
                 kiSlot = method(ki, "slot", int.class);
                 kiMenu = method(ki, "menu", int.class);
                 title = method(rows, "title", ItemContainer.class);
@@ -533,16 +580,42 @@ public class KnoxViewpoint {
                 // (the actions gathered anew and the nudge: without them the panel
                 // only misses a change of an action's name)
                 try {
+                    iaGather = method(ia, "gather", IsoPlayer.class, Class.forName("viewpoint.interact.LootTargets$Target", false, cl));
+                } catch (Throwable t) {
+                    iaGather = null;
+                }
+                try {
                     iaVersion = method(ia, "version");
                     iaRan = declared(ia, "ran");
                 } catch (Throwable t) {
                     iaVersion = null;
                     iaRan = null;
                 }
+                // (the place key, 0.1.7: without it the panel just has none)
+                try {
+                    bindPlace = declared(keys, "LOOT_PLACE").get(null);
+                    placeable = method(Class.forName("viewpoint.interact.LootActions", false, cl), "placeable", InventoryItem.class);
+                } catch (Throwable t) {
+                    bindPlace = null;
+                    placeable = null;
+                }
+                // (the use key, 0.1.7-rc3: G eats, drinks, wears or takes in hand what is chosen -
+                // Viewpoint's own rows' choice, hidden under Knox's panel; the author 2026-11-08)
+                try {
+                    bindUse = declared(keys, "LOOT_USE").get(null);
+                    useWords = method(Class.forName("viewpoint.interact.LootActions", false, cl), "useWords", IsoPlayer.class, InventoryItem.class);
+                } catch (Throwable t) {
+                    bindUse = null;
+                    useWords = null;
+                }
                 // (the target last: it is what says the parts are all here)
                 lmTarget = declared(lm, "target");
             } catch (Throwable t) {
                 lmTarget = null;
+                // (what is missing, for the next version of Viewpoint that changes it)
+                if (has(ClassLoader.getSystemClassLoader(), "viewpoint.FP")) {
+                    System.out.println("[Knox] Viewpoint's panel is not replaced, not found: " + t);
+                }
             }
         }
         return lmTarget != null;
@@ -707,14 +780,49 @@ public class KnoxViewpoint {
      * Knox's stove window, a window smashed by a swing - counts as such a run, so
      * what is shown follows the world (the author, 2026-10-29).
      */
-    public static void actionsUpdate(IsoPlayer player) {
+    public static void actionsUpdate(IsoPlayer player, Object target) {
         if (!panelOwned || iaRan == null || player == null) return;
         try {
             boolean busy = !player.getCharacterActions().isEmpty();
             if (wasBusy && !busy) iaRan.setBoolean(null, true);
             wasBusy = busy;
+            // One of a queue done, more to come: Viewpoint would wait for the whole queue, the
+            // clothes still to wash stood as they were (a player's report, 2026-11-05).
+            Object first = busy ? player.getCharacterActions().get(0) : null;
+            if (busy && lastFirst != null && first != lastFirst && iaGather != null && target != null) {
+                iaGather.invoke(null, player, target);
+            }
+            lastFirst = first;
+            if (!busy) waterLook(player, target);
         } catch (Throwable t) {
             iaRan = null;
+        }
+    }
+
+    /**
+     * A thing with water looked at: what its menu offers hangs on how much it holds and on
+     * being in its building, and Viewpoint read that once, when the eyes came to it - a sink's
+     * rows stood grey or lit as they were then (the author, 2026-11-05). Read anew when one of
+     * them changes, whole units and once a second: rain into a barrel is no reason to rebuild.
+     */
+    private static void waterLook(IsoPlayer player, Object target) {
+        if (waterFailed || tObject == null || target == null) return;
+        long now = System.currentTimeMillis();
+        if (now - waterMs < WATER_MS) return;
+        waterMs = now;
+        try {
+            Object seen = tObject.get(target);
+            int water = seen instanceof IsoObject ? (int) ((IsoObject) seen).getFluidAmount() : 0;
+            Object building = player.getBuilding();
+            if (seen == waterObject && (water > 0 || lastWater > 0) && (water != lastWater || building != waterBuilding)) {
+                iaRan.setBoolean(null, true);
+            }
+            waterObject = seen;
+            lastWater = water;
+            waterBuilding = building;
+        } catch (Throwable t) {
+            waterFailed = true;
+            System.out.println("[Knox] a water source's actions: " + t);
         }
     }
 
@@ -731,7 +839,12 @@ public class KnoxViewpoint {
     @LuaMethod(name = "knoxVpPanelRun", global = true)
     public static void knoxVpPanelRun(int i) {
         try {
-            if (panel() && IsoPlayer.players[0] != null) iaRun.invoke(null, IsoPlayer.players[0], i);
+            if (!panel() || IsoPlayer.players[0] == null) return;
+            if (iaRunSide != null) {
+                iaRunSide.invoke(null, IsoPlayer.players[0], i, tSide.getInt(target()));
+            } else {
+                iaRun.invoke(null, IsoPlayer.players[0], i);
+            }
         } catch (Throwable t) {
             // (another Viewpoint: nothing happens)
         }
@@ -751,7 +864,59 @@ public class KnoxViewpoint {
         panelWants = on;
     }
 
-    /** A key pressed since asked: 1 take, 2 take all, 0 none. */
+    /**
+     * Has the panel a thing chosen Viewpoint can set down (set by Lua when it changes)?
+     * Without one the place key is the game's.
+     */
+    @LuaMethod(name = "knoxVpPanelPlaces", global = true)
+    public static void knoxVpPanelPlaces(boolean on) {
+        panelPlaces = on;
+    }
+
+    /** Has this Viewpoint a place key (0.1.7)? Without one the panel's foot stays one line. */
+    @LuaMethod(name = "knoxVpPanelPlaceKey", global = true)
+    public static boolean knoxVpPanelPlaceKey() {
+        return panel() && bindPlace != null;
+    }
+
+    /** Can Viewpoint's place key set this thing down? (false: a Viewpoint without that key) */
+    @LuaMethod(name = "knoxVpPanelPlaceable", global = true)
+    public static boolean knoxVpPanelPlaceable(InventoryItem item) {
+        try {
+            return panel() && placeable != null && item != null && Boolean.TRUE.equals(placeable.invoke(null, item));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Has the panel a thing chosen Viewpoint's use key does something with (set by Lua when it changes)? */
+    @LuaMethod(name = "knoxVpPanelUses", global = true)
+    public static void knoxVpPanelUses(boolean on) {
+        panelUses = on;
+    }
+
+    /** Has this Viewpoint a use key (0.1.7-rc3)? */
+    @LuaMethod(name = "knoxVpPanelUseKey", global = true)
+    public static boolean knoxVpPanelUseKey() {
+        return panel() && bindUse != null;
+    }
+
+    /**
+     * What Viewpoint's use key does with this thing: the game's text key ("ContextMenu_Eat",
+     * "ContextMenu_Wear", "ContextMenu_Equip_Primary"...), null for nothing.
+     */
+    @LuaMethod(name = "knoxVpPanelUseWords", global = true)
+    public static String knoxVpPanelUseWords(IsoPlayer player, InventoryItem item) {
+        try {
+            if (!panel() || useWords == null || player == null || item == null) return null;
+            Object w = useWords.invoke(null, player, item);
+            return w instanceof String ? (String) w : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** A key pressed since asked: 1 take, 2 take all, 3 place, 4 use, 0 none. */
     @LuaMethod(name = "knoxVpPanelPressed", global = true)
     public static int knoxVpPanelPressed() {
         int n = pressed;
@@ -807,6 +972,11 @@ public class KnoxViewpoint {
                 return 1;
             }
             if (bind == bindAll) return lmLoot.getBoolean(null) ? 2 : result;
+            // (Viewpoint would set down what its own rows have chosen, not what Knox's panel
+            // shows chosen; the author 2026-11-04)
+            if (bindPlace != null && bind == bindPlace) return panelPlaces ? PLACE : 0;
+            // (the same for the use key: what Knox's panel shows chosen, not Viewpoint's rows)
+            if (bindUse != null && bind == bindUse) return panelUses ? USE : 0;
         } catch (Throwable t) {
             // (as Viewpoint said)
         }
@@ -818,12 +988,125 @@ public class KnoxViewpoint {
         if (!panelOwned) return false;
         try {
             int p = lmPending.getInt(null);
-            if (p != 1 && p != 2) return false;
-            pressed = p;
+            if (p != 1 && p != 2 && p != PLACE && p != USE) return false;
+            pressed = p == PLACE ? 3 : p == USE ? 4 : p;
             lmPending.setInt(null, 0);
             return true;
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    // The panel's keys in Knox's settings: Viewpoint's Lua had them (Viewpoint.Keys) up to
+    // 0.1.6; 0.1.7 took that off, the same is reached here (the author, 2026-11-04).
+
+    private static boolean keysLooked;
+    private static Class<?> keysCls;
+    private static Field kbFallback;
+    private static Method kbText, kcParse, kcText, kcDisplay, kcGameName, kChoose, swEdited;
+
+    private static boolean keys() {
+        if (!keysLooked) {
+            keysLooked = true;
+            try {
+                ClassLoader cl = ClassLoader.getSystemClassLoader();
+                Class<?> k = Class.forName("viewpoint.platform.Keys", false, cl);
+                Class<?> kb = Class.forName("viewpoint.platform.KeyBind", false, cl);
+                Class<?> kc = Class.forName("viewpoint.platform.KeyChord", false, cl);
+                kbFallback = declared(kb, "fallback");
+                kcParse = method(kc, "parse", String.class);
+                kcText = method(kc, "text", List.class);
+                kcDisplay = method(kc, "display", List.class, IntFunction.class);
+                kcGameName = method(kc, "gameName", int.class);
+                kChoose = method(k, "choose", kb, List.class);
+                kbText = method(kb, "text");
+                // (what writes the settings' file: without it a key holds only until the game is closed)
+                try {
+                    swEdited = method(Class.forName("viewpoint.platform.SettingsWindow", false, cl), "edited");
+                } catch (Throwable t) {
+                    swEdited = null;
+                }
+                keysCls = k;
+            } catch (Throwable t) {
+                keysCls = null;
+            }
+        }
+        return keysCls != null;
+    }
+
+    private static Object keyBind(String id) throws ReflectiveOperationException {
+        String name;
+        switch (id) {
+            case "keys.lootTake": name = "LOOT_TAKE"; break;
+            case "keys.lootTakeAll": name = "LOOT_TAKE_ALL"; break;
+            case "keys.lootWindow": name = "LOOT_WINDOW"; break;
+            case "keys.lootPlace": name = "LOOT_PLACE"; break;
+            case "keys.lootUse": name = "LOOT_USE"; break;
+            default: return null;
+        }
+        return declared(keysCls, name).get(null);
+    }
+
+    /** Has this Viewpoint the keys Knox's settings show? */
+    @LuaMethod(name = "knoxVpKeysHere", global = true)
+    public static boolean knoxVpKeysHere() {
+        return keys();
+    }
+
+    /** A key as Viewpoint writes it ("F", "SHIFT+F", "" none); nil: not there. */
+    @LuaMethod(name = "knoxVpKeyGet", global = true)
+    public static String knoxVpKeyGet(String id) {
+        try {
+            Object bind = keys() ? keyBind(id) : null;
+            return bind == null ? null : (String) kbText.invoke(bind);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** What the key is set to with nothing changed, written the same way. */
+    @LuaMethod(name = "knoxVpKeyFallback", global = true)
+    public static String knoxVpKeyFallback(String id) {
+        try {
+            Object bind = keys() ? keyBind(id) : null;
+            return bind == null ? null : (String) kcText.invoke(null, kbFallback.get(bind));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** How a key so written is shown ("NONE": no key); nil: not one. */
+    @LuaMethod(name = "knoxVpKeyDisplay", global = true)
+    public static String knoxVpKeyDisplay(String text) {
+        try {
+            if (!keys()) return null;
+            List<?> chords = (List<?>) kcParse.invoke(null, text);
+            if (chords.isEmpty()) return "NONE";
+            IntFunction<String> name = n -> {
+                try {
+                    // (Latin, whatever layout the game started with - KnoxInput.latin, the author 2026-11-08)
+                    String g = (String) kcGameName.invoke(null, n);
+                    return n >= 10000 ? g : KnoxInput.latin(n, g);
+                } catch (ReflectiveOperationException e) {
+                    return Integer.toString(n);
+                }
+            };
+            return (String) kcDisplay.invoke(null, chords, name);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Bind it: Viewpoint frees the key from its other bindings and keeps it in its settings. */
+    @LuaMethod(name = "knoxVpKeySet", global = true)
+    public static void knoxVpKeySet(String id, String text) {
+        try {
+            Object bind = keys() ? keyBind(id) : null;
+            if (bind == null) return;
+            kChoose.invoke(null, bind, kcParse.invoke(null, text));
+            if (swEdited != null) swEdited.invoke(null);
+        } catch (Throwable t) {
+            // (not a key: left as it was)
         }
     }
 
@@ -862,8 +1145,8 @@ public class KnoxViewpoint {
     @Patch(className = "viewpoint.interact.InteractActions", methodName = "update")
     public static class PanelActionsDone {
         @Patch.OnEnter
-        public static void enter(@Patch.Argument(0) IsoPlayer player) {
-            KnoxViewpoint.actionsUpdate(player);
+        public static void enter(@Patch.Argument(0) IsoPlayer player, @Patch.Argument(1) Object target) {
+            KnoxViewpoint.actionsUpdate(player, target);
         }
     }
 }

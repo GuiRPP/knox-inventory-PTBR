@@ -5,7 +5,8 @@
 #   band   - VIEWPOINT COMPATIBLE
 # THE poster since 2026-10-14 (replaced make_poster.ps1's four tiles). Writes
 # tools\art\poster2_1024.png / poster_1024.png, tools\art\preview_workshop.jpg (the
-# Workshop page, upload_page.ps1), 42\poster.png (256, the game's mod list) and
+# Workshop page, upload_page.ps1), tools\art\poster2_256.png (256; the mod list's poster is
+# tools\make_modlist_art.ps1's since 2026-11-08) and
 # tools\art\poster2_322.png (how it reads in the Workshop's tile).
 #
 # Usage: powershell -ExecutionPolicy Bypass -File tools\make_poster2.ps1
@@ -14,11 +15,23 @@
 #   preview: tools\make_poster_gif.ps1 lays a video of the camp under it.
 #   (with -Fps and -Length: tools\art\gif_frames\ov_000.png... - one a frame, the
 #   grid filling up; see DrawGridAt)
-param([switch]$Overlay, [int]$Fps = 8, [double]$Length = 3.5)
+#   -Winter: the preview of the winter update (the author, 2026-11-04): the ice skin
+#   (KnoxTheme T.SKINS "ice") in place of the sand, no tags over the panel - a plate
+#   "WINTER IS COMING - UPDATE AVAILABLE" in their place (UPDATE SOON till update 11 came out, 2026-11-05), a light sweeping over it once a loop
+#   -SandSkin (with -Winter): the same winter layout in the sand skin, into gif_frames_sand
+#   (make_poster_gif.ps1 -SandFrames; the author, 2026-11-05)
+param([switch]$Overlay, [int]$Fps = 8, [double]$Length = 3.5, [switch]$Winter, [switch]$SandSkin)
 
 . (Join-Path $PSScriptRoot "news_ui.ps1")
 $art = Join-Path $PSScriptRoot "art"
 $K.ammo = Hex "#3a321c"   # (T.category.ammo, news_ui has no ammo)
+if ($Winter -and -not $SandSkin) {
+    # the ice skin as KnoxTheme paints it: the main colour and the dark tones; the categories stay
+    $ice = @{ accent = "#8ec5e0"; window = "#101317"; header = "#171c21"; border = "#262e36"; cell = "#0b0f12"
+              line = "#20272e"; tileEdge = "#37414a"; tileFrame = "#535e69"; tileHover = "#8794a1"
+              text = "#d0d8de"; bright = "#e6edf2"; dim = "#87929b"; buttonBg = "#1a2026"; screen = "#090c0f"; ink = "#0c151b" }
+    foreach ($nm in $ice.Keys) { $K[$nm] = Hex $ice[$nm] }   # (not $k: it is the palette $K)
+}
 
 $S = 1024
 $bmp, $g = Canvas $S $S $K.screen
@@ -41,7 +54,11 @@ function VFade($y0, $y1, $a0, $a1) {
     $lg = New-Object System.Drawing.Drawing2D.LinearGradientBrush $r, (A $K.screen $a0), (A $K.screen $a1), 90.0
     $g.FillRectangle($lg, $r)
 }
-if ($Overlay) {
+if ($Overlay -and $Winter) {
+    # (the bar's video is dark at the top already: a shorter fade, the windows stay bright)
+    VFade 0 230 1.0 0.0
+    VFade 0 140 0.85 0.0
+} elseif ($Overlay) {
     # (the video's heroes stand higher and bigger: the dark ends right under the subtitle)
     VFade 0 240 1.0 0.0
     VFade 0 150 0.9 0.0
@@ -55,7 +72,7 @@ $path = New-Object System.Drawing.Drawing2D.GraphicsPath
 $path.AddEllipse(-260, -120, $S + 520, $sceneH + 200)
 $pg = New-Object System.Drawing.Drawing2D.PathGradientBrush $path
 $pg.CenterColor = A $K.screen 0
-$pg.SurroundColors = [System.Drawing.Color[]]@((A $K.screen $(if ($Overlay) { 0.45 } else { 0.85 })))   # (the video: the hero on the right is near the edge)
+$pg.SurroundColors = [System.Drawing.Color[]]@((A $K.screen $(if ($Overlay -and $Winter) { 0.25 } elseif ($Overlay) { 0.45 } else { 0.85 })))   # (the bar is dark at its sides already)   # (the video: the hero on the right is near the edge)
 $pg.FocusScales = New-Object System.Drawing.PointF 0.55, 0.45
 $g.FillRectangle($pg, 0, 0, $S, $sceneH)
 
@@ -66,7 +83,7 @@ $tx = ($S - ($wK + $sp + $wI)) / 2
 Txt $g "KNOX" "title" $tp $K.bright $tx 44
 Txt $g "INVENTORY" "title" $tp $K.accent ($tx + $wK + $sp) 44
 $ly = 44 + $capH * $tp + 26
-$sub = "TARKOV-STYLE UI OVERHAUL"
+$sub = "COMPLETE UI OVERHAUL"   # was TARKOV-STYLE UI OVERHAUL till 2026-11-09 (the author: the mod is not only about Tarkov)
 $subPx = 34
 $subW = TextW $g $sub "head" $subPx
 Fill $g $K.accent (($S - $subW) / 2 - 70) ($ly + 14) 48 3
@@ -98,6 +115,7 @@ do {
 } while ($pad -lt 20)
 $ty = $py - 10 - 16 - $tagH
 $x = $rowX
+if ($Winter) { $tagList = @() }   # (the winter plate in their place, drawn a frame at a time - DrawWinterAt)
 foreach ($t in $tagList) {
     $w = (TextW $g $t $tagStyle $tagPx) + $pad
     Fill $g $K.accent $x $ty $w $tagH
@@ -225,12 +243,43 @@ foreach ($d in @(@(1,0), @(-1,0), @(0,1), @(0,-1))) {
 }
 $vx = $ccx + $cr + 28
 TxtMid $g $vp "title" $bp $K.ink $vx $bandY $bandH
-TxtMid $g $cp "title" $bp (Hex "#5a5136") ($vx + $wv + 22) $bandY $bandH
+TxtMid $g $cp "title" $bp $(if ($Winter) { Mix $K.accent $K.ink 0.62 } else { Hex "#5a5136" }) ($vx + $wv + 22) $bandY $bandH
+
+# the winter plate where the tags were: ice with ink, Knox's 2 px frame a darker ice;
+# a light sweeps over it in the loop's first frames (as make_preview_beta.ps1's plate)
+$wName = "WINTER IS COMING"; $wSoon = "UPDATE AVAILABLE"; $wDot = [string][char]0x00B7
+$wPx = 40; $wGap = 24
+function DrawWinterAt($g, $f) {
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $w1 = TextW $g $wName "title" $wPx; $w2 = TextW $g $wDot "title" $wPx; $w3 = TextW $g $wSoon "title" $wPx
+    $W = [math]::Ceiling($w1 + $w2 + $w3 + 2 * $wGap + 2 * 34)
+    $H = 50; $x0 = [math]::Floor(($S - $W) / 2); $y0 = $ty + $tagH - $H   # (lower than the tags: the smoker's table shows)
+    Fill $g $K.accent $x0 $y0 $W $H
+    Frame $g (Mix $K.accent $K.ink 0.45) $x0 $y0 $W $H 2
+    $tx = $x0 + 34
+    TxtMid $g $wName "title" $wPx $K.ink $tx $y0 $H
+    TxtMid $g $wDot "title" $wPx (Mix $K.accent $K.ink 0.62) ($tx + $w1 + $wGap) $y0 $H
+    TxtMid $g $wSoon "title" $wPx (Mix $K.accent $K.ink 0.62) ($tx + $w1 + $w2 + 2 * $wGap) $y0 $H
+    $sweep = 12
+    if ($f -ge 0 -and $f -lt $sweep) {
+        $prog = $f / ($sweep - 1)
+        $bx = $x0 - 70 + ($W + 140) * $prog
+        $g.Clip = New-Object System.Drawing.Region (New-Object System.Drawing.RectangleF ([float]$x0), ([float]$y0), ([float]$W), ([float]$H))
+        $pts = [System.Drawing.PointF[]]@(
+            (New-Object System.Drawing.PointF ([float]$bx), ([float]($y0 - 10))),
+            (New-Object System.Drawing.PointF ([float]($bx + 40)), ([float]($y0 - 10))),
+            (New-Object System.Drawing.PointF ([float]($bx + 6)), ([float]($y0 + $H))),
+            (New-Object System.Drawing.PointF ([float]($bx - 34)), ([float]($y0 + $H))))
+        $g.FillPolygon((Br $K.bright 0.45), $pts)
+        $g.ResetClip()
+    }
+}
+if ($Winter -and -not $Overlay) { DrawWinterAt $g -1 }
 
 $g.Dispose()
 if ($Overlay) {
     # one overlay a frame: the poster with the grid as it is at that moment
-    $dir = Join-Path $art "gif_frames"
+    $dir = Join-Path $art $(if ($SandSkin) { "gif_frames_sand" } else { "gif_frames" })
     if (Test-Path $dir) { Get-ChildItem $dir -Filter "ov_*.png" | Remove-Item -Force }
     New-Item -ItemType Directory -Force $dir | Out-Null
     $n = [int][math]::Round($Length * $Fps)
@@ -241,7 +290,10 @@ if ($Overlay) {
         $fg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
         $fg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
         $fg.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
-        DrawGridAt $fg ($f / $Fps) $Length
+        if ($Winter) { DrawWinterAt $fg $f }   # (first: a thing carried in goes over the plate)
+        # (the bag's timing is for 3.5 s: a shorter loop runs it faster, or its things fade out as they land)
+        $gridK = [math]::Max([double]1, 3.5 / $Length)
+        DrawGridAt $fg ($f / $Fps * $gridK) ($Length * $gridK)
         $fg.Dispose()
         $fb.Save((Join-Path $dir ("ov_{0:D3}.png" -f $f)), [System.Drawing.Imaging.ImageFormat]::Png)
         $fb.Dispose()
@@ -249,6 +301,11 @@ if ($Overlay) {
     $bmp.Dispose()
     Write-Host "overlay written: $n frames"
     return
+}
+if ($Winter) {
+    # a still of the winter preview only: the mod's poster files stay as they are
+    $bmp.Save((Join-Path $art "poster_winter_1024.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    $bmp.Dispose(); Write-Host "poster_winter_1024.png written"; return
 }
 $bmp.Save((Join-Path $art "poster2_1024.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 # the mod's poster since 2026-10-14 (the user chose it): the Workshop page's preview,
@@ -264,7 +321,7 @@ $g3.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualit
 $g3.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 $g3.DrawImage($bmp, 0, 0, 256, 256)
 $g3.Dispose()
-$p256.Save((Join-Path $root "42\poster.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+$p256.Save((Join-Path $art "poster2_256.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $p256.Dispose()
 # how it reads in the Workshop's 322 px tile
 $small = New-Object System.Drawing.Bitmap 322, 322

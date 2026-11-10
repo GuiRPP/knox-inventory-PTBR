@@ -40,6 +40,10 @@ C.ACTIONS = {
     {id = "sort",      kind = "key",   default = "ctrl+key:" .. tostring(Keyboard.KEY_S)},   -- Sort the grid under the mouse
     -- held while a quick slot of the bar is dragged to another place (KnoxHotbar)
     {id = "hotbarMove", kind = "hold", default = "key:" .. tostring(Keyboard.KEY_LMENU), hint = false},
+    -- pressed over a magazine, a gun, a flashlight: its quick items' panel in place
+    -- of its tooltip, pressed again: the tooltip back (the author, 2026-10-30;
+    -- KnoxLoad.tipQuiet; a "hold" key: read as held, its press found there)
+    {id = "quickItems", kind = "hold", default = "key:" .. tostring(Keyboard.KEY_LSHIFT), hint = false},
 }
 
 local byId = {}
@@ -193,7 +197,8 @@ function C.label(gesture)
         name = getText("IGUI_Knox_MMB")
     else
         local key = tonumber(string.match(base, "^key:(%d+)$"))
-        name = key and getKeyName(key) or base
+        -- (Latin, whatever layout the game started with: knoxKeyName, the author 2026-11-08)
+        name = key and (knoxKeyName and knoxKeyName(key) or getKeyName(key)) or base
     end
     table.insert(parts, name)
     return table.concat(parts, "+")
@@ -228,10 +233,17 @@ C.VP_ACTIONS = {
 local vpById = {}
 for _, a in ipairs(C.VP_ACTIONS) do vpById[a.id] = a end
 
+local javaKeys = nil
+
 --- Viewpoint's keys (nil: no Viewpoint, or one without them).
 function C.vpKeys()
     local k = Viewpoint and Viewpoint.Keys
     if k and k.get and k.set and k.display and k.fallback then return k end
+    -- (Viewpoint 0.1.7 has none in its Lua: the same through the Java part - 2026-11-04)
+    if knoxVpKeysHere and knoxVpKeysHere() then
+        javaKeys = javaKeys or {get = knoxVpKeyGet, set = knoxVpKeySet, display = knoxVpKeyDisplay, fallback = knoxVpKeyFallback}
+        return javaKeys
+    end
     return nil
 end
 

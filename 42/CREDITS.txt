@@ -18,6 +18,19 @@ The menu radio's buttons (42/media/sound/knox_radio/press_1..4.ogg):
   press_4   "Switches and Buttons - Vintage Button, Plastic" by Artlist Foley
             https://artlist.io/sfx/track/switches-and-buttons---vintage-button-plastic/54916
 
+The journal's page in the menu's bar (42/media/sound/knox_page/page_1..4.ogg):
+  page_1    "Paper - Newspaper, Turning Page" by Mechanical Wave
+            https://artlist.io/sfx/track/paper---newspaper-turning-page/70875
+  page_2    "Crumples - Book Page, Flipping Back and Forth" by SpillAudio
+            https://artlist.io/sfx/pack/crumples/4926
+  page_3,4  "Crumples - Scrunching Piece of Paper" by SpillAudio, two pages
+            cut from it
+            https://artlist.io/sfx/pack/crumples/4926
+The pencil falling on the bar's floor (42/media/sound/knox_page/pencil_floor.ogg):
+  "Stationery - Pencil, Falling on Wood" by Matching Sound Effects, its
+  first knock cut off
+  https://artlist.io/sfx/track/stationery---pencil-falling-on-hard-surface/53752
+
 The fonts (42/media/fonts/knox): bitmap atlases made from Fira Sans Extra
 Condensed by The Mozilla Foundation and Telefonica S.A., under the SIL Open
 Font License 1.1 (42/media/fonts/knox/OFL.txt).

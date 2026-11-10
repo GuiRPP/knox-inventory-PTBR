@@ -48,14 +48,16 @@ KnoxSettings.PAGES = {"modules", "look", "game", "order", "sound", "controls", "
 local PAGE_ITEMS = {
     look = {{"sec", "Skin", "beta"}, {"skins"}, {"slider", "skin.hue"}, {"slider", "skin.sat"}, {"slider", "skin.val"},
             {"sec", "Sec_look_screen"}, {"slider", "look.all"}, {"slider", "look.bg"}, {"slider", "look.grid"},
-            {"slider", "look.line"}, {"slider", "look.slot"}, {"slider", "look.model"}, {"switch", "anim"}},
+            {"slider", "look.line"}, {"slider", "look.slot"}, {"slider", "look.model"}, {"switch", "anim"},
+            {"sec", "Sec_look_hotbar"}, {"slider", "hotbar.alpha"}, {"switch", "hotbar.hide"}, {"slider", "hotbar.hideTime"}},
     game = {{"sec", "Sec_game_search"}, {"switch", "search"}, {"slider", "search.time"}, {"switch", "scatter"},
-            {"choice", "loot.scope"}, {"switch", "vp.panel"}, {"sec", "Sec_game_bags"}, {"slider", "grid.scale"}},
+            {"choice", "loot.scope"}, {"switch", "vp.panel"}, {"sec", "Sec_game_bags"}, {"switch", "home"}, {"slider", "grid.scale"}},
     order = {{"sec", "Order_Title"}, {"choice", "order.rule"}, {"choice", "order.auto"}, {"sec", "Order_Cats"},
              {"cathelp"}, {"cats"}},
     sound = {{"sec", "Sec_sound_ui"}, {"slider", "search.sound"}, {"slider", "ui.sound"},
              {"sec", "Sec_sound_music"}, {"switch", "musicShare"}, {"switch", "musicHear"}, {"slider", "music.others"}},
-    menu = {{"sec", "Sec_menu_news"}, {"switch", "news"}, {"sec", "Camp_Title"}, {"camp"}},
+    menu = {{"sec", "Sec_menu_news"}, {"switch", "news"}, {"sec", "Camp_Title"}, {"camp"},
+            {"sec", "Sec_menu_bar"}, {"switch", "barHigh"}},
 }
 
 local function specOf(list, key)
@@ -625,7 +627,7 @@ function KnoxSettings:drawItem(e, oy, mx, my, hot, now)
         end
     elseif kind == "skins" then
         lines(self, e.lines, L.x0, y, T.color.dim)
-        local cur = T.skin()
+        local cur = T.skinChosen()
         for i, sk in ipairs(T.SKINS) do
             local r = self:skinRect(e, i, oy)
             local on = sk.id == cur
@@ -884,6 +886,8 @@ function KnoxSettings:clickItem(e, x, y, oy)
             if inRect(x, y, self:skinRect(e, i, oy)) then
                 T.settings["skin"] = sk.id
                 T.saveSettings()
+                -- (picked in the menu: seen at once, the place's own skin back with the next scene)
+                T.menuSkin = nil
                 T.applySkin()
                 getSoundManager():playUISound("UIActivateButton")
                 return true
@@ -1199,3 +1203,4 @@ local function look()
 end
 
 Events.OnPreUIDraw.Add(look)
+T.offInGame(Events.OnPreUIDraw, look)

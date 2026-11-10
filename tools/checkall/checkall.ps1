@@ -24,9 +24,10 @@ foreach ($l in 'EN', 'RU', 'CN') {
     $f = Join-Path $mod "42\media\lua\shared\Translate\$l\IG_UI.json"
     try { $o = [IO.File]::ReadAllText($f, [Text.Encoding]::UTF8) | ConvertFrom-Json; "JSON ${l}: ok, " + @($o.PSObject.Properties).Count + " keys" } catch { "JSON ${l}: BROKEN " + $_ }
 }
-foreach ($s in 'footprint', 'order', 'search', 'saveguard', 'net', 'carradio', 'dash', 'menu', 'gen', 'perf', 'crosshair', 'settings', 'editor', 'pinned', 'lists') {
+foreach ($s in 'footprint', 'order', 'home', 'search', 'saveguard', 'net', 'carradio', 'dash', 'menu', 'gen', 'perf', 'crosshair', 'vpscreen', 'settings', 'editor', 'pinned', 'newslive', 'lists', 'place', 'bar', 'barwalk', 'scene') {
     $out = & (Join-Path $mod "tools\$s\test.ps1") 2>&1 | Out-String
-    $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' }
+    $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' -and $_ -notmatch 'NativeCommandError' }   # (not a JVM's warning on stderr as PowerShell 5.1 wraps it)
     "${s}: " + ($lines -join ' | ')
 }
+"hot: " + ((& (Join-Path $mod 'tools\hot\test.ps1') -brief 2>&1 | ForEach-Object { "$_" }) -join ' | ')   # (the DEV reloader, 2026-11-10: its own short form - its passes are many)
 "uilint: " + ((& (Join-Path $mod 'tools\uilint\uilint.ps1') 2>&1 | Select-Object -Last 1) -join ' ')

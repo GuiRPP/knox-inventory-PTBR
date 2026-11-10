@@ -32,7 +32,8 @@ Translator = {getLanguage = function() return {name = function() return "EN" end
 
 local events = {}
 Events = setmetatable({}, {__index = function(t, k)
-    local e = {Add = function() end, Remove = function() end}
+    local e = {list = {}, Remove = function() end}
+    e.Add = function(f) table.insert(e.list, f) end
     rawset(t, k, e)
     return e
 end})

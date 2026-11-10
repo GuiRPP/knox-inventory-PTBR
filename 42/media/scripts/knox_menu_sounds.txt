@@ -9,6 +9,18 @@
    game hung (seen 2026-10-15). */
 module Base
 {
+    sound KnoxGarlandSwitch
+    {
+        category = UI,
+        master = Ambient,
+        is3D = false,
+        clip
+        {
+            file = media/sound/lightswitch.wav,
+            volume = 0.45,
+        }
+    }
+
     /* the radio by the fire, while the music plays from it (KnoxMenuMusic):
        its speaker's hiss and crackle - made by Knox (knox_radio_static.wav) */
     sound KnoxRadioStatic

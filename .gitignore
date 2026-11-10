@@ -14,6 +14,7 @@
 /VIEWPOINT_COMPAT.md
 /COPY_*.md
 /BOOSTY_*.md
+/DISCORD_*.md
 # Claude Code's own files: project rules, skills, settings
 /CLAUDE.md
 /CLAUDE.local.md
@@ -23,6 +24,7 @@
 # licence forbids handing the files out on their own (see 42/CREDITS.txt)
 /42/media/sound/knox_steps/boots_*.ogg
 /42/media/sound/knox_radio/press_*.ogg
+/42/media/sound/knox_page/*.ogg
 
 # --- Built: the Java part is built by java/build.ps1
 /42/media/java/client/*.jar
@@ -42,8 +44,12 @@
 # --- Reports the tools write
 /tools/**/report.txt
 
+# --- The media library: hard links to the files above, rebuilt by tools/make_media.ps1
+/MEDIA/
+
 # --- System
 Thumbs.db
 desktop.ini
 *.tmp
+__pycache__/
 /tools/art/**/*.html

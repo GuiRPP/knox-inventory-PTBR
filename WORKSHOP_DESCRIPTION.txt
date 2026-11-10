@@ -1,14 +1,15 @@
-Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+Title: [B42] Knox Inventory - Complete UI Overhaul
 
 [h1]Knox Inventory[/h1]
 [b]The whole Project Zomboid UI, redesigned in the style of Escape From Tarkov - one stage at a time.[/b]
 A grid inventory where every item takes its real space, your character in 3D, and a main menu that is a camp with the heroes of your saves by the fire.
+[b]Chat with us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].[/b]
 
 [img]https://images.steamusercontent.com/ugc/17471200081781262748/58D6572D5A1573EC011D4D04610A71F5174049DD/[/img]
 
-[h1]NEW: 1.0 BETA - a test version[/h1]
-[b]This item now has two mods: "Knox Inventory" (0.9.8.7, as before) and "Knox Inventory 1.0 BETA". Enable only one.[/b]
-The beta is for trying the new features and reporting bugs, [b]not for a full playthrough[/b] - back up your saves. For an existing save: Load, pick it, Mods, swap Knox Inventory for the beta.
+[h1]1.0 BETA[/h1]
+[b]Knox Inventory 1.0 BETA is now the one and only version of the mod.[/b]
+It is still in testing - back up your saves and tell us what breaks. Played the old 0.9.8.7? Its saves just need Knox turned on again: Load, pick the save, Mods, enable Knox Inventory.
 [list]
 [*][b]Rigs[/b]: bags with compartments, bags in bags, a bag size slider (50-200%).
 [*][b]A new right-click menu[/b] with groups and 81 icons, a world menu, alarm clock and fluid windows.
@@ -18,6 +19,7 @@ The beta is for trying the new features and reporting bugs, [b]not for a full pl
 Not finished yet: the dashboard, some item sizes, bag balance, menu tooltips. No Health tab in 1.0 (it comes in 2.0). Report bugs in the [b]1.0 BETA[/b] discussion with your console.txt and mod list. Full change list: the in-game news and Change Notes.
 [h1]Compatibility[/h1]
 [b]Viewpoint[/b], [b]OldPoint[/b] and [b]Project Viewpoint QOL[/b] are supported: Knox windows give you the cursor, Viewpoint's loot key opens Knox on what you look at (pick the fridge or freezer with the wheel), its Grab goes through Knox's grids.
+The winter bar menu needs "6282 3D models for Viewpoint" (3810302175); else the campfire menu.
 Not compatible: Grid Inventory, Inventory Tetris (they replace the same windows).
 
 [h1]Stage 1: Inventory[/h1]
@@ -95,10 +97,9 @@ Without ZombieBuddy the mod stays off, keeps the game's own inventory and menu, 
 [*][b]Source code?[/b] Open on [url=https://github.com/SVNTHETIK/knox-inventory]GitHub[/url]. Addons, patches, translations welcome; no re-uploads.
 [*][b]Existing save?[/b] Yes, add it any time.
 [*][b]My hero is a dark figure in the menu?[/b] Load that save once: the hero's look is recorded while you play.
-[*][b]Multiplayer?[/b] 0.9.8.7: singleplayer. 1.0 BETA: works on servers, in testing - tell us how it goes.
+[*][b]Multiplayer?[/b] Yes, Knox works on servers - still in testing, tell us how it goes.
 [*][b]A windowed inventory?[/b] Not planned - the opacity sliders in Settings > Look let you see the world through it.
 [*][b]An item's size or sound?[/b] Set your own in Zomboid/Lua/knox_overrides.txt.
-[*][b]With Grid Inventory / Inventory Tetris?[/b] No: both replace the same windows.
 [*][b]Controller?[/b] Controller and split-screen keep the game's inventory.
 [*][b]Found a bug?[/b] Post in Discussions with what you did and your [i]Zomboid\console.txt[/i].
 [/list]

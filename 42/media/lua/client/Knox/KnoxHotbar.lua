@@ -60,6 +60,22 @@ function ISHotbar:setSizeAndPosition()
         self:setWidth(self.width + extra)
         self:setX(getPlayerScreenLeft(self.playerNum) + (getPlayerScreenWidth(self.playerNum) - self.width) / 2)
     end
+    -- hidden or on its way: lowered under the screen's edge (see "Hiding" below)
+    self.knoxBaseY = self:getY()
+    if self.knoxHideOff and self.knoxHideOff ~= 0 then self:knoxLower() end
+end
+
+--- The bar at its place lowered by knoxHideOff. (A window of its own is kept on the screen
+--- by the game's setY - getKeepOnScreen: not while lowered, or it stayed where it was and
+--- only its plate was left, the author 2026-11-10.)
+function ISHotbar:knoxLower()
+    local off = self.knoxHideOff or 0
+    if off ~= 0 then
+        self.keepOnScreen = false
+    elseif self.keepOnScreen == false then
+        self.keepOnScreen = nil
+    end
+    if self.knoxBaseY then self:setY(self.knoxBaseY + off) end
 end
 
 -- (the slots are shown in the player's order: KnoxHotbarOrder)
@@ -83,18 +99,6 @@ function ISHotbar:getSlotForKey(key)
     return O.indexAt(self, pos)
 end
 
---- The thin meter along a tile's bottom, as on the Knox grids: condition of a
---- weapon, what is left of a battery or tape.
-local function drawMeter(ui, item, x, y, w, h)
-    if instanceof(item, "HandWeapon") and item:getConditionMax() > 0 then
-        local f = item:getCondition() / math.max(1, item:getConditionMax())
-        local c = f > 0.5 and T.color.good or (f > 0.25 and T.color.warn or T.color.bad)
-        T.tileMeter(ui, x, y, w, h, f, c, 1, 0)
-    elseif item:IsDrainable() then
-        T.tileMeter(ui, x, y, w, h, item:getCurrentUsesFloat(), T.color.accent, 1, 0)
-    end
-end
-
 local function inHand(chr, item)
     return item == chr:getPrimaryHandItem() or item == chr:getSecondaryHandItem()
 end
@@ -107,6 +111,26 @@ function SlotRef:getAbsoluteX() return self.hb:getAbsoluteX() + handsW(self.hb) 
 function SlotRef:getAbsoluteY() return self.hb:getAbsoluteY() + self.hb.margins + 1 end
 function SlotRef:getWidth() return self.hb.slotWidth end
 function SlotRef:getHeight() return self.hb.slotHeight end
+
+-- The same for a hand's tile (a gun in hand: its magazine panel, 2026-10-30):
+-- where the tile was drawn last.
+local HandRef = {}
+HandRef.__index = HandRef
+function HandRef:getAbsoluteX() return self.hb:getAbsoluteX() + self.x end
+function HandRef:getAbsoluteY() return self.hb:getAbsoluteY() + self.y end
+function HandRef:getWidth() return self.w end
+function HandRef:getHeight() return self.h end
+
+local function handRef(hb, key, x, y, w, h)
+    hb.knoxHandRefs = hb.knoxHandRefs or {}
+    local r = hb.knoxHandRefs[key]
+    if not r then
+        r = setmetatable({hb = hb}, HandRef)
+        hb.knoxHandRefs[key] = r
+    end
+    r.x, r.y, r.w, r.h = x, y, w, h
+    return r
+end
 
 local function slotRef(hb, i)
     hb.knoxRefs = hb.knoxRefs or {}
@@ -133,15 +157,127 @@ local function offer(hb, i, slot)
     return ref, items, pick
 end
 
+-- The bar from a ready list (the overhaul's stage 3, 2026-11-04: by knox_perf.txt the dearest
+-- thing of Knox's with the screen shut, 150-190 us a frame, what it shows hardly ever changing).
+-- While the mouse is off it, nothing is dragged, no panel is open and nothing is settling in,
+-- Java draws it again in one call; in all the rest Lua draws it as before. What it shows is
+-- kept in hb.knoxBarShows and looked at every frame: the slots, their faint pictures and what
+-- hangs in them, the hands, a gun's rounds in hand. A tile's height and colour one tile a
+-- frame, in turn (a burning torch's charge moves all the time, what shows of it seldom).
+-- Nothing new is made in a frame.
+local barLists = {}   -- (one per player and for good: Java keeps every list)
+
+local function isGun(item)
+    return item ~= nil and instanceof(item, "HandWeapon") and item:isRanged()
+end
+
+--- Tile `at`'s thing: the slots, then the hands.
+local function tileAt(hb, at, n, p, s)
+    if at <= n then return hb.attachedItems[at] end
+    if at == n + 1 then return p end
+    return s
+end
+
+--- What shows of tile `at`'s state: its height, as T.levelKey has it.
+local function levelShown(shows, at, item, size)
+    if not item then return false end
+    if shows.levelFor[at] ~= item then shows.levelFor[at], shows.levelFrom[at] = item, T.levelKind(item) end
+    return T.levelKey(item, size, T.itemLevel(item, shows.levelFrom[at]))
+end
+
+local function barRemember(hb, n, p, s)
+    local shows = hb.knoxBarShows
+    if not shows then
+        shows = {stamp = 0, at = 0, slot = {}, tex = {}, item = {}, level = {}, cat = {}, levelFor = {}, levelFrom = {}}
+        hb.knoxBarShows = shows
+    end
+    shows.stamp = shows.stamp + 1
+    shows.n, shows.p, shows.s, shows.hands = n, p, s, hb.knoxHands
+    shows.order, shows.hide = T.settings["hotbar.order"], KnoxMagKnown and KnoxMagKnown.hide
+    shows.gunP, shows.gunS = isGun(p), isGun(s)
+    shows.ammoP, shows.maxP = shows.gunP and p:getCurrentAmmoCount(), shows.gunP and p:getMaxAmmo()
+    shows.ammoS, shows.maxS = shows.gunS and s:getCurrentAmmoCount(), shows.gunS and s:getMaxAmmo()
+    for i = 1, n do
+        local slot = hb.availableSlot[i]
+        shows.slot[i], shows.tex[i], shows.item[i] = slot, slot.texture, hb.attachedItems[i]
+    end
+    for at = 1, n + 2 do
+        local item = tileAt(hb, at, n, p, s)
+        shows.level[at] = levelShown(shows, at, item, hb.slotWidth)
+        shows.cat[at] = item and T.categoryOf(item) or false
+    end
+end
+
+--- Is the bar as its list has it? (No: Lua draws it this frame.)
+local function barQuiet(hb)
+    -- (T.settleIn wants no list: what is settling in changes every frame)
+    if hb.knoxBarBusy ~= false or hb.knoxSlotDrag or hb.knoxHandDrag or ISMouseDrag.dragging
+            or KnoxSlotPicker.instance then
+        return false
+    end
+    local mx, my = hb:getMouseX(), hb:getMouseY()
+    -- (getSlotIndexAt's reach, the hands' width past the right edge with it)
+    if my >= 0 and my < hb.height and mx >= 0 and mx < hb.width + handsW(hb) then return false end
+    local shows = hb.knoxBarShows
+    local slots, items, chr = hb.availableSlot, hb.attachedItems, hb.chr
+    local n = #slots
+    local p, s = chr:getPrimaryHandItem(), chr:getSecondaryHandItem()
+    local same = shows ~= nil and shows.n == n and shows.p == p and shows.s == s and shows.hands == hb.knoxHands
+        and shows.order == T.settings["hotbar.order"] and shows.hide == (KnoxMagKnown and KnoxMagKnown.hide)
+    if same then
+        for i = 1, n do
+            -- (the picture apart: other clothes giving the same slot change it on the same table)
+            local slot = slots[i]
+            if shows.slot[i] ~= slot or shows.tex[i] ~= slot.texture or shows.item[i] ~= items[i] then
+                same = false
+                break
+            end
+        end
+    end
+    if same and shows.gunP and (shows.ammoP ~= p:getCurrentAmmoCount() or shows.maxP ~= p:getMaxAmmo()) then same = false end
+    if same and shows.gunS and (shows.ammoS ~= s:getCurrentAmmoCount() or shows.maxS ~= s:getMaxAmmo()) then same = false end
+    if same then
+        local at = shows.at % (n + 2) + 1
+        shows.at = at
+        local item = tileAt(hb, at, n, p, s)
+        if shows.level[at] ~= levelShown(shows, at, item, hb.slotWidth)
+                or shows.cat[at] ~= (item and T.categoryOf(item) or false) then
+            same = false
+        end
+    end
+    if same then return true end
+    barRemember(hb, n, p, s)
+    return false
+end
+
 function ISHotbar:render()
     if (self.playerNum > 0) or JoypadState.players[self.playerNum + 1] then
         self:setVisible(false)   -- as the game does: update() keeps running for refresh()
     end
-    -- the Knox screen has its own quick slots over it
-    if KnoxScreen and KnoxScreen.instance then return end
+    -- the Knox screen has its own quick slots over it - from its first frame drawn, not
+    -- before: the game draws a window it was just given only a frame later, and that frame
+    -- (the slow one, before the screen's first) showed the bar gone and no screen yet (the
+    -- author, 2026-11-10: "first you see it vanish, then the menu opens")
+    local screen = KnoxScreen and KnoxScreen.instance
+    if screen and screen.knoxDrawn then return end
     applySizes(self)
 
     local w, h = self.width, self.height
+    local L = barLists[self.playerNum]
+    if not L then
+        L = T.newList()
+        barLists[self.playerNum] = L
+    end
+    if not L.dead and T.listsOn() and barQuiet(self) then
+        if T.listDraw(self, L, w, h, self.slotWidth, self.knoxBarShows.stamp) then return end
+    elseif L.writing then
+        -- a frame being written fell over a Lua error and no T.listDraw comes now to start it
+        -- anew: thrown away, or what is drawn now (the mouse's glow) stays in it for good
+        T.listEnd(L)
+        L.ok = false
+    end
+    self.knoxBarBusy = false
+
     -- plate: the Knox bottom bar's color, a thin frame
     T.rect(self, 0, 0, w, h, T.color.header, 0.85)
     T.border(self, 0, 0, w, h, T.color.border)
@@ -166,20 +302,22 @@ function ISHotbar:render()
         T.rect(self, x, y, size, size, T.color.cell)
         if hot and dragged then item = dragged end
         if item then
-            T.rect(self, x, y, size, size, T.category[T.categoryOf(item)])
-            local side = math.floor(size * 0.66)
             -- just hung here: it settles in (one memory per slot)
             self.knoxSlotSettle = self.knoxSlotSettle or {}
             self.knoxSlotSettle[i] = self.knoxSlotSettle[i] or {}
-            local dy, da = T.settleIn(self.knoxSlotSettle[i], self.attachedItems[i])
-            ISInventoryItem.renderItemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, da, side, side)
-            drawMeter(self, item, x, y, size, size)
+            local memo = self.knoxSlotSettle[i]
+            -- (its state: the colour's height, condition_v3, the author, 2026-10-31)
+            T.tileFill(self, x, y, size, size, T.levelOf(memo, item), T.category[T.categoryOf(item)])
+            local side = math.floor(size * 0.66)
+            local dy, da = T.settleIn(memo, self.attachedItems[i])
+            if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
+            T.itemIcon(self, item, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2) + dy, side, da)
         elseif slot.texture then
             -- an empty slot: the game's faint picture of what goes there
             local side = math.floor(size * 0.5)
             self:drawTextureScaledAspect(slot.texture, x + math.floor((size - side) / 2), y + math.floor((size - side) / 2), side, side, 0.2, 1, 1, 1)
         end
-        T.text(self, tostring(pos), x + 4, y + 1, T.color.dim, T.fontTile)   -- (hotbar key N: the Nth shown)
+        T.outlinedLeft(self, tostring(pos), x + 4, y + 1, T.color.dim, T.fontTile)   -- (hotbar key N: the Nth shown)
         if moving and moving.index == i then self:drawRect(x, y, size, size, 0.55, 0, 0, 0) end   -- being moved
 
         -- an empty slot under the mouse: how many carried items can hang here, and
@@ -201,6 +339,10 @@ function ISHotbar:render()
                 end
             end
         end
+        -- a gun hung here: its magazine / rounds panel above it (KnoxLoad, 2026-10-30)
+        if item and hot and not ISMouseDrag.dragging and KnoxLoad and instanceof(item, "HandWeapon") then
+            KnoxLoad.offer(KnoxLoad.refOf(slotRef(self, i)), item, self.chr, self.playerNum, "above")
+        end
 
         local edge = item and T.color.tileFrame or T.color.tileEdge
         if hot then
@@ -215,7 +357,12 @@ function ISHotbar:render()
         end
         if item and inHand(self.chr, item) then edge = T.color.accent end   -- taken in hand
         -- the item's tooltip (shown before the next frame by KnoxSlotPicker's OnPreUIDraw)
-        if hot and item and not ISMouseDrag.dragging then KnoxTooltip.want(item, self.playerNum) end
+        -- (a gun with its panel above - the quick items' key held: no tooltip over
+        -- the panel's cells, 2026-10-30)
+        if hot and item and not ISMouseDrag.dragging then
+            KnoxTooltip.want(item, self.playerNum,
+                KnoxLoad and KnoxLoad.tipQuiet(item, instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"))
+        end
         if item then T.tileFrame(self, x, y, size, size, edge) else T.border(self, x, y, size, size, edge) end
         if offered then T.target(self, x, y, size, size) end   -- its quick pick panel
 
@@ -232,12 +379,13 @@ function ISHotbar:render()
         end
         x = x + size + self.slotPad
     end
+    T.listEnd(L)
 end
 
 -- Hands ----------------------------------------------------------------------------
 -- What is in the hands, on the left of the bar (in place of the game's pictures
 -- at the top left of the screen): the right hand, the left hand, a two-handed
--- thing across both. Condition along the bottom, a gun's rounds in the corner.
+-- thing across both, its state as its colour's height.
 -- Hover: the tooltip; click: out of the hand; right click: its menu; an item
 -- dropped from a game window: into that hand.
 
@@ -287,22 +435,32 @@ function ISHotbar:drawHands()
         local hot = over and T.inRect(mx, my, r)
         T.rect(self, x, y, w, h, T.color.cell)
         if item then
-            -- only draw category color when there's an actual item
-            T.rect(self, x, y, w, h, T.category[T.categoryOf(item)])
-            local side = math.floor(h * 0.66)
             -- just taken in this hand: it settles in
             self.knoxHandSettle = self.knoxHandSettle or {}
             local hk = r.both and "both" or (r[5] and "right" or "left")
             self.knoxHandSettle[hk] = self.knoxHandSettle[hk] or {}
-            local dy, da = T.settleIn(self.knoxHandSettle[hk], item)
-            ISInventoryItem.renderItemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, da, side, side)
-            drawMeter(self, item, x, y, w, h)
+            local memo = self.knoxHandSettle[hk]
+            -- only draw category color when there's an actual item
+            T.tileFill(self, x, y, w, h, T.levelOf(memo, item), T.category[T.categoryOf(item)])
+            local side = math.floor(h * 0.66)
+            local dy, da = T.settleIn(memo, item)
+            if dy ~= 0 or da ~= 1 then self.knoxBarBusy = true end
+            T.itemIcon(self, item, x + math.floor((w - side) / 2), y + math.floor((h - side) / 2) + dy, side, da)
             -- a gun's rounds: loaded / magazine
-            if instanceof(item, "HandWeapon") and item:isRanged() then
+            if not (KnoxMagKnown and KnoxMagKnown.hide) and instanceof(item, "HandWeapon") and item:isRanged() then
                 local text = tostring(item:getCurrentAmmoCount()) .. "/" .. tostring(item:getMaxAmmo())
                 T.outlinedRight(self, text, x + w - 4, y + h - T.fontTileH - 6, T.color.bright, T.fontTile)
             end
-            if hot and not ISMouseDrag.dragging then KnoxTooltip.want(item, self.playerNum) end
+            -- a gun in hand: its magazine / rounds panel above it, the quick items'
+            -- key pressed - in place of its tooltip (the author's bench, 2026-10-30:
+            -- nothing came up in hand)
+            if hot and not ISMouseDrag.dragging then
+                local gun = KnoxLoad and instanceof(item, "HandWeapon") and KnoxLoad.panelOf(item) == "gun"
+                if gun then
+                    KnoxLoad.offer(KnoxLoad.refOf(handRef(self, hk, x, y, w, h)), item, self.chr, self.playerNum, "above")
+                end
+                KnoxTooltip.want(item, self.playerNum, gun and KnoxLoad.tipQuiet(item, true))
+            end
         end
         -- an empty hand: a small grey palm in the middle of the tile (no
         -- caption); with something in the hand it goes
@@ -401,9 +559,164 @@ local function drawSlotDrag(hb)
     T.tileFrame(hb, x, y, size, size, T.color.accent)
 end
 
+-- Hiding (the author, 2026-11-10: "the hotbar outside the inventory hides while it is not
+-- in use and shows when you switch things, when a new thing comes into your hands, when the
+-- mouse comes over its place... the action key calls it up for a while; down when it hides,
+-- up when it shows; a setting in Knox, and a setting for its transparency").
+-- Every frame update() looks whether something happened to the bar - the hands' things, a
+-- slot hung or emptied, the mouse over its place, something dragged (not while the Knox
+-- screen is open: nothing done there calls it up) - and keeps it up for the setting's seconds after the last of it; then
+-- it slides down under the screen's edge (setSizeAndPosition lowers it by knoxHideOff). The
+-- interact key, held down, calls it up only when it did nothing in the world and nothing was looked at:
+-- no Viewpoint panel up, no Knox window open, the hero not climbing, opening a door, busy
+-- with an action (the author, the same day). Nothing new is made in a frame.
+local HIDE_UP_MS, HIDE_DOWN_MS = 180, 320   -- the slide up / down
+-- The interact key calls it up held down, a little longer than the game's own hold that
+-- climbs through a window or over a fence (IsoPlayer timePressedContext > 0.5 s): a short
+-- press brought it up as the hero climbed (the author, 2026-11-10)
+local KEY_HOLD_MS = 800
+local KEY_DONE_MS = 250   -- (what the key did a moment before it was seen pressed counts too)
+
+local function hideOn() return T.switch("hotbar.hide") end
+
+--- The bar's alpha (the setting, 1 = as it is).
+local function barAlpha() return T.look("hotbar.alpha") / 100 end
+
+local function wake(hb) hb.knoxAwake = getTimestampMs() end
+
+--- Is the hero doing something the interact key may have started (or anything that is not free)?
+local function busy(chr)
+    if chr:isPerformingAnAction() or chr:isClimbing() or chr:isBlockMovement() then return true end
+    local q = ISTimedActionQueue.queues[chr]
+    return q ~= nil and #q.queue > 0
+end
+
+--- Would the interact key be for something else now (a panel at the crosshair, a window)?
+local function keyTaken(hb)
+    if knoxVpPanelShown and knoxVpPanelShown() == true then return true end
+    if KnoxCompat and KnoxCompat.windowOpen and KnoxCompat.windowOpen() then return true end
+    local radial = getPlayerRadialMenu and getPlayerRadialMenu(hb.playerNum)
+    if radial and radial:isReallyVisible() then return true end
+    return busy(hb.chr)
+end
+
+--- What happened to the bar since the last frame: kept up by it.
+local function watch(hb)
+    local chr = hb.chr
+    local p, s = chr:getPrimaryHandItem(), chr:getSecondaryHandItem()
+    local changed = p ~= hb.knoxWatchP or s ~= hb.knoxWatchS
+    hb.knoxWatchP, hb.knoxWatchS = p, s
+    -- the Knox screen open: what is done there does not call the bar up after it shuts
+    -- (the author, 2026-11-10: "no need to show it after every opening of the inventory");
+    -- shots and reloads neither (the same day: "no need when the rounds' count changes")
+    if KnoxScreen and KnoxScreen.instance then return end
+    if changed then wake(hb) end
+    if hb.knoxSlotDrag or hb.knoxHandDrag or ISMouseDrag.dragging or KnoxSlotPicker.instance then
+        wake(hb)
+        return
+    end
+    -- the mouse where the bar stands when it is up
+    local mx, my = getMouseX(), getMouseY()
+    local bottom = getPlayerScreenTop(hb.playerNum) + getPlayerScreenHeight(hb.playerNum)
+    local x = hb:getX()
+    if mx >= x and mx < x + hb.width and my >= bottom - hb.height and my <= bottom then wake(hb) end
+    -- the interact key held: up once held long enough, unless it did something meanwhile
+    local at = hb.knoxKeyAt
+    if at then
+        local now = knoxNowMs()
+        if knoxContextDoneAt() >= at - KEY_DONE_MS or busy(chr) or not isKeyDown(hb.knoxKeyCode) then
+            hb.knoxKeyAt = nil
+        elseif now - at >= KEY_HOLD_MS then
+            hb.knoxKeyAt = nil
+            wake(hb)
+        end
+    end
+end
+
+--- The slide: knoxHideP 0 (up) .. 1 (down), knoxHideOff the pixels it is lowered by.
+-- (a step every frame drawn - prerender - and every update: the game's update runs fewer
+-- times than frames are drawn, and the slide from it went in jerks, the author 2026-11-10;
+-- what happened to the bar is looked at in update only)
+local function slide(hb, watching)
+    local now = getTimestampMs()
+    local dt = now - (hb.knoxHideT or now)
+    hb.knoxHideT = now
+    local p = hb.knoxHideP or 0
+    local down = false
+    if hideOn() then
+        hb.knoxAwake = hb.knoxAwake or now   -- (switched on: up for a while first)
+        if watching then watch(hb) end
+        down = now - hb.knoxAwake > T.look("hotbar.hideTime") * 1000
+    end
+    if down then
+        if p >= 1 then return end
+        p = math.min(1, p + T.anim(dt / HIDE_DOWN_MS))
+    else
+        if p <= 0 then return end
+        p = math.max(0, p - T.anim(dt / HIDE_UP_MS))
+    end
+    hb.knoxHideP = p
+    local off = math.floor((hb.height + 2) * p * p * (3 - 2 * p) + 0.5)
+    if off ~= hb.knoxHideOff then
+        hb.knoxHideOff = off
+        hb:knoxLower()
+    end
+end
+
+-- (keys: the interact key - held, see watch; a hotbar key - up at once)
+local function onKeyStart(key)
+    local hb = getPlayerHotbar and getPlayerHotbar(0)
+    if not hb or not hb.chr or not hideOn() or not knoxNowMs then return end
+    if hb:getSlotForKey(key) ~= -1 then
+        wake(hb)
+    elseif getCore():isKey("Interact", key) and not keyTaken(hb) then
+        hb.knoxKeyAt, hb.knoxKeyCode = knoxNowMs(), key
+    end
+end
+Events.OnKeyStartPressed.Add(onKeyStart)
+
+-- a slot hung, emptied, the slots changed with the clothes: up
+for _, name in ipairs({"attachItem", "removeItem", "refresh"}) do
+    local was = ISHotbar[name]
+    if was then
+        ISHotbar[name] = function(self, ...)
+            if hideOn() and not (KnoxScreen and KnoxScreen.instance) then wake(self) end
+            return was(self, ...)
+        end
+    end
+end
+
+-- (the game's own plate under Knox's - ISPanel:prerender, half black and a grey frame - faded
+-- with the rest, or it stayed dark under a see-through bar)
+local panelPrerender = ISHotbar.prerender
+function ISHotbar:prerender()
+    slide(self, false)
+    if not panelPrerender or (self.knoxHideP or 0) >= 1 then return end
+    local a = barAlpha()
+    if a < 1 and knoxUiPartAlpha then
+        knoxUiPartAlpha(a)
+        local ok, err = pcall(panelPrerender, self)
+        knoxUiPartAlpha(1)
+        if not ok then error(err, 0) end
+    else
+        panelPrerender(self)
+    end
+end
+
 local knoxRender = ISHotbar.render
 function ISHotbar:render()
-    knoxRender(self)
+    -- down under the screen's edge: nothing to draw
+    if (self.knoxHideP or 0) >= 1 and not self.knoxHandDrag then return end
+    -- the bar's transparency (the setting): everything it draws, scaled at once (Java, KnoxUiFade)
+    local a = barAlpha()
+    if a < 1 and knoxUiPartAlpha then
+        knoxUiPartAlpha(a)
+        local ok, err = pcall(knoxRender, self)
+        knoxUiPartAlpha(1)
+        if not ok then error(err, 0) end
+    else
+        knoxRender(self)
+    end
     if not (KnoxScreen and KnoxScreen.instance) then drawSlotDrag(self) end
     local d = self.knoxHandDrag
     if not d then return end
@@ -467,13 +780,19 @@ end
 
 local rightMouseUp = ISHotbar.onRightMouseUp
 function ISHotbar:onRightMouseUp(x, y)
+    -- (the menu told what it is about: Knox's header and groups, as in the screen -
+    -- the hotbar's came without them, the author's bench 2026-10-30)
     local r = self:handAt(x, y)
     if r then
         if r[6] then
+            if KnoxContextMenu then KnoxContextMenu.setTarget({r[6]}, self.playerNum) end
             ISInventoryPaneContextMenu.createMenu(self.playerNum, true, {r[6]}, getMouseX(), getMouseY())
         end
         return true
     end
+    local i = self:getSlotIndexAt(x, y)
+    local item = i ~= -1 and self.attachedItems[i] or nil
+    if item and KnoxContextMenu then KnoxContextMenu.setTarget({item}, self.playerNum) end
     return rightMouseUp(self, x, y)
 end
 
@@ -508,4 +827,15 @@ function ISEquippedItem:initialise()
         if m.displayString ~= p and m.displayString ~= s then table.insert(keep, m) end
     end
     self.mouseOverList = keep
+end
+
+-- The game's own item tooltip of a hotbar slot (ISHotbar:update) lay right
+-- under Knox's: Knox's went for the gun's panel, the game's stayed over it (the
+-- author's bench, 2026-10-30). Knox shows the slot's tooltip itself (render) - only with its tooltips
+-- on: off, the game's is the only one there is (QA, 2026-11-04).
+local knoxUpdate = ISHotbar.update
+function ISHotbar:update()
+    slide(self, true)
+    knoxUpdate(self)
+    if T.on("tooltips") and self.toolRender and self.toolRender:getIsVisible() then self.toolRender:setVisible(false) end
 end

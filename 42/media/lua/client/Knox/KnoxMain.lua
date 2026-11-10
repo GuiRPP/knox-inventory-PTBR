@@ -22,6 +22,19 @@ require "Knox/KnoxCompat"
 Knox = Knox or {}
 Knox.VERSION = "1.0-beta"   -- (the 1.0 beta, shipped as a mod of its own next to 0.9.8.7: 2026-10-20)
 
+--- Is this game the tutorial? Read once per game: forPlayer is asked many times a
+--- frame, and the mode doesn't change while playing (Lua is loaded anew on the way
+--- back to the menu). Since 42.22 getCore():getGameMode() is a GameMode, not a
+--- string - the Java part gives its word (knoxGameMode, jar 150; an older jar keeps
+--- the old comparison). (2026-11-09, the author's console on 42.22.2)
+local function isTutorial()
+    if Knox.tutorial == nil then
+        local mode = knoxGameMode and knoxGameMode() or getCore():getGameMode()
+        Knox.tutorial = mode == "Tutorial"
+    end
+    return Knox.tutorial
+end
+
 --- Does a part of Knox stand in for the game's window for this player? `module`:
 --- which part (KnoxTheme.MODULES; the inventory screen when not given). It is
 --- made for the mouse: the first player, not on a controller (a controller
@@ -35,7 +48,7 @@ function Knox.forPlayer(playerNum, module)
     return KnoxTheme.on(module) and not (module == "inventory" and Knox.failed) and not Knox.vanillaShot
         and playerNum == 0 and getSpecificPlayer(0) ~= nil
         and not (JoypadState and JoypadState.players and JoypadState.players[1])
-        and getCore():getGameMode() ~= "Tutorial"
+        and not isTutorial()
 end
 
 local function hideVanilla(playerNum)
@@ -75,6 +88,7 @@ local function screenFailed(err)
         pcall(function() s:removeFromUIManager() end)
     end
     if knoxSetScreenOpen then pcall(knoxSetScreenOpen, false) end
+    if KnoxRMenu then pcall(KnoxRMenu.abort) end
     if knoxViewpointCursor then pcall(knoxViewpointCursor, false, false) end
     local inv, loot = getPlayerInventory(0), getPlayerLoot(0)
     if inv then inv:setVisible(true) end
@@ -236,6 +250,76 @@ local function hookPlaceItem()
     end
 end
 
+-- "Place object" (furniture: a TV, a chair, a lamp). The game offers it only for a
+-- thing lying right in the main inventory (the pockets) and not in the hands, and
+-- its placing cursor takes only such things. With Knox a TV in a bag, too big for
+-- the pockets, or heavy furniture carried in the hands could never be placed, and
+-- the screen stayed over the world while the cursor was out (Steam: Martinete,
+-- mai72). Now the line is there wherever the thing is - on the character or
+-- around; chosen, the screen closes, the thing is taken out of the hands and into
+-- the pockets with the game's own actions (room or not: what fits no grid lies in
+-- the red rows), and the cursor opens once it is there. (the author 2026-11-09)
+local placing = nil   -- {player, item, open, ticks, untilMs} while it gets ready
+
+local function waitPlace()
+    local p = placing
+    if not p then Events.OnTick.Remove(waitPlace) return end
+    local player, item = p.player, p.item
+    p.ticks = p.ticks + 1
+    if item:getContainer() == player:getInventory()
+        and player:getPrimaryHandItem() ~= item and player:getSecondaryHandItem() ~= item then
+        placing = nil
+        Events.OnTick.Remove(waitPlace)
+        -- (brought out of a bag to be placed: not one to go back to its place - it went back
+        -- into the bag while the spot was picked, the author's bench 2026-11-10)
+        if KnoxHome and KnoxHome.forget then KnoxHome.forget(item) end
+        if KnoxScreen.instance then KnoxScreen.instance:close() end
+        p.open(item, player)
+    elseif (p.ticks > 2 and not ISTimedActionQueue.isPlayerDoingAction(player))
+        or getTimestampMs() > p.untilMs or player:isDead() then
+        -- (the actions were cancelled - walking, a zombie - or could not be done)
+        placing = nil
+        Events.OnTick.Remove(waitPlace)
+    end
+end
+
+local function hookPlaceObject()
+    local M = ISMoveableContextMenu
+    if not M or not M.createMenu or not M.openMovableCursor or M.knoxHooked then return end
+    M.knoxHooked = true
+    local createMenu, openCursor = M.createMenu, M.openMovableCursor
+    M.createMenu = function(context, item, playerObj)
+        if not (playerObj and Knox.forPlayer(playerObj:getPlayerNum())) then
+            return createMenu(context, item, playerObj)
+        end
+        -- (the game's one exception kept: a radio that stands on its own in the world)
+        if instanceof(item, "Radio") and item:getWorldStaticItem() then return end
+        local option = context:addOption(getText("IGUI_PlaceObject"), item, M.openMovableCursor, playerObj)
+        option.itemForTexture = item
+    end
+    M.openMovableCursor = function(item, playerObj)
+        if not (playerObj and item and Knox.forPlayer(playerObj:getPlayerNum())) then
+            return openCursor(item, playerObj)
+        end
+        if KnoxScreen.instance then KnoxScreen.instance:close() end
+        local inv = playerObj:getInventory()
+        local inHand = playerObj:getPrimaryHandItem() == item or playerObj:getSecondaryHandItem() == item
+        if item:getContainer() == inv and not inHand then
+            return openCursor(item, playerObj)
+        end
+        if inHand then
+            ISTimedActionQueue.add(ISUnequipAction:new(playerObj, item, 50))
+        end
+        if item:getContainer() and item:getContainer() ~= inv then
+            ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(
+                playerObj, item, item:getContainer(), inv))
+        end
+        if not placing then Events.OnTick.Add(waitPlace) end
+        placing = {player = playerObj, item = item, open = openCursor, ticks = 0,
+            untilMs = getTimestampMs() + 30000}
+    end
+end
+
 -- Pouring fluids: the game opens its window through ISFluidTransferUI.OpenPanel
 -- (item menus, barrels, sinks, crafting slots); the Knox window takes its place.
 local function hookFluidTransfer()
@@ -389,7 +473,7 @@ local searchSaid = nil
 Knox.viewpointLookAfter = false   -- the screen came from Viewpoint's loot key: closed, back to looking
 -- (only with Viewpoint: without it nothing of this runs a frame - it was asked every frame anyway)
 if KnoxCompat.vpHas("cursor") or KnoxCompat.vpHas("rows") then
-    Events.OnPreUIDraw.Add(function()
+    local function viewpointFrame()
         if not getSpecificPlayer(0) then return end
         -- (told to Java when it changes, not every frame)
         if knoxViewpointSearch then
@@ -407,7 +491,9 @@ if KnoxCompat.vpHas("cursor") or KnoxCompat.vpHas("rows") then
             if not want then Knox.viewpointLookAfter = false end
         end
         if want and knoxViewpointKeep then knoxViewpointKeep() end
-    end)
+    end
+    Events.OnPreUIDraw.Add(viewpointFrame)
+    KnoxTheme.offInGame(Events.OnPreUIDraw, viewpointFrame, "game")
 end
 
 -- Viewpoint's loot key opens the game's loot window on the container looked at
@@ -426,20 +512,15 @@ local function hookViewpoint()
     ViewpointLoot.knoxHooked = true
     -- (each pair only when Viewpoint still has both: a version without them keeps
     -- its own, and the log says which - KnoxCompat.report)
-    if KnoxCompat.luaHas("ViewpointLoot", ViewpointLoot, {"openWindow", "closeWindow"}) then
+    -- (from Viewpoint 0.1.7 its key opens a screen of its own: KnoxCompat.routeViewpointScreen;
+    -- these two are for the versions before it)
+    if not KnoxCompat.routeViewpointScreen()
+        and KnoxCompat.luaHas("ViewpointLoot", ViewpointLoot, {"openWindow", "closeWindow"}) then
         local open, close = ViewpointLoot.openWindow, ViewpointLoot.closeWindow
         ViewpointLoot.openWindow = function(player, container, ...)
             local n = player and player:getPlayerNum() or 0
             if not Knox.forPlayer(n) then return open(player, container, ...) end
-            -- Viewpoint gives the first container of what is looked at (a fridge, never
-            -- its freezer; a car's first part within reach): the one whose row is chosen
-            -- in its panel (the wheel) is opened instead
-            -- (Knox's crosshair panel shown: the row chosen in it - 2026-10-25)
-            local chosen = KnoxCrosshair and KnoxCrosshair.owned and KnoxCrosshair.chosen() or nil
-            if not chosen then
-                chosen = KnoxCompat.vpHas("menu") and knoxViewpointChosen and knoxViewpointChosen() or nil
-            end
-            if chosen and container and chosen ~= container then container = chosen end
+            container = KnoxCompat.vpChosen(container)
             if not KnoxScreen.instance then Knox.viewpointLookAfter = true end
             ViewpointLoot.knoxOpened = KnoxScreen.instance == nil
             if not Knox.open(n, container or ISInventoryPage.GetFloorContainer(n)) then
@@ -615,8 +696,13 @@ local function tellJavaMissing(inMenu)
     local key = KnoxTheme.javaVersion and "IGUI_Knox_JavaOld" or (inMenu and "IGUI_Knox_JavaRestart" or "IGUI_Knox_JavaMissing")
     local text = getText(key, tostring(KnoxTheme.javaVersion or ""), tostring(KnoxTheme.JAVA_NEEDED))
     local fontH = getTextManager():getFontHeight(UIFont.Small)
-    local w, h = math.max(640, fontH * 34), math.max(240, fontH * 14)
-    local modal = ISModalDialog:new((getCore():getScreenWidth() - w) / 2, (getCore():getScreenHeight() - h) / 2,
+    local screenW, screenH = getCore():getScreenWidth(), getCore():getScreenHeight()
+    local w = math.min(math.max(640, fontH * 34), screenW - 40)
+    text = KnoxTheme.wrapMessage(text, UIFont.Small, w - 40)
+    -- the dialog sizes itself to its text: centred by the size it will really have
+    local h
+    w, h = ISModalDialog.CalcSize(w, math.max(240, fontH * 14), text)
+    local modal = ISModalDialog:new((screenW - w) / 2, math.max(0, (screenH - h) / 2),
         w, h, text, false, nil, nil, 0)
     modal:initialise()
     modal:addToUIManager()
@@ -658,6 +744,7 @@ Events.OnGameStart.Add(function()
     hookWorldClick()
     hookLootShow()
     hookPlaceItem()
+    hookPlaceObject()
     hookViewpoint()
     hookWorldGrab()
     hideVanilla(0)
@@ -674,3 +761,7 @@ Events.OnContainerUpdate.Add(onContainerUpdate)
 Events.OnPlayerDeath.Add(onPlayerDeath)
 Events.OnResolutionChange.Add(onResolutionChange)
 Events.OnTick.Add(onTick)
+-- (the game's windows to keep hidden, the screen to close: only with the inventory)
+KnoxTheme.offInGame(Events.OnTick, onTick, "inventory")
+-- (the frame count is for what is on the way into a grid, the windows of any module's)
+KnoxTheme.offInGame(Events.OnPreUIDraw, KnoxGrid.onFrame, "game")

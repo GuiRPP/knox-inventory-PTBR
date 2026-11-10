@@ -448,7 +448,11 @@ function KnoxLootPanel:select(container, byUser)
                 table.insert(gone, {searchPlate = true, frac = frac, x = px, y = py, w = pw, h = ph, a = 1})
             end
             if px and not e.reserved and #gone < 80 and not KnoxSearch.isHidden(e.item) then
-                table.insert(gone, {item = e.item, x = px, y = py, w = pw, h = ph, a = e.ghost and 0.4 or 1})
+                -- (its level as the grid has it: a stack's is their average; asked once, not each frame)
+                local level
+                if e.draw then level = e.draw.level else level = T.itemLevel(e.item) end
+                table.insert(gone, {item = e.item, x = px, y = py, w = pw, h = ph, a = e.ghost and 0.4 or 1,
+                                    level = level, broken = e.item:isBroken()})
             end
         end
     end
@@ -767,6 +771,9 @@ function KnoxLootPanel:prerender()
     local total = #self.containers * (m.rowH + m.gap) - m.gap
     self.listScroll = math.max(0, math.min(self.listScroll or 0, total - listH))
     self:setStencilRect(0, 0, m.listW, listH)
+    local listBox = self.listBox or {0, 0, 0, 0}
+    self.listBox = listBox
+    listBox[3], listBox[4] = m.listW, listH
     self.rowRects = {}
     local y = -self.listScroll
     local lists = rowLists[self.playerNum]
@@ -922,7 +929,7 @@ function KnoxLootPanel:prerender()
                 nst = {}
                 self.nameSt[c.container] = nst
             end
-            T.marquee(self, nst, c.name, nameX, ty, nameW, nameC, T.fontText)
+            T.marquee(self, nst, c.name, nameX, ty, nameW, nameC, T.fontText, 1, listBox)
             -- a plate with the number in the heavier caps font: sand with black
             -- when looked into, plain grey when not yet; centred by its pixels
             T.rect(self, boxX, ty - 2, boxW, boxH, base, pa)
@@ -1022,10 +1029,15 @@ function KnoxLootPanel:prerender()
                     KnoxSearch.drawCurrent(self, tx, ty, pw, ph, o.frac or 0, o.a * fade)
                 elseif ty + ph <= self:getHeight() then
                     local a = o.a * fade
-                    T.rect(self, tx, ty, pw, ph, T.category[T.categoryOf(o.item)], a)
+                    T.tileFill(self, tx, ty, pw, ph, o.level, T.category[T.categoryOf(o.item)], a)
                     T.tileFrame(self, tx, ty, pw, ph, T.color.tileFrame, a)
                     local side = math.floor(math.min(pw, ph) * 0.85)
-                    ISInventoryItem.renderItemIcon(self, o.item, tx + math.floor((pw - side) / 2), ty + math.floor((ph - side) / 2), a, side, side)
+                    local ix, iy = tx + math.floor((pw - side) / 2), ty + math.floor((ph - side) / 2)
+                    if o.broken then
+                        T.brokenIcon(self, o.item, ix, iy, side, a)
+                    else
+                        ISInventoryItem.renderItemIcon(self, o.item, ix, iy, a, side, side)
+                    end
                 end
             end
         end

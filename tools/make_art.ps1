@@ -1,7 +1,8 @@
 # Draws the mod's art from a real in-game screenshot of the Knox screen
 # (tools\art\screen_stage1.jpg, 2000x1125), in the screen's own frame:
-#   42\poster.png  (256x256, mod list and Workshop preview)
-#   42\icon.png    (64x64, mod list icon)
+#   tools\art\poster_stage1.png  (256x256)
+#   tools\art\icon_stage1.png    (64x64)
+# (since 2026-11-08 the mod list's icon and poster come from tools\make_modlist_art.ps1 only)
 # Drawn at 1024 px and scaled down. Fonts: Fira Sans Extra Condensed from
 # Zomboid\tools\fonts\candidates (the mod's own font).
 #
@@ -213,6 +214,6 @@ if ($Lang -ne "en") {
     Write-Host "art written"
     return
 }
-Poster (Join-Path $root "42\poster.png") $false
-Icon (Join-Path $root "42\icon.png") $false
+Poster (Join-Path $PSScriptRoot "art\poster_stage1.png") $false
+Icon (Join-Path $PSScriptRoot "art\icon_stage1.png") $false
 Write-Host "art written"

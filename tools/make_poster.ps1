@@ -4,11 +4,11 @@
 # sand band "VIEWPOINT COMPATIBLE" under them.
 #   tools\art\poster_1024.png
 #   tools\art\preview_workshop.jpg (1024x1024: the Workshop page's preview, upload_page.ps1)
-#   42\poster.png (256x256: the game's mod list and Workshop\KnoxInventory\preview.png)
+#   tools\art\poster_tiles_256.png (256x256) (since 2026-11-08 the mod list's icon and poster come from tools\make_modlist_art.ps1 only)
 # The Workshop shows previews in 322x322 tiles and pads a smaller picture with black:
 # 256x256 got a black frame there, so the page gets the big one.
 # Cut from screenshots in tools\art (2000x1125). make_art.ps1 still draws the icon
-# and the older posters; do not run it without -Now after this, it rewrites 42\poster.png.
+# and the older posters.
 #
 # Usage: powershell -ExecutionPolicy Bypass -File tools\make_poster.ps1
 
@@ -138,6 +138,6 @@ $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQuality
 $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 $g.DrawImage($bmp, 0, 0, 256, 256)
 $g.Dispose()
-$small.Save((Join-Path $root "42\poster.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+$small.Save((Join-Path $PSScriptRoot "art\poster_tiles_256.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $small.Dispose(); $bmp.Dispose()
 Write-Host "poster written"
