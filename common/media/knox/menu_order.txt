@@ -1,0 +1,8 @@
+# Knox Inventory: the order of item menu options, the same for every player (the menu order editor, DEV).
+# section = id | id | ...  (top, use, equip, move, craft, other, danger); groups = the groups' order.
+groups = use | equip | move | craft | other
+top = knox:inspect
+equip = fn:OnPrimaryWeapon | fn:OnSecondWeapon
+move = fn:ISMoveableContextMenu.openMovableCursor | fn:onMoveItemsTo
+other = sub:onFavorite | text:Поиск рецептов | text:Редактор вещей | text:Sandbox Control: удалить предмет
+danger = fn:onDropItems

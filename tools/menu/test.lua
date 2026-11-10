@@ -157,4 +157,45 @@ frame(m)
 frame(s2)
 check("its parent laid out anew: the sub menu too", builds(s2) == sn + 1, builds(s2) - sn)
 
+
+-- the author's order (the menu order editor, 2026-11-10) -----------------------------
+local function optOrder(menu)
+    local out = {}
+    for _, row in ipairs(menu.knoxL.rows) do
+        if row.kind == "opt" then table.insert(out, menu.options[row.i].name) end
+    end
+    return table.concat(out, ",")
+end
+local function appleMenu()
+    K.setTarget({item}, 0)
+    m:clear()
+    m:addOption("ContextMenu_Eat", item, P.onEatItems)
+    m:addOption("ContextMenu_Wear", item, P.onWearItems)
+    m:addOption("Other mod's thing", item, function() end)
+    m:addOption("Another mod's thing", item, function() end)
+    m:addOption("ContextMenu_Drop", item, P.onDropItems)
+    m.knoxOtherWant = true
+    frame(m, 20)
+end
+K.order = {groups = nil, lists = {}}
+appleMenu()
+local game = optOrder(m)
+check("order: none - the game's own", game == "ContextMenu_Eat,ContextMenu_Wear,Other mod's thing,Another mod's thing,ContextMenu_Drop", game)
+K.order = {groups = {"other", "equip"}, lists = {other = {"text:Another mod's thing"}}}
+appleMenu()
+local o2 = optOrder(m)
+check("order: groups swapped, a listed one first in its group",
+    o2 == "ContextMenu_Eat,Another mod's thing,Other mod's thing,ContextMenu_Wear,ContextMenu_Drop", o2)
+K.order = {groups = nil, lists = {top = {"fn:onWearItems", "role:main"}}}
+appleMenu()
+local o3 = optOrder(m)
+check("order: an option moved to the top, before the main action",
+    o3 == "ContextMenu_Wear,ContextMenu_Eat,Other mod's thing,Another mod's thing,ContextMenu_Drop", o3)
+local snap = K.orderSnapshot(m)
+check("snapshot: the top as shown", snap and snap.now[1].rows[1].id == "fn:onWearItems" and snap.now[1].rows[2].id == "role:main",
+    snap and snap.now[1].rows[1] and snap.now[1].rows[1].id)
+check("snapshot: the game's own order kept", snap and snap.game[1].rows[1].id == "role:main" and snap.game[3].rows[1].id == "fn:onWearItems",
+    snap and snap.game[3].rows[1] and snap.game[3].rows[1].id)
+K.order = {groups = nil, lists = {}}
+
 print("DONE pass=" .. pass .. " fail=" .. fail)

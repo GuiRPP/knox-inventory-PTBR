@@ -1,4 +1,4 @@
-Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+Title: [B42] Knox Inventory - Complete UI Overhaul
 
 [h1]What is Knox[/h1]
 [b]Knox is a new interface for Project Zomboid in the style of Escape From Tarkov.[/b] It doesn't replace one window - it replaces most of what you look at: the main menu, the inventory, the TV and radio, right-click menus, tooltips. Everything shares one look, and every part can be switched off if you don't want it.

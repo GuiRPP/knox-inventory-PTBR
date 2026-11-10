@@ -48,7 +48,8 @@ KnoxSettings.PAGES = {"modules", "look", "game", "order", "sound", "controls", "
 local PAGE_ITEMS = {
     look = {{"sec", "Skin", "beta"}, {"skins"}, {"slider", "skin.hue"}, {"slider", "skin.sat"}, {"slider", "skin.val"},
             {"sec", "Sec_look_screen"}, {"slider", "look.all"}, {"slider", "look.bg"}, {"slider", "look.grid"},
-            {"slider", "look.line"}, {"slider", "look.slot"}, {"slider", "look.model"}, {"switch", "anim"}},
+            {"slider", "look.line"}, {"slider", "look.slot"}, {"slider", "look.model"}, {"switch", "anim"},
+            {"sec", "Sec_look_hotbar"}, {"slider", "hotbar.alpha"}, {"switch", "hotbar.hide"}, {"slider", "hotbar.hideTime"}},
     game = {{"sec", "Sec_game_search"}, {"switch", "search"}, {"slider", "search.time"}, {"switch", "scatter"},
             {"choice", "loot.scope"}, {"switch", "vp.panel"}, {"sec", "Sec_game_bags"}, {"switch", "home"}, {"slider", "grid.scale"}},
     order = {{"sec", "Order_Title"}, {"choice", "order.rule"}, {"choice", "order.auto"}, {"sec", "Order_Cats"},

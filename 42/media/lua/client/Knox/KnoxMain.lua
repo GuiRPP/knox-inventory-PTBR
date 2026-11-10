@@ -22,6 +22,19 @@ require "Knox/KnoxCompat"
 Knox = Knox or {}
 Knox.VERSION = "1.0-beta"   -- (the 1.0 beta, shipped as a mod of its own next to 0.9.8.7: 2026-10-20)
 
+--- Is this game the tutorial? Read once per game: forPlayer is asked many times a
+--- frame, and the mode doesn't change while playing (Lua is loaded anew on the way
+--- back to the menu). Since 42.22 getCore():getGameMode() is a GameMode, not a
+--- string - the Java part gives its word (knoxGameMode, jar 150; an older jar keeps
+--- the old comparison). (2026-11-09, the author's console on 42.22.2)
+local function isTutorial()
+    if Knox.tutorial == nil then
+        local mode = knoxGameMode and knoxGameMode() or getCore():getGameMode()
+        Knox.tutorial = mode == "Tutorial"
+    end
+    return Knox.tutorial
+end
+
 --- Does a part of Knox stand in for the game's window for this player? `module`:
 --- which part (KnoxTheme.MODULES; the inventory screen when not given). It is
 --- made for the mouse: the first player, not on a controller (a controller
@@ -35,7 +48,7 @@ function Knox.forPlayer(playerNum, module)
     return KnoxTheme.on(module) and not (module == "inventory" and Knox.failed) and not Knox.vanillaShot
         and playerNum == 0 and getSpecificPlayer(0) ~= nil
         and not (JoypadState and JoypadState.players and JoypadState.players[1])
-        and getCore():getGameMode() ~= "Tutorial"
+        and not isTutorial()
 end
 
 local function hideVanilla(playerNum)
@@ -234,6 +247,76 @@ local function hookPlaceItem()
     P.onPlaceItemOnGround = function(items, playerObj)
         if KnoxScreen.instance then KnoxScreen.instance:close() end
         return original(items, playerObj)
+    end
+end
+
+-- "Place object" (furniture: a TV, a chair, a lamp). The game offers it only for a
+-- thing lying right in the main inventory (the pockets) and not in the hands, and
+-- its placing cursor takes only such things. With Knox a TV in a bag, too big for
+-- the pockets, or heavy furniture carried in the hands could never be placed, and
+-- the screen stayed over the world while the cursor was out (Steam: Martinete,
+-- mai72). Now the line is there wherever the thing is - on the character or
+-- around; chosen, the screen closes, the thing is taken out of the hands and into
+-- the pockets with the game's own actions (room or not: what fits no grid lies in
+-- the red rows), and the cursor opens once it is there. (the author 2026-11-09)
+local placing = nil   -- {player, item, open, ticks, untilMs} while it gets ready
+
+local function waitPlace()
+    local p = placing
+    if not p then Events.OnTick.Remove(waitPlace) return end
+    local player, item = p.player, p.item
+    p.ticks = p.ticks + 1
+    if item:getContainer() == player:getInventory()
+        and player:getPrimaryHandItem() ~= item and player:getSecondaryHandItem() ~= item then
+        placing = nil
+        Events.OnTick.Remove(waitPlace)
+        -- (brought out of a bag to be placed: not one to go back to its place - it went back
+        -- into the bag while the spot was picked, the author's bench 2026-11-10)
+        if KnoxHome and KnoxHome.forget then KnoxHome.forget(item) end
+        if KnoxScreen.instance then KnoxScreen.instance:close() end
+        p.open(item, player)
+    elseif (p.ticks > 2 and not ISTimedActionQueue.isPlayerDoingAction(player))
+        or getTimestampMs() > p.untilMs or player:isDead() then
+        -- (the actions were cancelled - walking, a zombie - or could not be done)
+        placing = nil
+        Events.OnTick.Remove(waitPlace)
+    end
+end
+
+local function hookPlaceObject()
+    local M = ISMoveableContextMenu
+    if not M or not M.createMenu or not M.openMovableCursor or M.knoxHooked then return end
+    M.knoxHooked = true
+    local createMenu, openCursor = M.createMenu, M.openMovableCursor
+    M.createMenu = function(context, item, playerObj)
+        if not (playerObj and Knox.forPlayer(playerObj:getPlayerNum())) then
+            return createMenu(context, item, playerObj)
+        end
+        -- (the game's one exception kept: a radio that stands on its own in the world)
+        if instanceof(item, "Radio") and item:getWorldStaticItem() then return end
+        local option = context:addOption(getText("IGUI_PlaceObject"), item, M.openMovableCursor, playerObj)
+        option.itemForTexture = item
+    end
+    M.openMovableCursor = function(item, playerObj)
+        if not (playerObj and item and Knox.forPlayer(playerObj:getPlayerNum())) then
+            return openCursor(item, playerObj)
+        end
+        if KnoxScreen.instance then KnoxScreen.instance:close() end
+        local inv = playerObj:getInventory()
+        local inHand = playerObj:getPrimaryHandItem() == item or playerObj:getSecondaryHandItem() == item
+        if item:getContainer() == inv and not inHand then
+            return openCursor(item, playerObj)
+        end
+        if inHand then
+            ISTimedActionQueue.add(ISUnequipAction:new(playerObj, item, 50))
+        end
+        if item:getContainer() and item:getContainer() ~= inv then
+            ISTimedActionQueue.add(ISInventoryTransferUtil.newInventoryTransferAction(
+                playerObj, item, item:getContainer(), inv))
+        end
+        if not placing then Events.OnTick.Add(waitPlace) end
+        placing = {player = playerObj, item = item, open = openCursor, ticks = 0,
+            untilMs = getTimestampMs() + 30000}
     end
 end
 
@@ -661,6 +744,7 @@ Events.OnGameStart.Add(function()
     hookWorldClick()
     hookLootShow()
     hookPlaceItem()
+    hookPlaceObject()
     hookViewpoint()
     hookWorldGrab()
     hideVanilla(0)

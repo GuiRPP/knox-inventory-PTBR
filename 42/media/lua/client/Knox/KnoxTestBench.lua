@@ -23,6 +23,7 @@ KnoxTestBench = ISPanel:derive("KnoxTestBench")
 local B = KnoxTestBench
 local T = KnoxTheme
 local REPORT = "knox_testbench.txt"
+local SEL_FILE = "knox_testbench_sel.txt"   -- the point last open (the author 2026-11-10: reopened, the bench stays where it was)
 local RELEASE = "1.0 BETA"
 
 B.state = B.state or {}   -- id -> {verdict = "ok" | "bad", auto, autoOk, note}
@@ -653,6 +654,22 @@ local function readLines(file)
     end
     r:close()
     return out
+end
+
+--- The point the window opens on: the one open when it was closed (by id - points come and go).
+local function savedSel()
+    local id = readLines(SEL_FILE)[1]
+    for i, p in ipairs(B.POINTS) do
+        if p.id == id then return i end
+    end
+    return 1
+end
+
+local function saveSel(id)
+    local w = getFileWriter(SEL_FILE, true, false)
+    if not w then return end
+    w:write(tostring(id or ""))
+    w:close()
 end
 
 -- Checks: read the result from the grids -------------------------------------------
@@ -1569,20 +1586,135 @@ local function checkHome(player)
     return true, getText("IGUI_KnoxTB_Res_Home", homes, held, tostring(T.switch("home")))
 end
 
+-- Furniture placed from anywhere (the author, 2026-11-09: "Place" wherever the thing is,
+-- the Knox screen hides while the spot is picked). A chair as a world-sprite item, the way
+-- the game's debug menu makes one. (furniture_seating_indoor_01_0 was half a red sofa - the author
+-- 2026-11-10: "only one part, it cannot be placed"): the first one-tile moveable named a chair.
+local function chairSprite()
+    if B.chairSprite then return B.chairSprite end
+    local any = nil
+    for set = 1, 3 do
+        for i = 0, 63 do
+            local name = string.format("furniture_seating_indoor_%02d_%d", set, i)
+            local spr = getSprite(name)
+            local props = spr and spr:getProperties()
+            if props and props:has("IsMoveAble") and spr:getSpriteGrid() == nil then
+                local custom = props:has("CustomName") and props:get("CustomName") or ""
+                if string.find(string.lower(custom), "chair", 1, true) then
+                    B.chairSprite = name
+                    return name
+                end
+                any = any or name
+            end
+        end
+    end
+    B.chairSprite = any
+    return any
+end
+
+local function newChair()
+    local spr = chairSprite()
+    local it = spr and instanceItem("Moveables.Moveable")
+    if it and it:ReadFromWorldSprite(spr) then return tag(it) end
+    return nil
+end
+
+local function placeInBag(player, playerNum)
+    if not B.bag(player) then B.prepare(player, playerNum) end
+    local bag = B.bag(player)
+    local it = bag and newChair()
+    if it then bag:getInventory():AddItem(it) end
+    dirtyAll()
+end
+
+local function placeInHands(player)
+    local it = newChair()
+    if not it then return end
+    player:getInventory():AddItem(it)
+    player:setPrimaryHandItem(it)
+    player:setSecondaryHandItem(it)
+    dirtyAll()
+end
+
+local function placeNear(player)
+    local cont = nearFurniture(player)
+    if not cont then
+        halo(player, "IGUI_KnoxTB_WardrobeNone")
+        return
+    end
+    local it = newChair()
+    if it then cont:AddItem(it) end
+    dirtyAll()
+end
+
+--- Where the bench's chairs are now (the check of the three place_* points).
+local function checkPlace(player)
+    local bag, hands, inv, near = 0, 0, 0, 0
+    local function count(cont, into)
+        local items = cont and cont:getItems()
+        local n = 0
+        for i = 0, (items and items:size() or 0) - 1 do
+            local it = items:get(i)
+            if it:getModData().knoxBench and instanceof(it, "Moveable") then n = n + 1 end
+        end
+        return into + n
+    end
+    local b = B.bag(player)
+    bag = count(b and b:getInventory(), bag)
+    inv = count(player:getInventory(), inv)
+    local h = player:getPrimaryHandItem()
+    if h and h:getModData().knoxBench and instanceof(h, "Moveable") then hands = 1 end
+    near = count(nearFurniture(player), near)
+    return true, getText("IGUI_KnoxTB_Res_Place", bag, hands, inv, near)
+end
+
+-- The hero for the menu on the game's 42.22 (the author's console 2026-11-09: it was not written
+-- since the update - NoSuchMethodError; jar v150).
+B.snapWritten = nil
+local function checkSnap()
+    local v = knoxJavaVersion and tonumber(knoxJavaVersion()) or 0
+    local ok = v >= 150 and B.snapWritten == true
+    local w = B.snapWritten == nil and "-" or tostring(B.snapWritten)
+    return ok, getText("IGUI_KnoxTB_Res_Snap", tostring(v), w)
+end
+
+-- Mending clothes (rama 2026-11-04: looked for it in Knox's 3D "Inspect"; the game's one is named
+-- "Holes and patches" now): a shirt with holes and what mends it, into the pockets.
+local function sewKit(player)
+    local inv = player:getInventory()
+    local shirt = tag(inv:AddItem("Base.Shirt_FormalWhite"))
+    if shirt and shirt.addRandomHole then
+        shirt:addRandomHole()
+        shirt:addRandomHole()
+    end
+    for _, ft in ipairs({"Base.Needle", "Base.Thread", "Base.DenimStrips", "Base.DenimStrips", "Base.DenimStrips"}) do
+        if exists(ft) then tag(inv:AddItem(ft)) end
+    end
+    dirtyAll()
+end
+
+-- Eating and a move at once (D and Love <3, Steam, 2026-11-03: a move queued while eating shows
+-- as waiting, then is cancelled when the eating ends; not seen on the bench 2026-10-28). Food that
+-- leaves something behind (a can) and a drink, into the test backpack; the game prints
+-- "bugged action ... cleared queue" when it drops the whole queue.
+local function eatKit(player, playerNum)
+    if not B.bag(player) then B.prepare(player, playerNum) end
+    local bag = B.bag(player)
+    if not bag then return end
+    local inv = bag:getInventory()
+    for _, ft in ipairs({"Base.Apple", "Base.WaterBottle", "Base.OpenBeans", "Base.Crisps"}) do
+        if exists(ft) then tag(inv:AddItem(ft)) end
+    end
+    dirtyAll()
+end
+
 -- (all the earlier points taken off by the author, 2026-11-07: "it is all cluttered";
--- their marks are kept in Zomboid/Lua/knox_testbench_beta16.txt)
+-- their marks are kept in Zomboid/Lua/knox_testbench_beta16.txt; the home_* points passed
+-- on 2026-11-09 are kept in knox_testbench_home.txt, the ones passed 2026-11-10 in knox_testbench_1110.txt)
 B.POINTS = {
-    -- things go back to their place (the author, 2026-11-07; the mockup home_place)
-    {id = "home_hand", actions = {{"Prepare", function(p, n) B.prepare(p, n) end}}, check = checkHome},
-    {id = "home_block", check = checkHome},
-    {id = "home_drag", check = checkHome},
-    {id = "home_eat", actions = {{"Prepare", function(p, n) B.prepare(p, n) end}}, check = checkHome},
-    {id = "home_wear", check = checkHome},
-    {id = "home_belt", check = checkHome},
-    {id = "home_mine", check = checkHome},
-    {id = "home_nobag", check = checkHome},
-    {id = "home_save", check = checkHome},
-    {id = "home_off", actions = {{"Settings", function() openSettings() end}}, check = checkHome},
+    -- (group: the report a point checks - a caption row above its points, the author 2026-11-09:
+    -- "to see which report I am checking")
+    {id = "place_bag", group = "Place", actions = {{"ChairBag", function(p, n) placeInBag(p, n) end}}, check = checkPlace},
 }
 
 -- The report ----------------------------------------------------------------------
@@ -1633,8 +1765,23 @@ end
 
 function B:player() return getSpecificPlayer(self.playerNum) end
 
+--- The list's rows: a caption row where the group changes, then the points
+--- ({group = key} or {point = i}); rowOf[i] is point i's row.
+function B:buildRows()
+    self.rows, self.rowOf = {}, {}
+    local was = nil
+    for i, p in ipairs(B.POINTS) do
+        if p.group and p.group ~= was then table.insert(self.rows, {group = p.group}) end
+        was = p.group
+        table.insert(self.rows, {point = i})
+        self.rowOf[i] = #self.rows
+    end
+end
+
 function B:createChildren()
     load()
+    self.sel = savedSel()
+    self:buildRows()
     local c, pad = T.cell, T.pad
     self.headerH = T.sectionH + 4
     self.listW = math.floor(c * 4.6)
@@ -1642,7 +1789,7 @@ function B:createChildren()
     -- (no taller than 12 cells - the list scrolls with the wheel: with every point shown the
     -- window outgrew the screen and covered the game, the author 2026-10-22)
     local footH = (T.fontH(T.fontText) + 2) * 3 + T.fontTileH * 2
-    local listH = self.headerH + pad + #B.POINTS * (self.rowH + 2) + pad + footH
+    local listH = self.headerH + pad + #self.rows * (self.rowH + 2) + pad + footH
     local w, h = math.floor(c * 15), math.max(math.floor(c * 10.5), math.min(listH + pad, math.floor(c * 12)))
     self.listTop = self.headerH + pad
     self.listBottom = h - pad - footH
@@ -1699,14 +1846,18 @@ function B:rowRect(i)
     return {T.pad, self.listTop + (i - 1 - self.scroll) * (self.rowH + 2), self.listW, self.rowH}
 end
 
---- Is point i in the list's window (scrolled to)?
+--- Is row i in the list's window (scrolled to)?
 function B:rowShown(i)
     return i > self.scroll and i <= self.scroll + self.visRows
 end
 
-function B:scrollTo(i)
-    local most = math.max(0, #B.POINTS - self.visRows)
-    if i <= self.scroll then self.scroll = i - 1 elseif i > self.scroll + self.visRows then self.scroll = i - self.visRows end
+function B:scrollTo(point)
+    local i = self.rowOf[point] or point
+    -- (the group's caption shown too when its first point is scrolled to)
+    local cap = self.rows[i - 1]
+    local top = (cap and cap.group) and i - 1 or i
+    local most = math.max(0, #self.rows - self.visRows)
+    if top <= self.scroll then self.scroll = top - 1 elseif i > self.scroll + self.visRows then self.scroll = i - self.visRows end
     self.scroll = math.max(0, math.min(most, self.scroll))
 end
 
@@ -1735,10 +1886,22 @@ function B:prerender()
     end
 
     -- the list: a mark (green works, red broken, grey not yet), the number, the name
-    if self.sel ~= self.shownSel then self.shownSel = self.sel self:scrollTo(self.sel) end
-    for i, p in ipairs(B.POINTS) do
-        if self:rowShown(i) then
-            local r = self:rowRect(i)
+    if self.sel ~= self.shownSel then
+        self.shownSel = self.sel
+        self:scrollTo(self.sel)
+        saveSel(self:point().id)
+    end
+    for ri, row in ipairs(self.rows) do
+        if self:rowShown(ri) and row.group then
+            -- the caption: which report the points below check, and a line after it
+            local r = self:rowRect(ri)
+            local cap = T.fit(T.upper(getText("IGUI_KnoxTB_G_" .. row.group)), T.fontTile, r[3] - 8)
+            local ty = r[2] + r[4] - T.fontTileH - 3
+            T.text(self, cap, r[1] + 2, ty, T.color.accent, T.fontTile)
+            T.rect(self, r[1], r[2] + r[4] - 1, r[3], 1, T.color.accent)
+        elseif self:rowShown(ri) then
+            local i, p = row.point, B.POINTS[row.point]
+            local r = self:rowRect(ri)
             local s = B.state[p.id] or {}
             local on = i == self.sel
             T.rect(self, r[1], r[2], r[3], r[4], on and T.color.header or T.color.cell)
@@ -1753,11 +1916,11 @@ function B:prerender()
         end
     end
     -- the scroll bar: where the shown rows are in the whole list
-    if #B.POINTS > self.visRows then
+    if #self.rows > self.visRows then
         local tx, th = pad + self.listW + 3, self.listBottom - self.listTop
         T.rect(self, tx, self.listTop, 3, th, T.color.cell)
-        local ty = self.listTop + math.floor(th * self.scroll / #B.POINTS)
-        T.rect(self, tx, ty, 3, math.max(8, math.floor(th * self.visRows / #B.POINTS)), T.color.tileEdge)
+        local ty = self.listTop + math.floor(th * self.scroll / #self.rows)
+        T.rect(self, tx, ty, 3, math.max(8, math.floor(th * self.visRows / #self.rows)), T.color.tileEdge)
     end
     local done = 0
     for _, p in ipairs(B.POINTS) do
@@ -1868,9 +2031,9 @@ function B:onMouseDown(x, y)
             return true
         end
     end
-    for i = 1, #B.POINTS do
-        if self:rowShown(i) and T.inRect(x, y, self:rowRect(i)) then
-            self.sel = i
+    for ri, row in ipairs(self.rows) do
+        if row.point and self:rowShown(ri) and T.inRect(x, y, self:rowRect(ri)) then
+            self.sel = row.point
             self:showNote()
             getSoundManager():playUISound("UIActivateButton")
             return true
@@ -1920,7 +2083,7 @@ KnoxWindowDrag.install(B)
 function B:onRightMouseUp(x, y) return true end
 function B:onMouseWheel(del)
     if self:getMouseX() < T.pad + self.listW + 8 then
-        self.scroll = math.max(0, math.min(math.max(0, #B.POINTS - self.visRows), self.scroll + (del > 0 and 1 or -1)))
+        self.scroll = math.max(0, math.min(math.max(0, #self.rows - self.visRows), self.scroll + (del > 0 and 1 or -1)))
     end
     return true
 end

@@ -585,6 +585,13 @@ local function onFillMenu(playerNum, context, items)
         if not KnoxScreen.instance and not (Knox and Knox.open and Knox.open(playerNum)) then return end
         KnoxInspectWindow.open(it, playerNum)
     end)
+    -- The game's own "Inspect" of clothes is its holes-and-patches window: named for what it
+    -- does, so the two "Inspect" are not confused (rama 2026-11-04 looked for mending in Knox's
+    -- 3D one; the author 2026-11-08: keep both, rename the second)
+    local fn = ISInventoryPaneContextMenu and ISInventoryPaneContextMenu.onInspectClothing
+    for _, o in ipairs(fn and context.options or {}) do
+        if o.onSelect == fn then o.name = getText("IGUI_Knox_InspectClothing") end
+    end
 end
 
 Events.OnFillInventoryObjectContextMenu.Add(onFillMenu)

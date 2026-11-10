@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 139
+T.JAVA_NEEDED = 151
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -159,6 +159,10 @@ T.LOOK = {
     {key = "skin.hue", min = 0, max = 355, step = 5, default = 45, unit = "", page = "skin"},
     {key = "skin.sat", min = 0, max = 100, step = 5, default = 45, unit = "%", page = "skin"},
     {key = "skin.val", min = 30, max = 100, step = 5, default = 85, unit = "%", page = "skin"},
+    -- the hotbar outside the inventory: its opacity, and how long it stays up with nothing
+    -- happening before it hides (with "hotbar.hide" on; KnoxHotbar - the author, 2026-11-10)
+    {key = "hotbar.alpha", min = 20, max = 100, step = 5, default = 100, unit = "%"},
+    {key = "hotbar.hideTime", min = 1, max = 30, step = 1, default = 5, unit = ""},
 }
 
 -- (by key: T.look is asked many times a frame - every grid, panel and slot's alpha)
@@ -245,6 +249,10 @@ T.SWITCHES = {
     -- vp.panel  Knox's own crosshair panel in place of Viewpoint's (KnoxCrosshair;
     --           the author, 2026-10-25) - listed only with Viewpoint here
     {key = "vp.panel", default = true, new = true, page = "game", only = "viewpoint"},
+    -- hotbar.hide  the hotbar outside the inventory hides while nothing happens to it and comes
+    --              up when the things in hand change, the mouse comes to its place, the interact
+    --              key is pressed for nothing (KnoxHotbar; the author, 2026-11-10)
+    {key = "hotbar.hide", default = false, new = true},
 }
 
 -- Choices of the inventory in the settings: one of a few values, shown as a row

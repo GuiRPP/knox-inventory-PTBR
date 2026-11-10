@@ -83,7 +83,7 @@ $tx = ($S - ($wK + $sp + $wI)) / 2
 Txt $g "KNOX" "title" $tp $K.bright $tx 44
 Txt $g "INVENTORY" "title" $tp $K.accent ($tx + $wK + $sp) 44
 $ly = 44 + $capH * $tp + 26
-$sub = "TARKOV-STYLE UI OVERHAUL"
+$sub = "COMPLETE UI OVERHAUL"   # was TARKOV-STYLE UI OVERHAUL till 2026-11-09 (the author: the mod is not only about Tarkov)
 $subPx = 34
 $subW = TextW $g $sub "head" $subPx
 Fill $g $K.accent (($S - $subW) / 2 - 70) ($ly + 14) 48 3

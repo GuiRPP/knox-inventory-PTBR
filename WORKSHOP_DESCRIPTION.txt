@@ -1,4 +1,4 @@
-Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+Title: [B42] Knox Inventory - Complete UI Overhaul
 
 [h1]Knox Inventory[/h1]
 [b]The whole Project Zomboid UI, redesigned in the style of Escape From Tarkov - one stage at a time.[/b]

@@ -1,4 +1,4 @@
-Title: [B42] Knox Inventory - Tarkov-style UI Overhaul
+Title: [B42] Knox Inventory - Complete UI Overhaul
 
 [h1]Knox Inventory[/h1]
 [b]Not just a Tarkov-style inventory: one interface for the whole of Project Zomboid, in one style.[/b] Its own fonts, plates, frames, tooltips, cursor and sounds - from your bags to the car's dashboard and the main menu. The inventory is one module of ten, and each can be switched off.

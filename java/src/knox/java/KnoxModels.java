@@ -120,7 +120,9 @@ public class KnoxModels {
     /** Version of the Java part, for the Lua side to check it is loaded. */
     @LuaMethod(name = "knoxJavaVersion", global = true)
     public static String knoxJavaVersion() {
-        return "149";   // 149: knoxKeyName - key hints always in Latin letters, whatever layout the game started with (the author 2026-11-08)
+        return "151";   // 151: knoxUiPartAlpha - one window's own alpha (the hotbar's transparency); knoxContextDoneAt - the interact key did something (the hidden hotbar, the author 2026-11-10)
+                        // 150: the game mode asked by name - 42.22 made getGameMode() return a GameMode, and the menu snapshot stopped being written (NoSuchMethodError); knoxGameMode for Lua's tutorial check (the author's console 2026-11-09)
+                        // 149: knoxKeyName - key hints always in Latin letters, whatever layout the game started with (the author 2026-11-08)
                         // 148: Viewpoint 0.1.7-rc3's use key (G) goes through Knox's crosshair panel; OldPoint's rotation key asked in CameraController now (the author 2026-11-08)
                         // 147: a new jar hash on purpose. A Discord player had a stored ZombieBuddy denial of the v146 jar: its window never came back, and reinstalling the game or the mods does not clear it (the author 2026-11-06)
                         // 146: knoxOpenUrl also opens Knox's Discord invite (the news plate's second button, the author 2026-11-05)

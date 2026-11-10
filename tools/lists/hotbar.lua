@@ -395,8 +395,13 @@ check("no hands: written anew", J.begun == b0 + 1, J.begun - b0)
 Knox.forPlayer = forPlayer0
 settle()
 
--- the Knox screen open: nothing at all
+-- the Knox screen given but not drawn yet: the bar stays (the author 2026-11-10: it went
+-- before the screen came); drawn: nothing at all
 KnoxScreen = {instance = {}}
+local q0 = J.played + D.icons
+frames(1)
+check("the Knox screen not drawn yet: the bar still drawn", J.played + D.icons > q0)
+KnoxScreen.instance.knoxDrawn = true
 local a0, b1, p1 = D.icons, J.begun, J.played
 frames(3)
 check("the Knox screen open: nothing", D.icons == a0 and J.begun == b1 and J.played == p1)
@@ -431,6 +436,151 @@ frames(12)
 knoxListDraw = draw0
 nb, np, ni = counted(3)
 check("a list that fails: Lua from now on", np == 0 and nb == 0 and ni > 0, np)
+
+-- Hiding (the author, 2026-11-10): down after the setting's seconds with nothing happening,
+-- up when the hands' things change, the mouse comes to its place, the interact key did nothing;
+-- the key not when it opened a door, the hero is busy or Viewpoint's panel is up
+T.settings["hotbar.hide"], T.settings["hotbar.hideTime"] = "1", "2"
+DONE, VP, RADIAL = 0, false, nil
+knoxNowMs = function() return clock end
+knoxContextDoneAt = function() return DONE end
+knoxVpPanelShown = function() return VP end
+function getPlayerScreenTop() return 0 end
+function getPlayerScreenHeight() return 1080 end
+function getPlayerHotbar() return hb end
+function hb:getX() return 0 end
+function hb:getY() return 1020 end
+local LASTY = nil
+function hb:setY(y) LASTY = y end
+local SX, SY = 2000, 2000
+function getMouseX() return SX end
+function getMouseY() return SY end
+getCore().isKey = function(self, name, key) return name == "Interact" and key == 33 end
+ISTimedActionQueue = {queues = {}}
+chr.isPerformingAnAction = function() return chr.busy == true end
+chr.isClimbing = function() return false end
+chr.isBlockMovement = function() return false end
+local keyStart = Events.OnKeyStartPressed.list[#Events.OnKeyStartPressed.list]
+local HELD = {}
+isKeyDown = function(k) return HELD[k] == true end
+local function tick(ms)
+    for _ = 1, math.ceil(ms / 16) do
+        clock = clock + 16
+        hb:update()
+    end
+end
+--- The interact key held for `ms` and let go.
+local function hold(key, ms)
+    HELD[key] = true
+    keyStart(key)
+    tick(ms)
+    HELD[key] = nil
+end
+local function up() return (hb.knoxHideP or 0) == 0 end
+local function down() return hb.knoxHideP == 1 end
+hb.knoxAwake = nil
+tick(1500)
+check("hide: up while the seconds go", up(), hb.knoxHideP)
+tick(1000)
+check("hide: down after them", down(), hb.knoxHideP)
+check("hide: lowered under the edge", hb.knoxHideOff == hb.height + 2, hb.knoxHideOff)
+screen = {}
+hb:render()
+check("hide: down, nothing drawn", #screen == 0, #screen)
+chr.hand = item("Knife")
+tick(100)
+check("hide: a thing taken in hand - going up", hb.knoxHideP < 1, hb.knoxHideP)
+tick(300)
+check("hide: a thing taken in hand - up", up(), hb.knoxHideP)
+tick(2500)
+check("hide: down again", down(), hb.knoxHideP)
+hold(33, 300)
+tick(500)
+check("hide: the interact key pressed short - stays down", down(), hb.knoxHideP)
+hold(33, 1000)
+tick(400)
+check("hide: the interact key held for nothing - up", up(), hb.knoxHideP)
+tick(2500)
+HELD[33] = true
+keyStart(33)
+tick(500)
+DONE = clock   -- (held past the game's 0.5 s: it climbed through a window)
+tick(800)
+HELD[33] = nil
+tick(400)
+check("hide: the interact key held and it climbed - stays down", down(), hb.knoxHideP)
+chr.busy = true
+hold(33, 1000)
+tick(400)
+check("hide: the interact key while busy (climbing...) - stays down", down(), hb.knoxHideP)
+chr.busy = false
+VP = true
+hold(33, 1000)
+tick(400)
+check("hide: the interact key with Viewpoint's panel up - stays down", down(), hb.knoxHideP)
+VP = false
+keyStart(30)
+tick(500)
+check("hide: another key - stays down", down(), hb.knoxHideP)
+SX, SY = 100, 1075
+tick(500)
+check("hide: the mouse at its place - up", up(), hb.knoxHideP)
+SX, SY = 2000, 2000
+tick(2500)
+check("hide: the mouse gone - down", down(), hb.knoxHideP)
+hb:attachItem(item("Bat"), hb.availableSlot[1], 1, hb.availableSlot[1].def, true)
+tick(500)
+check("hide: a slot hung - up", up(), hb.knoxHideP)
+tick(2500)
+hb:setSizeAndPosition()
+check("hide: lowered - not kept on the screen by the game", hb.keepOnScreen == false, tostring(hb.keepOnScreen))
+check("hide: lowered under the edge", LASTY == 1020 + hb.height + 2, LASTY)
+-- the slide steps with every frame drawn, not only with the game's (rarer) update
+hb.knoxAwake = clock
+local ys, steps = {}, 0
+for _ = 1, 30 do
+    clock = clock + 16
+    hb:prerender()
+    if ys[#ys] ~= LASTY then ys[#ys + 1] = LASTY end
+end
+check("hide: up by frames drawn alone", up() and LASTY == 1020, tostring(hb.knoxHideP) .. " " .. tostring(LASTY))
+check("hide: up in many small steps", #ys >= 8, #ys)
+check("hide: up - kept on the screen again", hb.keepOnScreen == nil, tostring(hb.keepOnScreen))
+tick(2500)
+local pistol = gun("Pistol", 10, 15)
+chr.hand = pistol
+tick(500)
+tick(2500)
+check("hide: a gun in hand, down again", down(), hb.knoxHideP)
+pistol.ammo = 9
+tick(500)
+check("hide: a shot - stays down (the author 2026-11-10)", down(), hb.knoxHideP)
+KnoxScreen = {instance = {}}
+tick(500)
+chr.hand = item("Axe")
+hb:attachItem(item("Bat"), hb.availableSlot[2], 2, hb.availableSlot[2].def, true)
+tick(500)
+KnoxScreen = nil
+tick(500)
+check("hide: the Knox screen opened, things changed there, shut - stays down", down(), hb.knoxHideP)
+T.settings["anim"] = "0"
+chr.hand = nil
+tick(16)
+check("hide: animations off - up at once", up(), hb.knoxHideP)
+T.settings["anim"] = nil
+T.settings["hotbar.hide"] = nil
+tick(5000)
+check("hide: switched off - never down", up(), hb.knoxHideP)
+-- the bar's transparency: set around its drawing, back to 1 after
+local alphas = {}
+knoxUiPartAlpha = function(a) alphas[#alphas + 1] = a end
+T.settings["hotbar.alpha"] = "50"
+hb:render()
+check("alpha: the bar drawn at the setting's", alphas[1] == 0.5 and alphas[2] == 1, table.concat(alphas, ","))
+T.settings["hotbar.alpha"] = nil
+alphas = {}
+hb:render()
+check("alpha: 100% - left alone", #alphas == 0, #alphas)
 
 T.levelKind = levelKind0
 T.drawText = drawText0

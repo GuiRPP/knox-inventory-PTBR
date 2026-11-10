@@ -1,0 +1,23 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+
+[b]New Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, pick Yes / Allow.[/b]
+
+[h2]The hotbar can step aside[/h2]
+[list]
+[*]New settings in Knox: Look > Hotbar.
+[*][b]Hide the hotbar[/b] (off by default): the hotbar slides down out of sight when you don't use it, and comes back up when the things in your hands change, when the mouse comes to its place at the bottom of the screen, or when you hold the Interact key a little longer than it takes to climb through a window. Choose how many seconds it waits before hiding.
+[*][b]Hotbar opacity[/b]: make the whole hotbar see-through, from 20 to 100%.
+[/list]
+
+[h2]Fixes[/h2]
+[list]
+[*]Game 42.22.2: the menu heroes were no longer saved (new survivors stayed silhouettes, deaths were not noted). Fixed.
+[*]Furniture: "Place" works wherever the item is - in a bag, in your pockets, in your hands, in a container nearby. The Knox screen steps aside and the placing cursor opens.
+[*]Furniture taken out of a backpack to be placed no longer jumps back into the backpack.
+[*]Clothes: the game's window with holes and patches is now called "Holes and patches", with its own icon, right after "Rip" - it was a second "Inspect".
+[*]Item menus: a few options moved to more natural places.
+[*]Sizes of a few more items fixed.
+[*]Opening the inventory: the hotbar no longer vanishes a moment before the screen appears.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

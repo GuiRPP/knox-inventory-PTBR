@@ -41,6 +41,17 @@ local function on()
     return T.on("inventory") and T.switch("home")
 end
 
+--- A line in console.txt, DEV mode only (the author's bench 2026-11-10: eaten or drunk in part,
+--- the thing still lands in a random cell of its bag - the offline test goes home; this shows
+--- where the place is lost in the game).
+function H.trace(item, what)
+    if not (KnoxTestBench and KnoxTestBench.devOn and KnoxTestBench.devOn()) then return end
+    local md = item and item:getModData() or {}
+    local function pl(p) return p and (tostring(p.k) .. " " .. tostring(p.x) .. "," .. tostring(p.y)) or "-" end
+    print("[Knox] home: " .. tostring(item and item:getFullType()) .. " " .. what .. " | knox " .. pl(md.knox)
+        .. " | knoxP " .. pl(md.knoxP) .. " | knoxH " .. pl(md.knoxH))
+end
+
 local function tell(item, key)
     if KnoxNet and KnoxNet.itemChanged then KnoxNet.itemChanged(item, key) end
 end
@@ -55,6 +66,7 @@ local function pockets(c)
 end
 
 local function forget(item)
+    if item:getModData().knoxH then H.trace(item, "forgotten") end
     H.homes[item] = nil
     local md = item:getModData()
     if md.knoxH then
@@ -71,6 +83,9 @@ local function forget(item)
         tell(item, "knox")
     end
 end
+
+--- Not to go back: taken out of its bag for good (KnoxMain's "Place object").
+H.forget = forget
 
 --- The bag with this key ("i<id>") on the character, at any depth, or nil.
 local function bagOn(player, key)
@@ -146,7 +161,13 @@ end
 function H.note(item, player)
     local md = item:getModData()
     local p = md.knox
-    if not p or md.knoxP or md.knoxH or type(p.k) ~= "string" or string.sub(p.k, 1, 1) ~= "i" then return end
+    if not p or md.knoxP or md.knoxH or type(p.k) ~= "string" or string.sub(p.k, 1, 1) ~= "i" then
+        -- (only a thing from a bag kept back by a wanted place: the pockets' own are asked often)
+        if not md.knoxH and md.knoxP and p and type(p.k) == "string" and string.sub(p.k, 1, 1) == "i" then
+            H.trace(item, "not noted, a wanted place")
+        end
+        return
+    end
     if not on() or not player or item:getContainer() ~= player:getInventory() then return end
     -- (only a bag on the character: an apple eaten from a backpack on the ground stays;
     -- asked once a thing and bag - the pockets' grid asks four times a second of all it wears)
@@ -157,6 +178,7 @@ function H.note(item, player)
     end
     md.knoxH = {k = p.k, x = p.x, y = p.y, r = p.r}
     tell(item, "knoxH")
+    H.trace(item, "noted")
     H.homes[item] = true
     H.poke()
 end
@@ -311,6 +333,7 @@ local function check(player)
         if hp and bag and "i" .. tostring(bag:getID()) == hp.k then
             -- put back into its bag by the game itself (after eating or drinking part of it):
             -- the bag's grid puts it home, or as near as it can (KnoxGrid.build - readPlace)
+            H.trace(it, "back by the game")
             KnoxGrid.build(c, player)
             H.homes[it] = nil
             markViews()

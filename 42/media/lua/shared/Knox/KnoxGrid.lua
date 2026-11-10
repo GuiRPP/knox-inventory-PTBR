@@ -1630,6 +1630,11 @@ function KnoxGrid.build(container, player, dry, mayWait)
             if noteHome and not place then
                 for _, it in ipairs(e.items) do noteHome(it, player) end
             end
+            -- (DEV: a thing of the pockets come into a bag with no place for it here - KnoxHome.trace)
+            if not dry and key ~= "p" and KnoxHome and KnoxHome.trace then
+                local k0 = e.item:getModData().knox
+                if k0 and k0.k == "p" then KnoxHome.trace(e.item, "no place in " .. key) end
+            end
             table.insert(homeless, e)
         end
     end

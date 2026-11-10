@@ -814,6 +814,7 @@ local function eased(screen, key, target)
 end
 
 function KnoxScreen:prerender()
+    self.knoxDrawn = true   -- (the hotbar gives way from now on: KnoxHotbar render)
     self:hideDashboard()
     local hb = getPlayerHotbar(self.playerNum)
     if (hb and #hb.availableSlot or 0) ~= self.quickCount

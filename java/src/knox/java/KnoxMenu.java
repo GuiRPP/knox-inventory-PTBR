@@ -114,12 +114,33 @@ public class KnoxMenu {
 
     // ---------------------------------------------------------------- snapshot
 
+    /** The game mode's word ("Apocalypse", "Sandbox", "Tutorial"...) from IsoWorld or Core.
+     *  Asked by name: up to 42.21 getGameMode() gave a String, since 42.22 a GameMode
+     *  whose toString() is the same word, and a call bound to either signature breaks
+     *  on the other game (NoSuchMethodError, the snapshot stopped being written on
+     *  42.22 - the author's console 2026-11-09). "" when it can't be read. */
+    static String gameModeOf(Object owner) {
+        if (owner == null) return "";
+        try {
+            return String.valueOf(owner.getClass().getMethod("getGameMode").invoke(owner));
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** The game mode's word for Lua (its own getCore():getGameMode() is no longer a
+     *  string since 42.22, the tutorial check never matched). */
+    @LuaMethod(name = "knoxGameMode", global = true)
+    public static String knoxGameMode() {
+        return gameModeOf(Core.getInstance());
+    }
+
     /** Write the player's snapshot into the save being played. */
     @LuaMethod(name = "knoxMenuSnapshot", global = true)
     public static boolean knoxMenuSnapshot(IsoPlayer player, String extra) {
         if (player == null || GameClient.client) return false;
         try {
-            played = IsoWorld.instance.getGameMode() + File.separator + IsoWorld.instance.getWorld();
+            played = gameModeOf(IsoWorld.instance) + File.separator + IsoWorld.instance.getWorld();
             ByteBuffer bb = ByteBuffer.allocate(1 << 17);
             bb.putInt(MAGIC);
             bb.putInt(VERSION);

@@ -42,6 +42,32 @@ public class KnoxInput {
         KnoxCursor.hide(open);
     }
 
+    // The game's interact key did something (the author 2026-11-10: the key that calls the
+    // hidden hotbar up must not call it when it opened a door, climbed through a window or
+    // over a fence...): IsoPlayer.doContext is what that key runs - doors, windows, fences,
+    // walls, corners, a car's part - and it answers whether something was done.
+    public static long contextDoneAt;
+
+    /** When the interact key last did something in the world (ms, System.currentTimeMillis). */
+    @LuaMethod(name = "knoxContextDoneAt", global = true)
+    public static double knoxContextDoneAt() {
+        return contextDoneAt;
+    }
+
+    /** The time now, the same clock as knoxContextDoneAt. */
+    @LuaMethod(name = "knoxNowMs", global = true)
+    public static double knoxNowMs() {
+        return System.currentTimeMillis();
+    }
+
+    @Patch(className = "zombie.characters.IsoPlayer", methodName = "doContext")
+    public static class DoContext {
+        @Patch.OnExit
+        public static void exit(@Patch.Return boolean result) {
+            if (result) KnoxInput.contextDoneAt = System.currentTimeMillis();
+        }
+    }
+
     // A key's name for Knox's hints, always in Latin letters (the author 2026-11-08: started
     // with the Russian layout the hints read a Cyrillic letter for F until the game restarts). The game
     // names keys once, at its start, by the layout on then (Keyboard.initKeyNames ->

@@ -60,6 +60,22 @@ function ISHotbar:setSizeAndPosition()
         self:setWidth(self.width + extra)
         self:setX(getPlayerScreenLeft(self.playerNum) + (getPlayerScreenWidth(self.playerNum) - self.width) / 2)
     end
+    -- hidden or on its way: lowered under the screen's edge (see "Hiding" below)
+    self.knoxBaseY = self:getY()
+    if self.knoxHideOff and self.knoxHideOff ~= 0 then self:knoxLower() end
+end
+
+--- The bar at its place lowered by knoxHideOff. (A window of its own is kept on the screen
+--- by the game's setY - getKeepOnScreen: not while lowered, or it stayed where it was and
+--- only its plate was left, the author 2026-11-10.)
+function ISHotbar:knoxLower()
+    local off = self.knoxHideOff or 0
+    if off ~= 0 then
+        self.keepOnScreen = false
+    elseif self.keepOnScreen == false then
+        self.keepOnScreen = nil
+    end
+    if self.knoxBaseY then self:setY(self.knoxBaseY + off) end
 end
 
 -- (the slots are shown in the player's order: KnoxHotbarOrder)
@@ -238,8 +254,12 @@ function ISHotbar:render()
     if (self.playerNum > 0) or JoypadState.players[self.playerNum + 1] then
         self:setVisible(false)   -- as the game does: update() keeps running for refresh()
     end
-    -- the Knox screen has its own quick slots over it
-    if KnoxScreen and KnoxScreen.instance then return end
+    -- the Knox screen has its own quick slots over it - from its first frame drawn, not
+    -- before: the game draws a window it was just given only a frame later, and that frame
+    -- (the slow one, before the screen's first) showed the bar gone and no screen yet (the
+    -- author, 2026-11-10: "first you see it vanish, then the menu opens")
+    local screen = KnoxScreen and KnoxScreen.instance
+    if screen and screen.knoxDrawn then return end
     applySizes(self)
 
     local w, h = self.width, self.height
@@ -539,9 +559,164 @@ local function drawSlotDrag(hb)
     T.tileFrame(hb, x, y, size, size, T.color.accent)
 end
 
+-- Hiding (the author, 2026-11-10: "the hotbar outside the inventory hides while it is not
+-- in use and shows when you switch things, when a new thing comes into your hands, when the
+-- mouse comes over its place... the action key calls it up for a while; down when it hides,
+-- up when it shows; a setting in Knox, and a setting for its transparency").
+-- Every frame update() looks whether something happened to the bar - the hands' things, a
+-- slot hung or emptied, the mouse over its place, something dragged (not while the Knox
+-- screen is open: nothing done there calls it up) - and keeps it up for the setting's seconds after the last of it; then
+-- it slides down under the screen's edge (setSizeAndPosition lowers it by knoxHideOff). The
+-- interact key, held down, calls it up only when it did nothing in the world and nothing was looked at:
+-- no Viewpoint panel up, no Knox window open, the hero not climbing, opening a door, busy
+-- with an action (the author, the same day). Nothing new is made in a frame.
+local HIDE_UP_MS, HIDE_DOWN_MS = 180, 320   -- the slide up / down
+-- The interact key calls it up held down, a little longer than the game's own hold that
+-- climbs through a window or over a fence (IsoPlayer timePressedContext > 0.5 s): a short
+-- press brought it up as the hero climbed (the author, 2026-11-10)
+local KEY_HOLD_MS = 800
+local KEY_DONE_MS = 250   -- (what the key did a moment before it was seen pressed counts too)
+
+local function hideOn() return T.switch("hotbar.hide") end
+
+--- The bar's alpha (the setting, 1 = as it is).
+local function barAlpha() return T.look("hotbar.alpha") / 100 end
+
+local function wake(hb) hb.knoxAwake = getTimestampMs() end
+
+--- Is the hero doing something the interact key may have started (or anything that is not free)?
+local function busy(chr)
+    if chr:isPerformingAnAction() or chr:isClimbing() or chr:isBlockMovement() then return true end
+    local q = ISTimedActionQueue.queues[chr]
+    return q ~= nil and #q.queue > 0
+end
+
+--- Would the interact key be for something else now (a panel at the crosshair, a window)?
+local function keyTaken(hb)
+    if knoxVpPanelShown and knoxVpPanelShown() == true then return true end
+    if KnoxCompat and KnoxCompat.windowOpen and KnoxCompat.windowOpen() then return true end
+    local radial = getPlayerRadialMenu and getPlayerRadialMenu(hb.playerNum)
+    if radial and radial:isReallyVisible() then return true end
+    return busy(hb.chr)
+end
+
+--- What happened to the bar since the last frame: kept up by it.
+local function watch(hb)
+    local chr = hb.chr
+    local p, s = chr:getPrimaryHandItem(), chr:getSecondaryHandItem()
+    local changed = p ~= hb.knoxWatchP or s ~= hb.knoxWatchS
+    hb.knoxWatchP, hb.knoxWatchS = p, s
+    -- the Knox screen open: what is done there does not call the bar up after it shuts
+    -- (the author, 2026-11-10: "no need to show it after every opening of the inventory");
+    -- shots and reloads neither (the same day: "no need when the rounds' count changes")
+    if KnoxScreen and KnoxScreen.instance then return end
+    if changed then wake(hb) end
+    if hb.knoxSlotDrag or hb.knoxHandDrag or ISMouseDrag.dragging or KnoxSlotPicker.instance then
+        wake(hb)
+        return
+    end
+    -- the mouse where the bar stands when it is up
+    local mx, my = getMouseX(), getMouseY()
+    local bottom = getPlayerScreenTop(hb.playerNum) + getPlayerScreenHeight(hb.playerNum)
+    local x = hb:getX()
+    if mx >= x and mx < x + hb.width and my >= bottom - hb.height and my <= bottom then wake(hb) end
+    -- the interact key held: up once held long enough, unless it did something meanwhile
+    local at = hb.knoxKeyAt
+    if at then
+        local now = knoxNowMs()
+        if knoxContextDoneAt() >= at - KEY_DONE_MS or busy(chr) or not isKeyDown(hb.knoxKeyCode) then
+            hb.knoxKeyAt = nil
+        elseif now - at >= KEY_HOLD_MS then
+            hb.knoxKeyAt = nil
+            wake(hb)
+        end
+    end
+end
+
+--- The slide: knoxHideP 0 (up) .. 1 (down), knoxHideOff the pixels it is lowered by.
+-- (a step every frame drawn - prerender - and every update: the game's update runs fewer
+-- times than frames are drawn, and the slide from it went in jerks, the author 2026-11-10;
+-- what happened to the bar is looked at in update only)
+local function slide(hb, watching)
+    local now = getTimestampMs()
+    local dt = now - (hb.knoxHideT or now)
+    hb.knoxHideT = now
+    local p = hb.knoxHideP or 0
+    local down = false
+    if hideOn() then
+        hb.knoxAwake = hb.knoxAwake or now   -- (switched on: up for a while first)
+        if watching then watch(hb) end
+        down = now - hb.knoxAwake > T.look("hotbar.hideTime") * 1000
+    end
+    if down then
+        if p >= 1 then return end
+        p = math.min(1, p + T.anim(dt / HIDE_DOWN_MS))
+    else
+        if p <= 0 then return end
+        p = math.max(0, p - T.anim(dt / HIDE_UP_MS))
+    end
+    hb.knoxHideP = p
+    local off = math.floor((hb.height + 2) * p * p * (3 - 2 * p) + 0.5)
+    if off ~= hb.knoxHideOff then
+        hb.knoxHideOff = off
+        hb:knoxLower()
+    end
+end
+
+-- (keys: the interact key - held, see watch; a hotbar key - up at once)
+local function onKeyStart(key)
+    local hb = getPlayerHotbar and getPlayerHotbar(0)
+    if not hb or not hb.chr or not hideOn() or not knoxNowMs then return end
+    if hb:getSlotForKey(key) ~= -1 then
+        wake(hb)
+    elseif getCore():isKey("Interact", key) and not keyTaken(hb) then
+        hb.knoxKeyAt, hb.knoxKeyCode = knoxNowMs(), key
+    end
+end
+Events.OnKeyStartPressed.Add(onKeyStart)
+
+-- a slot hung, emptied, the slots changed with the clothes: up
+for _, name in ipairs({"attachItem", "removeItem", "refresh"}) do
+    local was = ISHotbar[name]
+    if was then
+        ISHotbar[name] = function(self, ...)
+            if hideOn() and not (KnoxScreen and KnoxScreen.instance) then wake(self) end
+            return was(self, ...)
+        end
+    end
+end
+
+-- (the game's own plate under Knox's - ISPanel:prerender, half black and a grey frame - faded
+-- with the rest, or it stayed dark under a see-through bar)
+local panelPrerender = ISHotbar.prerender
+function ISHotbar:prerender()
+    slide(self, false)
+    if not panelPrerender or (self.knoxHideP or 0) >= 1 then return end
+    local a = barAlpha()
+    if a < 1 and knoxUiPartAlpha then
+        knoxUiPartAlpha(a)
+        local ok, err = pcall(panelPrerender, self)
+        knoxUiPartAlpha(1)
+        if not ok then error(err, 0) end
+    else
+        panelPrerender(self)
+    end
+end
+
 local knoxRender = ISHotbar.render
 function ISHotbar:render()
-    knoxRender(self)
+    -- down under the screen's edge: nothing to draw
+    if (self.knoxHideP or 0) >= 1 and not self.knoxHandDrag then return end
+    -- the bar's transparency (the setting): everything it draws, scaled at once (Java, KnoxUiFade)
+    local a = barAlpha()
+    if a < 1 and knoxUiPartAlpha then
+        knoxUiPartAlpha(a)
+        local ok, err = pcall(knoxRender, self)
+        knoxUiPartAlpha(1)
+        if not ok then error(err, 0) end
+    else
+        knoxRender(self)
+    end
     if not (KnoxScreen and KnoxScreen.instance) then drawSlotDrag(self) end
     local d = self.knoxHandDrag
     if not d then return end
@@ -660,6 +835,7 @@ end
 -- on: off, the game's is the only one there is (QA, 2026-11-04).
 local knoxUpdate = ISHotbar.update
 function ISHotbar:update()
+    slide(self, true)
     knoxUpdate(self)
     if T.on("tooltips") and self.toolRender and self.toolRender:getIsVisible() then self.toolRender:setVisible(false) end
 end

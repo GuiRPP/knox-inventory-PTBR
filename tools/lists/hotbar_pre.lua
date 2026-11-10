@@ -20,6 +20,9 @@ ISHotbar = ISPanel:derive("ISHotbar")
 function ISHotbar:setSizeAndPosition() end
 function ISHotbar:getSlotForKey() return -1 end
 function ISHotbar:update() end
+function ISHotbar:attachItem() end
+function ISHotbar:removeItem() end
+function ISHotbar:refresh() end
 function ISHotbar:render() end
 -- (the game's own)
 function ISHotbar:getSlotIndexAt(x, y)
