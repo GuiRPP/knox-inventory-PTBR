@@ -120,7 +120,9 @@ public class KnoxModels {
     /** Version of the Java part, for the Lua side to check it is loaded. */
     @LuaMethod(name = "knoxJavaVersion", global = true)
     public static String knoxJavaVersion() {
-        return "151";   // 151: knoxUiPartAlpha - one window's own alpha (the hotbar's transparency); knoxContextDoneAt - the interact key did something (the hidden hotbar, the author 2026-11-10)
+        return "153";   // 153: knoxBarCannot - no winter bar and no menu swipe on a Mac (the game's OpenGL 2.1 there) or without OpenGL 3.3: a Mac player's crashes (the author 2026-11-10)
+                        // 152: the DEV reloader - knoxHot* (KnoxHot, KnoxHotEngine, KnoxHotJava): Lua files run again, the texts read again, classes swapped in a game that is going; only where knox_dev.txt is (the author 2026-11-10)
+                        // 151: knoxUiPartAlpha - one window's own alpha (the hotbar's transparency); knoxContextDoneAt - the interact key did something (the hidden hotbar, the author 2026-11-10)
                         // 150: the game mode asked by name - 42.22 made getGameMode() return a GameMode, and the menu snapshot stopped being written (NoSuchMethodError); knoxGameMode for Lua's tutorial check (the author's console 2026-11-09)
                         // 149: knoxKeyName - key hints always in Latin letters, whatever layout the game started with (the author 2026-11-08)
                         // 148: Viewpoint 0.1.7-rc3's use key (G) goes through Knox's crosshair panel; OldPoint's rotation key asked in CameraController now (the author 2026-11-08)

@@ -335,10 +335,38 @@ public final class KnoxBarLua {
         if (frame != null) frame.quality(value);
     }
 
+    // The bar's frame and the menu's swipe are OpenGL 3.3: shaders of their own, vertex arrays,
+    // targets. The game asks GLFW for no version of OpenGL, and macOS gives such a window the old
+    // 2.1 - neither can be drawn there, and on a Mac they only tried and failed on the render
+    // thread, through calls its driver doesn't have (the author, 2026-11-10: a Mac player's game
+    // crashes since the 1.0 beta). On a Mac they aren't tried at all; elsewhere a context found
+    // without 3.3 on the render thread (oldGL) stops them the same way. The menu keeps its camp.
+    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("mac");
+    private static volatile boolean oldGL;
+
+    /** No bar and no swipe here (a Mac, or a context without OpenGL 3.3): the camp only. */
+    @LuaMethod(name = "knoxBarCannot", global = true)
+    public static boolean knoxBarCannot() {
+        return MAC || oldGL;
+    }
+
+    /** Render thread: true if OpenGL 3.3 can't be used, before any call of it. */
+    static boolean glTooOld() {
+        if (MAC || oldGL) return true;
+        try {
+            if (org.lwjgl.opengl.GL.getCapabilities().OpenGL33) return false;
+        } catch (Throwable t) {
+            // (no capabilities on this thread: nothing of ours can be drawn either)
+        }
+        oldGL = true;
+        System.out.println("[Knox] OpenGL 3.3 is not there: the menu has no bar and no swipe");
+        return true;
+    }
+
     /** The video card couldn't do it (see the console): back to the camp. */
     @LuaMethod(name = "knoxBarFailed", global = true)
     public static boolean knoxBarFailed() {
-        return frame != null && frame.failure() != null;
+        return knoxBarCannot() || (frame != null && frame.failure() != null);
     }
 
     @LuaMethod(name = "knoxBarBegin", global = true)
@@ -759,6 +787,7 @@ public final class KnoxBarLua {
     /** The bar's files read in the background, for the next switch to it (the author, 2026-11-02). */
     @LuaMethod(name = "knoxBarPrepare", global = true)
     public static void knoxBarPrepare() {
+        if (knoxBarCannot()) return;   // (a bar that can't be drawn: nothing of it into memory)
         findPack();
         KnoxBarFrame.prepare(KnoxBarLua::find);
     }
@@ -772,7 +801,7 @@ public final class KnoxBarLua {
     /** The video card refused it: the old dark instead. */
     @LuaMethod(name = "knoxMenuSwipeFailed", global = true)
     public static boolean knoxMenuSwipeFailed() {
-        return KnoxMenuSwipe.failed();
+        return knoxBarCannot() || KnoxMenuSwipe.failed();
     }
 
     /** Everything the frame holds, off the video card: the menu is gone. */

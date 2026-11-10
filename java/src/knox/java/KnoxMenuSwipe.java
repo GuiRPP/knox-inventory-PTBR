@@ -63,7 +63,12 @@ public final class KnoxMenuSwipe {
 
     private static void run(float k, int dir, boolean coming, float blur) {
         if (failed) return;
-        int draw = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), read = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
+        // (no OpenGL 3.3, a Mac: not one call of it, the state given back included - 2026-11-10)
+        if (KnoxBarLua.glTooOld()) {
+            fail("OpenGL 3.3 is not there");
+            return;
+        }
+        int draw =glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), read = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
         glGetIntegerv(GL_VIEWPORT, VIEW);
         int x = VIEW[0], y = VIEW[1], w = VIEW[2], h = VIEW[3];
         if (w <= 0 || h <= 0) return;   // (the window minimised)

@@ -1984,5 +1984,15 @@
     "IGUI_KnoxTB_home_save_Want": "After the load the silhouette is there, the flashlight goes back to its cell.",
     "IGUI_KnoxTB_home_off": "The switch",
     "IGUI_KnoxTB_home_off_Do": "Game > Put things back: off, repeat the first point. Then switch it on again.",
-    "IGUI_KnoxTB_home_off_Want": "Off: no silhouette, the flashlight stays in the pockets, as before."
+    "IGUI_KnoxTB_home_off_Want": "Off: no silhouette, the flashlight stays in the pockets, as before.",
+    "IGUI_KnoxHot_Updated": "Updated: %1",
+    "IGUI_KnoxHot_Error": "Error in %1 (the file ran up to it):",
+    "IGUI_KnoxHot_Lang": "Texts read again",
+    "IGUI_KnoxHot_Java": "Java: classes swapped - %1",
+    "IGUI_KnoxHot_JavaSame": "Java: nothing new",
+    "IGUI_KnoxHot_Restart": "Restart needed: %1",
+    "IGUI_KnoxHot_Shape": "%1 - a method, field or lambda added or removed: plain Java swaps only the insides of methods (or start the game with tools\\hot\\run_jbr.ps1)",
+    "IGUI_KnoxHot_Patch": "%1 - the patch can't be written into the game's class again",
+    "IGUI_KnoxHot_Package": "%1 - not in Knox's package",
+    "IGUI_KnoxHot_Retry": "The Knox screen failed to open earlier - on again"
 }

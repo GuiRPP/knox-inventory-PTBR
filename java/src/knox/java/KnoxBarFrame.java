@@ -552,6 +552,11 @@ public final class KnoxBarFrame {
     /** Into our frame, cleared. The heroes the game draws next land in it. */
     public void begin() {
         if (failure != null || released) return;
+        // (no OpenGL 3.3, a Mac: not one call of it - KnoxBarLua.glTooOld, 2026-11-10)
+        if (KnoxBarLua.glTooOld()) {
+            fail(new IllegalStateException("OpenGL 3.3 is not there"));
+            return;
+        }
         // (an end() that never came, the game's drawing threw in between: we are still bound,
         // what was saved before stands - QA, 2026-10-31)
         if (!began) {

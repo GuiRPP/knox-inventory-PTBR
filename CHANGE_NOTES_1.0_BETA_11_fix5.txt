@@ -1,0 +1,11 @@
+[h1]Knox Inventory 1.0 BETA: a small fix[/h1]
+
+[b]New Java part: when ZombieBuddy asks about KnoxInventoryJava.jar, pick Yes / Allow.[/b]
+
+[h2]Mac[/h2]
+[list]
+[*]On a Mac the game runs on an old version of OpenGL, and the winter bar in the main menu (and the slide between the menus on Tab) can't be drawn there. Knox still tried, and that could crash the game. Now on a Mac the main menu simply stays at the campfire, and Tab doesn't switch to the bar. Nothing changes on Windows or Linux.
+[*]If your game still crashes on a Mac, send us console.txt from your Zomboid folder and the hs_err_pid file the crash leaves behind - in the game's folder or your home folder.
+[/list]
+
+Join us on [url=https://discord.gg/HKpREqdDqD]Discord[/url].

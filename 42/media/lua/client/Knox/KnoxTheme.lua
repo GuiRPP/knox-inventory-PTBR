@@ -18,7 +18,7 @@ T.MOD_ID = KnoxModId or "KnoxInventory"
 -- the game is replaced - the player gets the game's own UI and a message.
 -- (raised with every change of the jar: Lua of one release with the jar of
 -- another, both "22", failed on calls the older jar lacked - 0.9.5, 14.10.2026)
-T.JAVA_NEEDED = 151
+T.JAVA_NEEDED = 153
 T.javaVersion = knoxJavaVersion and tonumber(knoxJavaVersion()) or nil
 T.active = T.javaVersion ~= nil and T.javaVersion >= T.JAVA_NEEDED
 
@@ -102,17 +102,27 @@ end
 -- so there it is back. (A player with the menus only saw Knox at half the game's calls in a
 -- profiler - near-empty handlers, but none of them had any reason to run: 2026-11-06.)
 local offInGame = {}
-function T.offInGame(event, fn, ...)
-    table.insert(offInGame, {event = event, fn = fn, keep = {...}})
-end
-Events.OnGameStart.Add(function()
+local function anyGameModule()
     local any = false
     for _, name in ipairs(T.MODULE_GROUPS[1].list) do any = any or T.on(name) end
-    for _, o in ipairs(offInGame) do
-        local keep = false
-        for _, name in ipairs(o.keep) do keep = keep or T.on(name) or (name == "game" and any) end
-        if not keep then o.event.Remove(o.fn) end
-    end
+    return any
+end
+local function takeOff(o, any)
+    local keep = false
+    for _, name in ipairs(o.keep) do keep = keep or T.on(name) or (name == "game" and any) end
+    if not keep then o.event.Remove(o.fn) end
+end
+function T.offInGame(event, fn, ...)
+    local o = {event = event, fn = fn, keep = {...}}
+    -- (a file run again in a game that has started - the DEV reloader: off at once, as it was
+    -- at the start; otherwise its handler would be back. 2026-11-10)
+    if T.gameStarted then takeOff(o, anyGameModule()) return end
+    table.insert(offInGame, o)
+end
+Events.OnGameStart.Add(function()
+    T.gameStarted = true
+    local any = anyGameModule()
+    for _, o in ipairs(offInGame) do takeOff(o, any) end
     offInGame = {}
 end)
 

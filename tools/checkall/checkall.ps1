@@ -29,4 +29,5 @@ foreach ($s in 'footprint', 'order', 'home', 'search', 'saveguard', 'net', 'carr
     $lines = ($out -split "`r?`n") | Where-Object { $_ -match 'pass|FAIL|rror' -and $_ -notmatch 'NativeCommandError' }   # (not a JVM's warning on stderr as PowerShell 5.1 wraps it)
     "${s}: " + ($lines -join ' | ')
 }
+"hot: " + ((& (Join-Path $mod 'tools\hot\test.ps1') -brief 2>&1 | ForEach-Object { "$_" }) -join ' | ')   # (the DEV reloader, 2026-11-10: its own short form - its passes are many)
 "uilint: " + ((& (Join-Path $mod 'tools\uilint\uilint.ps1') 2>&1 | Select-Object -Last 1) -join ' ')

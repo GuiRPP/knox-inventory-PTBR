@@ -3337,6 +3337,8 @@ function KnoxMenuScene.createScene(hid)
     -- the camp, or the bar in winter (KnoxMenuPlace; Tab switches them). A bar
     -- that can't be built leaves the menu its camp.
     local place = "camp"
+    -- (no bar at all where its OpenGL 3.3 can't be: a Mac - knoxBarCannot, 2026-11-10)
+    if knoxBarCannot and knoxBarCannot() then KnoxMenuScene.barFailed = true end
     if KnoxMenuPlace and KnoxMenuBar and not KnoxMenuScene.barFailed then
         local okPlace, kept = pcall(KnoxMenuPlace.current)
         if okPlace and kept then place = kept end
